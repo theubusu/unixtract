@@ -1,14 +1,15 @@
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path};
-use std::io::{Write};
+use std::io::{Write, Cursor};
 use lz4::block::decompress;
+use lzma_rs::lzma_decompress;
 use crate::common;
 
 pub fn is_mstar_file(file: &File) -> bool {
     let header = common::read_file(&file, 0, 32768).expect("Failed to read from file.");
     let header_string = String::from_utf8_lossy(&header);
 
-    if header_string.contains("filepartload") & header_string.contains("MstarUpgrade") | header_string.contains("CtvUpgrade") {
+    if header_string.contains("filepartload") & header_string.contains("MstarUpgrade") | header_string.contains("CtvUpgrade") | header_string.contains("LetvUpgrade"){
         true
     } else {
         false
@@ -23,6 +24,14 @@ fn parse_number(s: &str) -> Option<u64> {
     }
 }
 
+fn decompress_lzma(compressed_data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let mut input = Cursor::new(compressed_data);
+    let mut output = Vec::new();
+    
+    lzma_decompress(&mut input, &mut output)?;
+    Ok(output)
+}
+
 fn decompress_lz4(compressed_data: &[u8], original_size: i32) -> Result<Vec<u8>, std::io::Error> {
     match decompress(compressed_data, Some(original_size)) {
         Ok(decompressed) => Ok(decompressed),
@@ -32,6 +41,7 @@ fn decompress_lz4(compressed_data: &[u8], original_size: i32) -> Result<Vec<u8>,
 
 pub fn extract_mstar(file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
     println!();
+
     let mut script = common::read_file(&file, 0, 32768)?;
 
     if let Some(pos) = script.iter().position(|x| [0x00, 0xFF].contains(x)) {
@@ -40,11 +50,15 @@ pub fn extract_mstar(file: &File, output_folder: &str) -> Result<(), Box<dyn std
 
     let mut script_string = String::from_utf8_lossy(&script);
     //println!("{}", script_string);
-
     if script_string == "" {
-        //try ts hisense
+        //try for hisense
         println!("Failed to get script at 0x0, trying 0x1000...");
         script = common::read_file(&file, 4096, 32768)?;
+
+        if let Some(pos) = script.iter().position(|x| [0x00, 0xFF].contains(x)) {
+            script.truncate(pos);
+        }
+
         script_string = String::from_utf8_lossy(&script);
 
         if script_string == "" {
@@ -77,15 +91,26 @@ pub fn extract_mstar(file: &File, output_folder: &str) -> Result<(), Box<dyn std
                 let mut j = i + 1;
                 while j < lines.len() && !lines[j].starts_with("filepartload") {
                     //get compression method
-                    if lines[j].contains("mscompress7") {
-                        compression = "lzma";
-                    } else if lines[j].contains("lz4") {
-                        compression = "lz4";
+                    if lines[j].starts_with("mscompress7"){
+                        if compression == "none" {
+                            compression = "lzma";
+                        } else if compression == "lzma" {
+                            //thank the turks
+                            compression = "double_lzma";
+                        }
                     }
-
                     if lines[j].starts_with("lz4"){
+                        compression = "lz4";
                         let parts: Vec<&str> = lines[j].split_whitespace().collect();
                         lz4_expect_size = parse_number(parts[5]).unwrap_or(0);
+                    }
+                    if lines[j].starts_with("mmc unlzo"){
+                        compression = "lzo";
+                        let parts: Vec<&str> = lines[j].split_whitespace().collect();
+                        // get part name from mmc unlzo
+                        if partname == "unknown" {
+                            partname = parts[4]
+                        }
                     }
 
                     // check if its boot partition
@@ -106,40 +131,51 @@ pub fn extract_mstar(file: &File, output_folder: &str) -> Result<(), Box<dyn std
                     j += 1;
                 }
 
-                println!("offset: {} size: {} --> {} (compression: {})", offset, size, partname, compression);
+                println!("Part - Offset: {}, Size: {} --> {}.bin", offset, size, partname);
 
-                let data = common::read_file(&file, offset, size.try_into().unwrap())?;
-
-                //println!("{:02x?}", &data[0]);
-                //println!("{}", data.len());
-
-                let out_data;
-
-                if compression == "lzma" {
-                    // TODO: do lzma decompression
-                    out_data = data;
-                } else if compression == "lz4" {
-                    println!("- Decompressing lz4, expected size: {}", lz4_expect_size);
-                    out_data = decompress_lz4(&data, lz4_expect_size.try_into().unwrap())?;
-                    //out_data = data;
+                if partname == "unknown"{
+                    println!("- Unknown destination, skipping!");
                 } else {
-                    out_data = data;
-                }
+                    let data = common::read_file(&file, offset, size.try_into().unwrap())?;
+                    let out_data;
 
-                let output_path = Path::new(&output_folder).join(partname.to_owned() + ".bin");
+                    if compression == "lzma" {
+                        println!("- Decompressing LZMA...");
+                        out_data = decompress_lzma(&data)?;
+                    } else if compression == "double_lzma" {
+                        println!("- Decompressing LZMA (Pass 1)...");
+                        let pass_1 = decompress_lzma(&data)?;
+                        println!("- Decompressing LZMA (Pass 2)...");
+                        out_data = decompress_lzma(&pass_1)?;
+                    } else if compression == "lz4" {
+                        println!("- Decompressing lz4, expected size: {}", lz4_expect_size);
+                        out_data = decompress_lz4(&data, lz4_expect_size.try_into().unwrap())?;
+                    } else if compression == "lzo" {
+                        //TODO: add lzo
+                        println!("- Decompressing lzo...");
+                        out_data = data;
+                    }else {
+                        out_data = data;
+                    }
 
-                fs::create_dir_all(&output_folder)?;
-                let mut out_file = OpenOptions::new()
-                    .append(true)
-                    .create(true)
-                    .open(output_path)?;
+                    let output_path = Path::new(&output_folder).join(partname.to_owned() + ".bin");
 
-                out_file.write_all(&out_data)?;
+                    fs::create_dir_all(&output_folder)?;
+                    let mut out_file = OpenOptions::new()
+                        .append(true)
+                        .create(true)
+                        .open(output_path)?;
+
+                    out_file.write_all(&out_data)?;
+                }        
             }
         }
 
         i += 1;
     }
+
+    println!();
+    println!("Extraction finished!");
 
     Ok(())
 }
