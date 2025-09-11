@@ -27,15 +27,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         //println!("file");
         let file = File::open(path)?;
 
+        println!();
+
         if formats::mstar::is_mstar_file(&file) {
             println!("Mstar upgrade file detected!");
-            formats::mstar::extract_mstar(&file);
+            formats::mstar::extract_mstar(&file, &output_path)?;
         } else {
             println!("File format not recognized!");
         }
     }
-
-    
 
     Ok(())
 }
