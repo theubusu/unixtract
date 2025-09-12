@@ -3,13 +3,14 @@ use std::path::{Path};
 use std::io::{Write, Cursor};
 use lz4::block::decompress;
 use lzma_rs::lzma_decompress;
+
 use crate::common;
 
 pub fn is_mstar_file(file: &File) -> bool {
     let header = common::read_file(&file, 0, 32768).expect("Failed to read from file.");
     let header_string = String::from_utf8_lossy(&header);
 
-    if header_string.contains("filepartload") & header_string.contains("MstarUpgrade") | header_string.contains("CtvUpgrade") | header_string.contains("LetvUpgrade"){
+    if header_string.contains("filepartload"){
         true
     } else {
         false
@@ -40,7 +41,6 @@ fn decompress_lz4(compressed_data: &[u8], original_size: i32) -> Result<Vec<u8>,
 }
 
 pub fn extract_mstar(file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
-    println!();
 
     let mut script = common::read_file(&file, 0, 32768)?;
 
@@ -89,6 +89,7 @@ pub fn extract_mstar(file: &File, output_folder: &str) -> Result<(), Box<dyn std
                 let mut compression = "none";
                 let mut lz4_expect_size = 0;
                 let mut j = i + 1;
+                // get lines after this filepartload, before the next one
                 while j < lines.len() && !lines[j].starts_with("filepartload") {
                     //get compression method
                     if lines[j].starts_with("mscompress7"){
@@ -116,7 +117,7 @@ pub fn extract_mstar(file: &File, output_folder: &str) -> Result<(), Box<dyn std
                     // check if its boot partition
                     if lines[j].starts_with("mmc write.boot") {
                         if partname == "unknown" {
-                            partname = "boot"
+                            partname = "_mmc_boot"
                         }
                     }
 
@@ -131,7 +132,7 @@ pub fn extract_mstar(file: &File, output_folder: &str) -> Result<(), Box<dyn std
                     j += 1;
                 }
 
-                println!("Part - Offset: {}, Size: {} --> {}.bin", offset, size, partname);
+                println!("Part - Offset: {}, Size: {} --> {}", offset, size, partname);
 
                 if partname == "unknown"{
                     println!("- Unknown destination, skipping!");
@@ -151,8 +152,8 @@ pub fn extract_mstar(file: &File, output_folder: &str) -> Result<(), Box<dyn std
                         println!("- Decompressing lz4, expected size: {}", lz4_expect_size);
                         out_data = decompress_lz4(&data, lz4_expect_size.try_into().unwrap())?;
                     } else if compression == "lzo" {
-                        //TODO: add lzo
-                        println!("- Decompressing lzo...");
+                        // nothing in rust to parse lzo file with header
+                        println!("- lzo compression is not supported yet!!...");
                         out_data = data;
                     }else {
                         out_data = data;

@@ -22,18 +22,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let path = PathBuf::from(target_path);
     if path.is_dir() {
-        println!("Directory");
+        if formats::samsung_old::is_samsung_old_dir(&path) {
+            println!("Samsung old firmware dir detected!");
+            println!();
+            formats::samsung_old::extract_samsung_old(&path, &output_path)?
+        } else {
+            println!("Input format not recognized!");
+        }
     } else {
-        //println!("file");
         let file = File::open(path)?;
 
         println!();
 
         if formats::mstar::is_mstar_file(&file) {
             println!("Mstar upgrade file detected!");
+            println!();
             formats::mstar::extract_mstar(&file, &output_path)?;
         } else {
-            println!("File format not recognized!");
+            println!("Input format not recognized!");
         }
     }
 
