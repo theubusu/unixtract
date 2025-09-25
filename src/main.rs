@@ -34,7 +34,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         println!();
 
-        if formats::mstar::is_mstar_file(&file) {
+        if formats::tpv_timg::is_tpv_timg_file(&file) {
+            println!("TPV TIMG file detected!");
+            println!();
+            formats::tpv_timg::extract_tpv_timg(&file, &output_path)?;
+        } else if formats::mstar::is_mstar_file(&file) {
             println!("Mstar upgrade file detected!");
             println!();
             formats::mstar::extract_mstar(&file, &output_path)?;

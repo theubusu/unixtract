@@ -147,6 +147,8 @@ pub fn extract_samsung_old(path: &PathBuf, output_folder: &str) -> Result<(), Bo
         }
     }
 
+    println!();
+    println!("Extraction finished!");
 
     Ok(())
 }
