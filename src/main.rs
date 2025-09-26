@@ -1,8 +1,9 @@
+mod common;
+mod formats;
+
 use clap::Parser;
 use std::path::{PathBuf};
 use std::fs::{File};
-mod formats;
-mod common;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -38,6 +39,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("TPV TIMG file detected!");
             println!();
             formats::tpv_timg::extract_tpv_timg(&file, &output_path)?;
+        } else if formats::pfl_upg::is_pfl_upg_file(&file) {
+            println!("PFL UPG file detected!");
+            println!();
+            formats::pfl_upg::extract_pfl_upg(&file, &output_path)?;
         } else if formats::mstar::is_mstar_file(&file) {
             println!("Mstar upgrade file detected!");
             println!();
