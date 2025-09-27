@@ -15,4 +15,3 @@ flate2 = "1.0"
 rsa = { version = "0.9", features = ["hazmat"] }
 hex = "0.4"
 ecb = "0.1"
-block-padding = "0.3"

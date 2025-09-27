@@ -644,7 +644,6 @@ name = "unixtract"
 version = "0.1.0"
 dependencies = [
  "aes",
- "block-padding",
  "cbc",
  "clap",
  "ecb",
