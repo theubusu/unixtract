@@ -132,28 +132,28 @@ pub fn extract_mstar(file: &File, output_folder: &str) -> Result<(), Box<dyn std
                     j += 1;
                 }
 
-                println!("Part - Offset: {}, Size: {} --> {}", offset, size, partname);
+                println!("- Part: Offset: {}, Size: {} --> {}", offset, size, partname);
 
                 if partname == "unknown"{
-                    println!("- Unknown destination, skipping!");
+                    println!("-- Unknown destination, skipping!");
                 } else {
                     let data = common::read_file(&file, offset, size.try_into().unwrap())?;
                     let out_data;
 
                     if compression == "lzma" {
-                        println!("- Decompressing LZMA...");
+                        println!("-- Decompressing LZMA...");
                         out_data = decompress_lzma(&data)?;
                     } else if compression == "double_lzma" {
-                        println!("- Decompressing LZMA (Pass 1)...");
+                        println!("-- Decompressing LZMA (Pass 1)...");
                         let pass_1 = decompress_lzma(&data)?;
-                        println!("- Decompressing LZMA (Pass 2)...");
+                        println!("-- Decompressing LZMA (Pass 2)...");
                         out_data = decompress_lzma(&pass_1)?;
                     } else if compression == "lz4" {
-                        println!("- Decompressing lz4, expected size: {}", lz4_expect_size);
+                        println!("-- Decompressing lz4, expected size: {}", lz4_expect_size);
                         out_data = decompress_lz4(&data, lz4_expect_size.try_into().unwrap())?;
                     } else if compression == "lzo" {
                         // nothing in rust to parse lzo file with header
-                        println!("- lzo compression is not supported yet!!...");
+                        println!("-- lzo compression is not supported yet!!...");
                         out_data = data;
                     }else {
                         out_data = data;

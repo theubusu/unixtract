@@ -70,17 +70,17 @@ pub fn extract_tpv_timg(mut file: &File, output_folder: &str) -> Result<(), Box<
         //actual data
         let data = common::read_exact(&mut file, size as usize)?;
 
-        println!("PIMG - Name: {} Size: {} Dest: {} Compression: {}", name, size, dev, comp_type);
+        println!("- PIMG: Name: {} Size: {} Dest: {} Compression: {}", name, size, dev, comp_type);
 
         let out_data;
 
         if comp_type == "gzip" {
-            println!("- Decompressing gzip...");
+            println!("-- Decompressing gzip...");
             out_data = decompress_gzip(&data)?;
         } else if comp_type == "none" {
             out_data = data;
         } else {
-            println!("- Warning: unsupported compression type!");
+            println!("-- Warning: unsupported compression type!");
             out_data = data;
         }
 
@@ -88,13 +88,13 @@ pub fn extract_tpv_timg(mut file: &File, output_folder: &str) -> Result<(), Box<
 
         fs::create_dir_all(&output_folder)?;
         let mut out_file = OpenOptions::new()
-            .append(true)
+            .write(true)
             .create(true)
             .open(output_path)?;
 
         out_file.write_all(&out_data)?;
 
-        println!("- Saved file!");
+        println!("-- Saved file!");
     }
 
     println!();

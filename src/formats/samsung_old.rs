@@ -85,7 +85,7 @@ pub fn extract_samsung_old(path: &PathBuf, output_folder: &str) -> Result<(), Bo
                     let file = File::open(&path)?;
                     let filename = path.file_name().unwrap().to_str().unwrap();
                     let file_size = file.metadata()?.len();
-                    println!("File: {}", filename);
+                    println!("- File: {}", filename);
                     let data = common::read_file(&file, 0, file_size.try_into().unwrap())?;
                     let salt = &data[8..16];
 
@@ -126,10 +126,10 @@ pub fn extract_samsung_old(path: &PathBuf, output_folder: &str) -> Result<(), Bo
                     //println!("IV: {:02x?}", iv_md5);
 
                     let end = file_size - 260;
-                    println!("- Decrypting file...");
+                    println!("-- Decrypting file...");
                     let decrypted_data = decrypt_aes(&data[16..end.try_into().unwrap()], &key_md5, &iv_md5)?;
 
-                    println!("- DeXORing file...");
+                    println!("-- DeXORing file...");
                     let xor_key = fw_info.split_whitespace().next().unwrap();
                     let out_data = decrypt_xor(&decrypted_data, xor_key);
                     
@@ -137,7 +137,7 @@ pub fn extract_samsung_old(path: &PathBuf, output_folder: &str) -> Result<(), Bo
 
                     fs::create_dir_all(&output_folder)?;
                     let mut out_file = OpenOptions::new()
-                        .append(true)
+                        .write(true)
                         .create(true)
                         .open(output_path)?;
 
