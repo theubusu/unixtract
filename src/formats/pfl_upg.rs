@@ -61,41 +61,30 @@ fn decrypt_aes256_ecb(key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, Box<dyn 
 }
 
 pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
-    //2SWU3TXV magic
-    let _ = common::read_exact(&mut file, 8)?;
+    let _ = common::read_exact(&mut file, 8)?; //2SWU3TXV magic
 
-    //header size
     let header_size_bytes = common::read_exact(&mut file, 4)?;
     let header_size = u32::from_le_bytes(header_size_bytes.try_into().unwrap());
 
-    //data size
     let data_size_bytes = common::read_exact(&mut file, 4)?;
     let data_size = u32::from_le_bytes(data_size_bytes.try_into().unwrap());
 
-    //crc32
-    let _ = common::read_exact(&mut file, 4)?;
+    let _crc32 = common::read_exact(&mut file, 4)?;
 
-    //mask
     let mask_bytes = common::read_exact(&mut file, 4)?;
     let mask = u32::from_le_bytes(mask_bytes.try_into().unwrap());
 
-    //data size decompressed
-    let _ = common::read_exact(&mut file, 4)?;
+    let _data_size_decompressed = common::read_exact(&mut file, 4)?;
 
-    //padding2?
-    let _ = common::read_exact(&mut file, 4)?;
+    let _padding2 = common::read_exact(&mut file, 4)?;
 
-    //description
     let description_bytes = common::read_exact(&mut file, 512)?;
     let description = common::string_from_bytes(&description_bytes);
     
-    //signature
     let signature = common::read_exact(&mut file, 128)?;
 
-    //unknown
-    let _ = common::read_exact(&mut file, 32)?;
+    let _ = common::read_exact(&mut file, 32)?; //unknown
 
-    //version string
     let version_bytes = common::read_exact(&mut file, header_size as usize - 704)?;
     let version = common::string_from_bytes(&version_bytes);
 

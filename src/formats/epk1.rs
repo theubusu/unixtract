@@ -22,7 +22,6 @@ struct Pak {
 }
 
 pub fn extract_epk1(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
-
     //check type of epk1
     let epk1_type;
     let init_pak_count_bytes = common::read_file(&file, 8, 4)?;
@@ -46,14 +45,11 @@ pub fn extract_epk1(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
     let mut paks: Vec<Pak> = Vec::new();
 
     if epk1_type == "be" {
-        //epak magic
-        let _epak = common::read_exact(&mut file, 4)?;
+        let _epak = common::read_exact(&mut file, 4)?; //epak magic
 
-        //file size
         let file_size_bytes = common::read_exact(&mut file, 4)?;
         let file_size = u32::from_be_bytes(file_size_bytes.try_into().unwrap());
 
-        //pak count
         let pak_count_bytes = common::read_exact(&mut file, 4)?;
         let pak_count = u32::from_be_bytes(pak_count_bytes.try_into().unwrap());
 
@@ -79,14 +75,11 @@ pub fn extract_epk1(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
                 file_size, pak_count, version[1], version[2], version[3]);
 
     } else if epk1_type == "le" {
-        //epak magic
-        let _epak = common::read_exact(&mut file, 4)?;
+        let _epak = common::read_exact(&mut file, 4)?; //epak magic
 
-        //file size
         let file_size_bytes = common::read_exact(&mut file, 4)?;
         let file_size = u32::from_le_bytes(file_size_bytes.try_into().unwrap());
 
-        //pak count
         let pak_count_bytes = common::read_exact(&mut file, 4)?;
         let pak_count = u32::from_le_bytes(pak_count_bytes.try_into().unwrap());
 

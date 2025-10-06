@@ -39,6 +39,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("TPV TIMG file detected!");
             println!();
             formats::tpv_timg::extract_tpv_timg(&file, &output_path)?;
+        } else if formats::novatek::is_novatek_file(&file) {
+            println!("Novatek file detected!");
+            println!();
+            formats::novatek::extract_novatek(&file, &output_path)?;
         } else if formats::epk1::is_epk1_file(&file) {
             println!("EPK1 file detected!");
             println!();
