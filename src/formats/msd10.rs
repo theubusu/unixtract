@@ -11,7 +11,6 @@ use crate::common;
 
 pub fn is_msd10_file(file: &File) -> bool {
     let header = common::read_file(&file, 0, 6).expect("Failed to read from file.");
-
     if header == b"MSDU10" {
         true
     } else {
@@ -28,14 +27,15 @@ struct Section {
 
 //fw name, type, key
 static KEYS: &[(&str, &str, &str)] = &[
-    ("T-NT14M", "old", "95d01e0bae861a05695bc8a6edb2ea835a09accd"),
-    ("T-HKM", "tizen", "1ac8989ff57db5e75ea67b033050871c"),
+    ("T-NT14M", "old",   "95d01e0bae861a05695bc8a6edb2ea835a09accd"),
+    ("T-HKM",   "tizen", "1ac8989ff57db5e75ea67b033050871c"),
+    ("T-HKP",   "tizen", "cce8a3ef92f3e94895999e928f4dd6c3"),
 ];
 
 fn decrypt_aes_salted_old(encrypted_data: &[u8], passphrase_bytes: &Vec<u8>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut data = encrypted_data.to_vec();
 
-    assert!(String::from_utf8(data[0..8].to_vec())? == "Salted__", "invalid encrypted data!");
+    assert!(data[0..8].to_vec() == b"Salted__", "invalid encrypted data!");
     let salt = &data[8..16];
 
     //key = md5 of (passphrase + salt)
@@ -61,7 +61,7 @@ fn decrypt_aes_salted_old(encrypted_data: &[u8], passphrase_bytes: &Vec<u8>) -> 
 fn decrypt_aes_salted_tizen(encrypted_data: &[u8], passphrase_bytes: &Vec<u8>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut data = encrypted_data.to_vec();
 
-    assert!(String::from_utf8(data[0..8].to_vec())? == "Salted__", "invalid encrypted data!");
+    assert!(data[0..8].to_vec() == b"Salted__", "invalid encrypted data!");
     let salt = &data[8..16];
 
     //iv = md5 of salt
@@ -93,7 +93,7 @@ pub fn extract_msd10(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
 
     let section_count_bytes = common::read_exact(&mut file, 4)?;
     let section_count = u32::from_le_bytes(section_count_bytes.try_into().unwrap());
-    println!("Number of sections: {}", section_count);
+    println!("\nNumber of sections: {}", section_count);
 
     let mut sections: Vec<Section> = Vec::new();
 
@@ -158,7 +158,7 @@ pub fn extract_msd10(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
     if let Some(p) = passphrase {
         println!("Passphrase: {}", p);
         passphrase_bytes = hex::decode(p)?;
-        println!("Firmware type: {}\n", firmware_type);
+        println!("Firmware type: {}", firmware_type);
     } else {
         println!("Sorry, this firmware is not supported!");
         std::process::exit(1);
@@ -191,11 +191,13 @@ pub fn extract_msd10(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
 
             toc_reader.seek(SeekFrom::Current(13))?; //unknown
 
-            println!("- Extracting section {}: {}...", sections[i as usize].index, name);
+            println!("\nSection {}: {}", sections[i as usize].index, name);
 
             let offset = sections[i as usize].offset;
             let size = sections[i as usize].size;
             let encrypted_data = common::read_file(&file, offset as u64, size as usize)?;
+
+            println!("- Decrypting...");
             let decrypted_data = decrypt_aes_tizen(&encrypted_data, &passphrase_bytes, &salt)?;
 
             let output_path = Path::new(&output_folder).join(name);
@@ -242,17 +244,19 @@ pub fn extract_msd10(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
 
             toc_reader.seek(SeekFrom::Current((segment_length - name_length as u32 - 31).into()))?;
 
-            println!("- Extracting section {}: {}...", sections[i as usize].index, name);
+            println!("\nSection {}: {}", sections[i as usize].index, name);
             
             let offset = sections[i as usize].offset;
             let size = sections[i as usize].size;
 
             if i != 0 && name == sections[i as usize - 1].name { //second section with the same name is some sort of signature
-                println!("-- Skipping signature file..");
+                println!("- Skipping signature file...");
                 continue;
             }
             
             let encrypted_data = common::read_file(&file, offset as u64 + 136, size as usize - 136)?;
+
+            println!("- Decrypting...");
             let out_data = decrypt_aes_salted_old(&encrypted_data, &passphrase_bytes)?; 
 
             let output_path = Path::new(&output_folder).join(name);

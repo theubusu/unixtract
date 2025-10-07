@@ -7,9 +7,7 @@ use crate::common;
 
 pub fn is_novatek_file(file: &File) -> bool {
     let header = common::read_file(&file, 0, 4).expect("Failed to read from file.");
-    let header_string = String::from_utf8_lossy(&header);
-
-    if header_string == "NFWB"{
+    if header == b"NFWB" {
         true
     } else {
         false
@@ -27,7 +25,7 @@ pub fn extract_novatek(mut file: &File, output_folder: &str) -> Result<(), Box<d
 
     let _first_part_offset = common::read_exact(&mut file, 4)?;
 
-    println!("Part count: {}", part_count);
+    println!("\nPart count: {}", part_count);
 
     let _ = common::read_exact(&mut file, 116)?;
 
@@ -47,7 +45,7 @@ pub fn extract_novatek(mut file: &File, output_folder: &str) -> Result<(), Box<d
 
         let data = common::read_file(&file, offset as u64, size as usize)?;
 
-        println!("- Part {}: index: {}, size: {}, offset: {}", i + 1, index, size, offset);
+        println!("\nPart {}: index: {}, size: {}, offset: {}", i + 1, index, size, offset);
 
         let output_path = Path::new(&output_folder).join(format!("part_{}.bin", i + 1));
 
@@ -59,7 +57,7 @@ pub fn extract_novatek(mut file: &File, output_folder: &str) -> Result<(), Box<d
             
         out_file.write_all(&data)?;
 
-        println!("-- Saved file!");
+        println!("- Saved file!");
 
         file.seek(std::io::SeekFrom::Start(current_pos))?;
 

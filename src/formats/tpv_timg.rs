@@ -9,9 +9,7 @@ use crate::common;
 
 pub fn is_tpv_timg_file(file: &File) -> bool {
     let header = common::read_file(&file, 0, 4).expect("Failed to read from file.");
-    let header_string = String::from_utf8_lossy(&header);
-
-    if header_string == "TIMG"{
+    if header == b"TIMG" {
         true
     } else {
         false
@@ -27,8 +25,7 @@ fn decompress_gzip(compressed_data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error
 
 
 pub fn extract_tpv_timg(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
-    //TIMG header
-    let _timg = common::read_exact(&mut file, 288)?;
+    let _timg = common::read_exact(&mut file, 288)?; //TIMG magic + header
 
     loop {
         //PIMG
@@ -39,48 +36,39 @@ pub fn extract_tpv_timg(mut file: &File, output_folder: &str) -> Result<(), Box<
             assert!(&pimg == b"PIMG", "Invalid PIMG section!");
         }
 
-        //4 bytes 00
-        let _ = common::read_exact(&mut file, 4)?;
+        let _ = common::read_exact(&mut file, 4)?; //4 bytes 00
 
-        //4 bytes size
         let size_bytes = common::read_exact(&mut file, 4)?;
         let size = u32::from_le_bytes(size_bytes.try_into().unwrap());
 
-        //4 bytes nothing
-        let _ = common::read_exact(&mut file, 4)?;
+        let _ = common::read_exact(&mut file, 4)?; //4 bytes 00
 
-        //16 bytes checksum? or maybe signature
-        let _checksum = common::read_exact(&mut file, 16)?;
+        let _checksum = common::read_exact(&mut file, 16)?; //16 bytes checksum? or maybe signature
 
-        //16 bytes name
         let name_bytes = common::read_exact(&mut file, 16)?;
         let name = common::string_from_bytes(&name_bytes);
 
-        //64 bytes destination device
         let dev_bytes = common::read_exact(&mut file, 64)?;
         let dev = common::string_from_bytes(&dev_bytes);
 
-        //16 bytes compression type
         let comp_bytes = common::read_exact(&mut file, 16)?;
         let comp_type = common::string_from_bytes(&comp_bytes);
+    
+        let _ = common::read_exact(&mut file, 1032)?; //1032 bytes maybe comment? skip this
 
-        //1032 bytes maybe comment? skip this
-        let _ = common::read_exact(&mut file, 1032)?;
-
-        //actual data
         let data = common::read_exact(&mut file, size as usize)?;
 
-        println!("- PIMG: Name: {} Size: {} Dest: {} Compression: {}", name, size, dev, comp_type);
+        println!("\nPIMG: Name: {}, Size: {}, Dest: {}, Compression: {}", name, size, dev, comp_type);
 
         let out_data;
 
         if comp_type == "gzip" {
-            println!("-- Decompressing gzip...");
+            println!("- Decompressing gzip...");
             out_data = decompress_gzip(&data)?;
         } else if comp_type == "none" {
             out_data = data;
         } else {
-            println!("-- Warning: unsupported compression type!");
+            println!("- Warning: unsupported compression type!");
             out_data = data;
         }
 
@@ -97,8 +85,7 @@ pub fn extract_tpv_timg(mut file: &File, output_folder: &str) -> Result<(), Box<
         println!("-- Saved file!");
     }
 
-    println!();
-    println!("Extraction finished!");
+    println!("\nExtraction finished!");
 
     Ok(())
 }

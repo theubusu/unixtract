@@ -5,3 +5,5 @@ pub mod pfl_upg;
 pub mod epk1;
 pub mod novatek;
 pub mod msd10;
+pub mod msd11;
+pub mod sddl_sec;

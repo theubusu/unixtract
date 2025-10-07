@@ -12,7 +12,7 @@ struct Args {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("unixtract Firmware extractor v0.0");
+    println!("unixtract Firmware extractor");
     let args = Args::parse();
 
     let target_path = args.input_target;
@@ -24,8 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = PathBuf::from(target_path);
     if path.is_dir() {
         if formats::samsung_old::is_samsung_old_dir(&path) {
-            println!("Samsung old firmware dir detected!");
-            println!();
+            println!("Samsung old firmware dir detected!\n");
             formats::samsung_old::extract_samsung_old(&path, &output_path)?
         } else {
             println!("Input format not recognized!");
@@ -35,29 +34,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         println!();
 
-        if formats::msd10::is_msd10_file(&file) {
+        if formats::sddl_sec::is_sddl_sec_file(&file) {
+            println!("SDDL.SEC file detected!");
+            formats::sddl_sec::extract_sddl_sec(&file, &output_path)?;
+        } else if formats::msd10::is_msd10_file(&file) {
             println!("MSD10 file detected!");
-            println!();
             formats::msd10::extract_msd10(&file, &output_path)?;
+        } else if formats::msd11::is_msd11_file(&file) {
+            println!("MSD11 file detected!");
+            formats::msd11::extract_msd11(&file, &output_path)?;
         } else if formats::tpv_timg::is_tpv_timg_file(&file) {
             println!("TPV TIMG file detected!");
-            println!();
             formats::tpv_timg::extract_tpv_timg(&file, &output_path)?;
         } else if formats::novatek::is_novatek_file(&file) {
             println!("Novatek file detected!");
-            println!();
             formats::novatek::extract_novatek(&file, &output_path)?;
         } else if formats::epk1::is_epk1_file(&file) {
             println!("EPK1 file detected!");
-            println!();
             formats::epk1::extract_epk1(&file, &output_path)?;
         } else if formats::pfl_upg::is_pfl_upg_file(&file) {
             println!("PFL UPG file detected!");
-            println!();
             formats::pfl_upg::extract_pfl_upg(&file, &output_path)?;
         } else if formats::mstar::is_mstar_file(&file) {
             println!("Mstar upgrade file detected!");
-            println!();
             formats::mstar::extract_mstar(&file, &output_path)?;
         } else {
             println!("Input format not recognized!");

@@ -7,9 +7,7 @@ use crate::common;
 
 pub fn is_epk1_file(file: &File) -> bool {
     let header = common::read_file(&file, 0, 4).expect("Failed to read from file.");
-    let header_string = String::from_utf8_lossy(&header);
-
-    if header_string == "epak"{
+    if header == b"epak" {
         true
     } else {
         false
@@ -28,15 +26,15 @@ pub fn extract_epk1(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
     let init_pak_count = u32::from_le_bytes(init_pak_count_bytes.try_into().unwrap());
 
     if init_pak_count > 256 {
-        println!("Big endian EPK1 detected.");
+        println!("\nBig endian EPK1 detected.");
         epk1_type = "be";
     } else if init_pak_count < 21 {
-        println!("Little endian EPK1 detected.");
+        println!("\nLittle endian EPK1 detected.");
         epk1_type = "le";
     } else {
-        //println!("EPK1(new) detected.");
+        //println!("\nEPK1(new) detected.");
         //epk1_type = "new";
-        println!("Not supported!");
+        println!("\nNot supported!");
         return Ok(());
     }
 
@@ -71,7 +69,7 @@ pub fn extract_epk1(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
 
         let version = common::read_exact(&mut file, 4)?;
 
-        println!("EPK info:\nFile size: {}\nPak count: {}\nVersion: {:02x?}.{:02x?}.{:02x?}\n",
+        println!("EPK info:\nFile size: {}\nPak count: {}\nVersion: {:02x?}.{:02x?}.{:02x?}",
                 file_size, pak_count, version[1], version[2], version[3]);
 
     } else if epk1_type == "le" {
@@ -104,7 +102,7 @@ pub fn extract_epk1(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
         let ota_id_bytes = common::read_exact(&mut file, 32)?;
         let ota_id = common::string_from_bytes(&ota_id_bytes);
 
-        println!("EPK info:\nFile size: {}\nPak count: {}\nOTA ID: {}\nVersion: {:02x?}.{:02x?}.{:02x?}\n", 
+        println!("EPK info:\nFile size: {}\nPak count: {}\nOTA ID: {}\nVersion: {:02x?}.{:02x?}.{:02x?}", 
                 file_size, pak_count, ota_id, version[2], version[1], version[0]);
     }
 
@@ -125,7 +123,7 @@ pub fn extract_epk1(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
 
             let data = common::read_file(&file, pak.offset as u64, pak.size as usize)?;
 
-            println!("- Pak {}: {}, Offset: {}, Size: {}, Platform: {}", i + 1, pak_name, pak.offset, pak.size, pak_platform);
+            println!("\nPak {}: {}, Offset: {}, Size: {}, Platform: {}", i + 1, pak_name, pak.offset, pak.size, pak_platform);
 
             let output_path = Path::new(&output_folder).join(pak_name + ".bin");
 
@@ -137,7 +135,7 @@ pub fn extract_epk1(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
             
             out_file.write_all(&data[128..pak_actual_size as usize + 128])?;
 
-            println!("-- Saved file!");
+            println!("- Saved file!");
         }
     
     println!("\nExtraction finished!");

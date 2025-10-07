@@ -12,9 +12,7 @@ use crate::common;
 
 pub fn is_pfl_upg_file(file: &File) -> bool {
     let header = common::read_file(&file, 0, 8).expect("Failed to read from file.");
-    let header_string = String::from_utf8_lossy(&header);
-
-    if header_string == "2SWU3TXV"{
+    if header == b"2SWU3TXV" {
         true
     } else {
         false
@@ -88,7 +86,7 @@ pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<d
     let version_bytes = common::read_exact(&mut file, header_size as usize - 704)?;
     let version = common::string_from_bytes(&version_bytes);
 
-    println!("Version: {}", version);
+    println!("\nVersion: {}", version);
     println!("Description: \n{}", description);
     println!("Data size: {}", data_size);
 
@@ -130,8 +128,7 @@ pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<d
         let decrypted = decrypted_int.to_bytes_le();
 
         let aes_key = &decrypted[20..52];
-        println!("AES key: {}", hex::encode(aes_key));
-        println!();
+        println!("AES key: {}\n", hex::encode(aes_key));
 
         let encrypted_data = common::read_exact(&mut file, data_size as usize)?;
         println!("Decrypting data...");
@@ -140,8 +137,6 @@ pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<d
         println!("File is not encrypted.");
         decrypted_data = common::read_exact(&mut file, data_size as usize)?;
     }
-
-    println!();
 
     let mut data_reader = Cursor::new(decrypted_data);
 
@@ -157,7 +152,7 @@ pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<d
 
         let _header_size = u32::from_le_bytes(file_header[68..72].try_into().unwrap());
 
-        println!("- File: {}, Size: {}", file_name, real_size);
+        println!("\nFile: {}, Size: {}", file_name, real_size);
 
         let data = common::read_exact(&mut data_reader, stored_size as usize)?;
 
@@ -175,11 +170,10 @@ pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<d
 
         out_file.write_all(&data[..real_size as usize])?;
 
-        println!("-- Saved file!");
+        println!("- Saved file!");
     }
 
-    println!();
-    println!("Extraction finished!");
+    println!("\nExtraction finished!");
     
     Ok(())
 }
