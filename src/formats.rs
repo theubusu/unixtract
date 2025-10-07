@@ -7,3 +7,4 @@ pub mod novatek;
 pub mod msd10;
 pub mod msd11;
 pub mod sddl_sec;
+pub mod epk2;

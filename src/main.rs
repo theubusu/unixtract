@@ -3,7 +3,8 @@ mod formats;
 
 use clap::Parser;
 use std::path::{PathBuf};
-use std::fs::{File};
+use std::io::{self};
+use std::fs::{self, File};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -21,6 +22,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output_path = args.output_folder;
     println!("Output folder: {}", output_path);
 
+    let output_folder_path = PathBuf::from(&output_path);
+    if output_folder_path.exists() {
+        if output_folder_path.is_dir() {
+            let is_empty = fs::read_dir(&output_folder_path)?.next().is_none();
+            if !is_empty {
+                println!("\nWarning: Output folder exists and is NOT empty! Files may be overwritten!");
+                println!("Press Enter if you want to continue...");
+                io::stdin().read_line(&mut String::new())?;
+            }
+        }
+    }
+
     let path = PathBuf::from(target_path);
     if path.is_dir() {
         if formats::samsung_old::is_samsung_old_dir(&path) {
@@ -37,28 +50,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if formats::sddl_sec::is_sddl_sec_file(&file) {
             println!("SDDL.SEC file detected!");
             formats::sddl_sec::extract_sddl_sec(&file, &output_path)?;
-        } else if formats::msd10::is_msd10_file(&file) {
+        } 
+        else if formats::msd10::is_msd10_file(&file) {
             println!("MSD10 file detected!");
             formats::msd10::extract_msd10(&file, &output_path)?;
-        } else if formats::msd11::is_msd11_file(&file) {
+        } 
+        else if formats::msd11::is_msd11_file(&file) {
             println!("MSD11 file detected!");
             formats::msd11::extract_msd11(&file, &output_path)?;
-        } else if formats::tpv_timg::is_tpv_timg_file(&file) {
+        } 
+        else if formats::tpv_timg::is_tpv_timg_file(&file) {
             println!("TPV TIMG file detected!");
             formats::tpv_timg::extract_tpv_timg(&file, &output_path)?;
-        } else if formats::novatek::is_novatek_file(&file) {
+        } 
+        else if formats::novatek::is_novatek_file(&file) {
             println!("Novatek file detected!");
             formats::novatek::extract_novatek(&file, &output_path)?;
-        } else if formats::epk1::is_epk1_file(&file) {
+        } 
+        else if formats::epk1::is_epk1_file(&file) {
             println!("EPK1 file detected!");
             formats::epk1::extract_epk1(&file, &output_path)?;
-        } else if formats::pfl_upg::is_pfl_upg_file(&file) {
+        } 
+        else if formats::epk2::is_epk2_file(&file) {
+            println!("EPK2 file detected!");
+            formats::epk2::extract_epk2(&file, &output_path)?;
+        } 
+        else if formats::pfl_upg::is_pfl_upg_file(&file) {
             println!("PFL UPG file detected!");
             formats::pfl_upg::extract_pfl_upg(&file, &output_path)?;
-        } else if formats::mstar::is_mstar_file(&file) {
+        } 
+        else if formats::mstar::is_mstar_file(&file) {
             println!("Mstar upgrade file detected!");
             formats::mstar::extract_mstar(&file, &output_path)?;
-        } else {
+        } 
+        else {
             println!("Input format not recognized!");
         }
     }
