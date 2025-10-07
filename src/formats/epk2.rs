@@ -38,7 +38,17 @@ fn decrypt_aes128_ecb(key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, Box<dyn 
 }
 
 pub fn extract_epk2(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let _epak = common::read_exact(&mut file, 4)?; // epak magic
+
+    file.seek(SeekFrom::Start(128))?;
+
+    //check if header is encrypted
+    let epak = common::read_exact(&mut file, 4)?; // epak magic
+    if epak == b"epak" {
+        println!("Header is not encrypted.");
+    } else {
+        println!("Header is encrypted. Not supported yet");
+        return Ok(());
+    }
 
     let file_size_bytes = common::read_exact(&mut file, 4)?;
     let file_size = u32::from_le_bytes(file_size_bytes.try_into().unwrap());
@@ -79,7 +89,14 @@ pub fn extract_epk2(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
     }
 
     // Saturn7/BCM3556
-    let key = "2F2E2D2C2B2A29281716151413121110";
+    //let key = "2F2E2D2C2B2A29281716151413121110";
+
+    // new BCM35230
+    let key = "6856A0482475A8B41728A35474810203";
+
+    //mtk5369 - Mediatek GP4 - HE_DTV_GP4I_AFAAATAA
+    //let key = "7184C9C428D03C445188234D5A827196";
+
     let key_bytes = hex::decode(key)?;
 
     let mut signature_count = 0;

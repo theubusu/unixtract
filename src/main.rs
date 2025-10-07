@@ -70,11 +70,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         else if formats::epk1::is_epk1_file(&file) {
             println!("EPK1 file detected!");
             formats::epk1::extract_epk1(&file, &output_path)?;
-        } 
+        }
+        //epk2 with unencrypted header
         else if formats::epk2::is_epk2_file(&file) {
             println!("EPK2 file detected!");
             formats::epk2::extract_epk2(&file, &output_path)?;
-        } 
+        }
+        //epk with encrypted header - it can be epk2 or epk3 so we need to check
+        else if formats::epk::is_epk_file(&file) {
+            println!("EPK file detected!");
+            formats::epk::extract_epk(&file, &output_path)?;
+        }
         else if formats::pfl_upg::is_pfl_upg_file(&file) {
             println!("PFL UPG file detected!");
             formats::pfl_upg::extract_pfl_upg(&file, &output_path)?;
