@@ -35,7 +35,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         println!();
 
-        if formats::tpv_timg::is_tpv_timg_file(&file) {
+        if formats::msd10::is_msd10_file(&file) {
+            println!("MSD10 file detected!");
+            println!();
+            formats::msd10::extract_msd10(&file, &output_path)?;
+        } else if formats::tpv_timg::is_tpv_timg_file(&file) {
             println!("TPV TIMG file detected!");
             println!();
             formats::tpv_timg::extract_tpv_timg(&file, &output_path)?;
