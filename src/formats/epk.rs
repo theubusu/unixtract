@@ -14,6 +14,7 @@ pub fn is_epk_file(file: &File) -> bool {
 }
 
 fn check_epk_version(versions: &[u8]) -> Option<String> {
+    // _ - 0x00     X - a number    . - a dot
     let epk2_pattern = "____XXXX.XXXX.XXXX__XX.XX.XXX_______";
     let epk3_pattern = "____X.X.X___________X.X.X___________";
 
@@ -29,10 +30,9 @@ fn check_epk_version(versions: &[u8]) -> Option<String> {
 fn match_with_pattern(data: &[u8], pattern: &str) -> bool {
     for (&b, p) in data.iter().zip(pattern.bytes()) {
         match p {
-            b'_' if b != 0x00 => return false,
+            b'_' if b != 0x00           => return false,
             b'X' if !b.is_ascii_digit() => return false,
-            b'.' if b != b'.' => return false,
-            _ if p != b'_' && p != b'X' && p != b'.' => return false,
+            b'.' if b != b'.'           => return false,
             _ => {}
         }
     }
