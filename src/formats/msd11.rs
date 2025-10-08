@@ -8,6 +8,7 @@ use cbc::{Decryptor, cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit}}
 type Aes128CbcDec = Decryptor<Aes128>;
 
 use crate::common;
+use crate::keys;
 
 pub fn is_msd11_file(file: &File) -> bool {
     let header = common::read_file(&file, 0, 6).expect("Failed to read from file.");
@@ -24,17 +25,6 @@ struct Section {
     size: u64,
     name: String,
 }
-
-static KEYS: &[(&str, &str)] = &[
-    ("T-JZM",   "9b1d077c0d137d406c79ddacb6b159fe"), //2015
-    ("T-HKMFK", "c7097975e8ab994beb5eaae57e0ba77c"), //2016
-    ("T-KTM2L", "46b04f5e794ca4377a20951c9ea00427"), //2018
-    ("T-KTM2",  "29110e0ce940b3a9b67d3e158f3f1342"), //2018
-    ("T-KTM",   "d0d49d5f36f5c0da50062fbf32168f5b"), //2017
-    ("T-KTSU",  "19e1ba41163f03735e692d9daa2cbb47"), //2018
-    ("T-KTSD",  "39332605ff47a0aea999b10ce9087389"), //2018
-    ("T-NKL",   "5bab1098dab48792619ebd63650d929f"), //2020
-];
 
 fn decrypt_aes_salted_tizen(encrypted_data: &[u8], passphrase_bytes: &Vec<u8>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut data = encrypted_data.to_vec();
@@ -125,7 +115,7 @@ pub fn extract_msd11(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
     let passphrase_bytes;
 
     //find passphrase
-    for (prefix, value) in KEYS {
+    for (prefix, value) in keys::MSD11 {
         if firmware_name.starts_with(prefix) {
             passphrase = Some(value);
             break;

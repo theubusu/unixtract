@@ -8,6 +8,7 @@ use cbc::{Decryptor, cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit}}
 type Aes128CbcDec = Decryptor<Aes128>;
 
 use crate::common;
+use crate::keys;
 
 pub fn is_msd10_file(file: &File) -> bool {
     let header = common::read_file(&file, 0, 6).expect("Failed to read from file.");
@@ -24,13 +25,6 @@ struct Section {
     size: u32,
     name: String,
 }
-
-//fw name, type, key
-static KEYS: &[(&str, &str, &str)] = &[
-    ("T-NT14M", "old",   "95d01e0bae861a05695bc8a6edb2ea835a09accd"),
-    ("T-HKM",   "tizen", "1ac8989ff57db5e75ea67b033050871c"),
-    ("T-HKP",   "tizen", "cce8a3ef92f3e94895999e928f4dd6c3"),
-];
 
 fn decrypt_aes_salted_old(encrypted_data: &[u8], passphrase_bytes: &Vec<u8>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut data = encrypted_data.to_vec();
@@ -148,7 +142,7 @@ pub fn extract_msd10(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
     let passphrase_bytes;
 
     //find passphrase
-    for (prefix, fw_type, value) in KEYS {
+    for (prefix, fw_type, value) in keys::MSD10 {
         if firmware_name.starts_with(prefix) {
             passphrase = Some(value);
             firmware_type = fw_type;

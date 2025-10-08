@@ -89,6 +89,7 @@ pub fn extract_mstar(file: &File, output_folder: &str) -> Result<(), Box<dyn std
                 let mut compression = "none";
                 let mut lz4_expect_size = 0;
                 let mut j = i + 1;
+                
                 // get lines after this filepartload, before the next one
                 while j < lines.len() && !lines[j].starts_with("filepartload") {
                     //get compression method

@@ -6,6 +6,7 @@ use aes::Aes128;
 use ecb::{Decryptor, cipher::{BlockDecryptMut, KeyInit, generic_array::GenericArray}};
 
 use crate::common;
+use crate::keys;
 
 pub fn is_epk2_file(file: &File) -> bool {
     let header = common::read_file(&file, 128, 4).expect("Failed to read from file.");
@@ -22,15 +23,8 @@ struct Pak {
     name: String,
 }
 
-static KEYS: &[(&str, &str)] = &[
-    ("Saturn7/BCM3556", "2F2E2D2C2B2A29281716151413121110"),
-    ("new BCM35230", "6856A0482475A8B41728A35474810203"),
-    ("mtk5369 - Mediatek GP4", "7184C9C428D03C445188234D5A827196"),
-    ("mtk5398 (a2) - Mediatek NetCast 4/4.5", "385A992430196A8C44F1985823C01440"),
-];
-
 fn find_key<'a>(data: &[u8], expected_magic: &[u8]) -> Result<Option<(&'a str, Vec<u8>)>, Box<dyn std::error::Error>> {
-    for (name, key_hex) in KEYS {
+    for (key_hex, name) in keys::EPK2 {
         let key_bytes = hex::decode(key_hex)?;
         let decrypted = match decrypt_aes128_ecb(&key_bytes, data) {
             Ok(d) => d,
