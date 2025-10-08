@@ -14,15 +14,18 @@ pub fn is_epk_file(file: &File) -> bool {
 }
 
 fn check_epk_version(versions: &[u8]) -> Option<String> {
-    // _ - 0x00     X - a number    . - a dot
-    let epk2_pattern = "____XXXX.XXXX.XXXX__XX.XX.XXX_______";
-    let epk3_pattern = "____X.X.X___________X.X.X___________";
+    //                      _ - 0x00     X - a number    . - a dot
+    let epk2_pattern =     "____XXXX.XXXX.XXXX__XX.XX.XXX_______";
+    let epk3_pattern =     "____X.X.X___________X.X.X___________";
+    let epk3_new_pattern = "____XX.X.X__________XX.X.X__________";
 
     if match_with_pattern(&versions, epk2_pattern) {
         Some("epk2".to_string())
     } else if match_with_pattern(&versions, epk3_pattern) {     
         Some("epk3".to_string())
-    } else {
+    } else if match_with_pattern(&versions, epk3_new_pattern) {     
+        Some("epk3".to_string())
+    }else {
         None
     }
 }
