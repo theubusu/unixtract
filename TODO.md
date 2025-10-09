@@ -8,4 +8,5 @@
 - Samsung MSD10(Legacy and Tizen 2015) - Complete
 - Samsung MSD11(Tizen 2016+) - Complete
 - Panasonic SDDL.SEC(2011+) - Complete
-- LG Epk2 (Crypted and plain header)- Should be complete, but needs some more testing
+- LG Epk2 (Crypted and plain header)- 100% complete (unless unencrypted versions exist  >)
+- LG epk3 - Probably fine??? but needs more testing     (and more stolen keys)

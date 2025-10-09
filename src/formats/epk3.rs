@@ -100,7 +100,7 @@ pub fn extract_epk3(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
         let mut segment_size = u32::from_le_bytes(segment_size_b.try_into().unwrap());
         //
 
-        println!("\nPak - {}, Size: {}, Segment Count: {}",
+        println!("\nPak - {}, Size: {}, Segments: {}",
                 package_name, package_size, segment_count);
         
         for i in 0..segment_count {
@@ -134,6 +134,8 @@ pub fn extract_epk3(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
             println!("-- Saved to file!");
         }
     }
+
+    println!("\nExtraction finished!");
 
     Ok(())
 }
