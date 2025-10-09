@@ -14,7 +14,7 @@ pub fn extract_epk3(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
 
     let mut new_type = false;
 
-    let mut matching_key: Option<Vec<u8>> = None;
+    let matching_key: Option<Vec<u8>>;
     println!("Finding key...");
 
     // find the key, knowing that the header should start with "EPK3"
