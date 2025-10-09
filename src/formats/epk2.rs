@@ -2,11 +2,9 @@ use std::fs::{self, File, OpenOptions};
 use std::path::{Path};
 use std::io::{Write, Seek, SeekFrom, Cursor};
 
-use aes::Aes128;
-use ecb::{Decryptor, cipher::{BlockDecryptMut, KeyInit, generic_array::GenericArray}};
-
 use crate::common;
 use crate::keys;
+use crate::formats::epk::{decrypt_aes_ecb_auto, find_key};
 
 pub fn is_epk2_file(file: &File) -> bool {
     let header = common::read_file(&file, 128, 4).expect("Failed to read from file.");
@@ -21,35 +19,6 @@ struct Pak {
     offset: u32,
     size: u32,
     name: String,
-}
-
-fn find_key<'a>(data: &[u8], expected_magic: &[u8]) -> Result<Option<(&'a str, Vec<u8>)>, Box<dyn std::error::Error>> {
-    for (key_hex, name) in keys::EPK2 {
-        let key_bytes = hex::decode(key_hex)?;
-        let decrypted = match decrypt_aes128_ecb(&key_bytes, data) {
-            Ok(d) => d,
-            Err(_) => continue,
-        };
-        if decrypted.starts_with(expected_magic) {
-            return Ok(Some((name, key_bytes)));
-        }
-    }
-    Ok(None)
-}
-
-type Aes128EcbDec = Decryptor<Aes128>;
-
-fn decrypt_aes128_ecb(key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let key_array: [u8; 16] = key.try_into()?;
-    let mut decryptor = Aes128EcbDec::new(&key_array.into());
-    let mut buffer = ciphertext.to_vec();
-
-    for chunk in buffer.chunks_exact_mut(16) {
-        let block: &mut [u8; 16] = chunk.try_into()?;
-        decryptor.decrypt_block_mut(GenericArray::from_mut_slice(block));
-    }
-    
-    Ok(buffer)
 }
 
 pub fn extract_epk2(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -69,10 +38,10 @@ pub fn extract_epk2(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
         println!("Header is encrypted...");
         println!("\nFinding key...");
         //find the key, knowing that the header should start with "epak"
-        if let Some((key_name, key_bytes)) = find_key(&stored_header, b"epak")? {
+        if let Some((key_name, key_bytes)) = find_key(&keys::EPK2, &stored_header, b"epak")? {
             println!("Found valid key: {}", key_name);
             matching_key = Some(key_bytes);
-            header = decrypt_aes128_ecb(matching_key.as_ref().unwrap(), &stored_header)?;
+            header = decrypt_aes_ecb_auto(matching_key.as_ref().unwrap(), &stored_header)?;
         } else {
             println!("No valid key found!");
             return Ok(());
@@ -137,7 +106,7 @@ pub fn extract_epk2(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
         if matching_key.is_none() {
             println!("\nFinding key...");
             //find the key, knowing that the header should start with with the paks name
-            if let Some((key_name, key_bytes)) = find_key(&encrypted_header, pak.name.as_bytes())? {
+            if let Some((key_name, key_bytes)) = find_key(&keys::EPK2, &encrypted_header, pak.name.as_bytes())? {
                 println!("Found correct key: {}", key_name);
                 matching_key = Some(key_bytes);
             } else {
@@ -148,7 +117,7 @@ pub fn extract_epk2(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
 
         let matching_key_bytes = matching_key.as_ref().unwrap();
 
-        let header = decrypt_aes128_ecb(&matching_key_bytes, &encrypted_header)?;
+        let header = decrypt_aes_ecb_auto(&matching_key_bytes, &encrypted_header)?;
 
         let segment_count = u32::from_le_bytes(header[84..88].try_into().unwrap());
         let mut segment_size = u32::from_le_bytes(header[88..92].try_into().unwrap());
@@ -162,7 +131,7 @@ pub fn extract_epk2(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
                 signature_count += 1;
 
                 let encrypted_header = common::read_exact(&mut file, 128)?;
-                let header = decrypt_aes128_ecb(&matching_key_bytes, &encrypted_header)?;
+                let header = decrypt_aes_ecb_auto(&matching_key_bytes, &encrypted_header)?;
                 segment_size = u32::from_le_bytes(header[88..92].try_into().unwrap());
             }
 
@@ -186,7 +155,7 @@ pub fn extract_epk2(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
             };
 
             let segment_data = common::read_exact(&mut file, actual_segment_size as usize)?;
-            let out_data = decrypt_aes128_ecb(&matching_key_bytes, &segment_data)?;
+            let out_data = decrypt_aes_ecb_auto(&matching_key_bytes, &segment_data)?;
 
             println!("- Segment {}/{}, size: {}", i + 1, segment_count, actual_segment_size);
 

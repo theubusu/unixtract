@@ -1,4 +1,5 @@
 //samsung old keys
+//github.com/george-hopkins/samygo-patcher
 pub static SAMSUNG: &[(&str, &str)] = &[
     ("T-GA", 	"SHWJUH:85a045ae-2296-484c-b457-ede832fcfbe1-646390a3-105e-40aa-85f6-da3086c70111"),
     ("T-MST5",	"SHWJUH:eceb2c14-db11-425e-9ebf-5f9607f0eb4b-3c38193e-751e-4719-8884-9e76322c0cec"),
@@ -21,6 +22,7 @@ pub static PFLUPG: &[(&str, &str)] = &[
 ];
 
 //MSD10 keys
+//github.com/bugficks/msddecrypt
 //fw prefix, type, key
 pub static MSD10: &[(&str, &str, &str)] = &[
     ("T-NT14M", "old",   "95d01e0bae861a05695bc8a6edb2ea835a09accd"),
@@ -29,6 +31,7 @@ pub static MSD10: &[(&str, &str, &str)] = &[
 ];
 
 //MSD11 keys
+//github.com/bugficks/msddecrypt
 pub static MSD11: &[(&str, &str)] = &[
     ("T-JZM",   "9b1d077c0d137d406c79ddacb6b159fe"), //2015
     ("T-HKMFK", "c7097975e8ab994beb5eaae57e0ba77c"), //2016
@@ -41,6 +44,7 @@ pub static MSD11: &[(&str, &str)] = &[
 ];
 
 //epk2 keys
+//github.com/openlgtv/epk2extract
 pub static EPK2: &[(&str, &str)] = &[
     ("214BF3C129547AF31D32A5ECB4742192", "unknown"),
     ("1F1E1D1C1B1A19180706050403020100", "BCM35230/early MTK5369 and LG1152"),
@@ -57,4 +61,11 @@ pub static EPK2: &[(&str, &str)] = &[
     ("68A284B4953CAD15024BED2C4F852A09", "lm14 - MStar NetCast 4.5"),
     ("4813B5B63C998A2874EF3320684AC8D9", "lg1152 - LX GP4"),
     ("14B3623488212250C7C992AACD537447", "lg115x - LX NC4"),
+];
+
+//epk3 keys
+//github.com/openlgtv/epk2extract
+pub static EPK3: &[(&str, &str)] = &[
+    ("34CC219D3AFC102433109BBC1DA44095", "m14 (m14tv) - LX webOS 1 (2014)"),
+    ("52A208FA24E7E70730A40999B1C22C148F4920484BC50B515D243E35D14689F1", "o24n - LX webOS 10 (2025)")
 ];
