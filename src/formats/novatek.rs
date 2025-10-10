@@ -7,8 +7,7 @@ use binrw::{BinRead, BinReaderExt};
 
 use crate::common;
 
-#[derive(Debug, BinRead)]
-#[br(little)]
+#[derive(BinRead)]
 struct Header {
     #[br(count = 4)] _magic_bytes: Vec<u8>,
     #[br(count = 4)] _flags: Vec<u8>,
@@ -19,8 +18,7 @@ struct Header {
     #[br(count = 116)] _unknown2: Vec<u8>,
 }
 
-#[derive(Debug, BinRead)]
-#[br(little)]
+#[derive(BinRead)]
 struct PartEntry {
     #[br(count = 16)] _unknown: Vec<u8>,
     index: u32,

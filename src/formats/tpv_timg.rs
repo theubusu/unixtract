@@ -9,7 +9,6 @@ use flate2::read::GzDecoder;
 use crate::common;
 
 #[derive(Debug, BinRead)]
-#[br(little)]
 struct PIMG {
     #[br(count = 4)] _magic_bytes: Vec<u8>,
     _unknown1: u32,
@@ -21,7 +20,6 @@ struct PIMG {
     #[br(count = 16)] comp_type_bytes: Vec<u8>,
     #[br(count = 1032)] _comment: Vec<u8>,
 }
-
 impl PIMG {
     fn name(&self) -> String {
         common::string_from_bytes(&self.name_bytes)
@@ -49,7 +47,6 @@ fn decompress_gzip(compressed_data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error
     decoder.read_to_end(&mut decompressed)?;
     Ok(decompressed)
 }
-
 
 pub fn extract_tpv_timg(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
     let _timg = common::read_exact(&mut file, 288)?; //TIMG magic + header

@@ -3,7 +3,37 @@ use std::path::{Path};
 use std::fs::{self, OpenOptions};
 use std::io::{Write, Seek, SeekFrom};
 
+use binrw::{BinRead, BinReaderExt};
+
 use crate::common;
+
+#[derive(BinRead)]
+struct CommonHeader {
+    #[br(count = 4)] _magic_bytes: Vec<u8>,
+    file_size: u32,
+    pak_count: u32,
+}
+
+#[derive(BinRead)]
+struct Pak {
+    offset : u32,
+    size : u32,
+}
+
+#[derive(BinRead)]
+struct PakHeader {
+    #[br(count = 4)] pak_name_bytes: Vec<u8>,
+    stored_size: u32,
+	#[br(count = 15)] platform_id_bytes: Vec<u8>,
+}
+impl PakHeader {
+    fn pak_name(&self) -> String {
+        common::string_from_bytes(&self.pak_name_bytes)
+    }
+    fn platform_id(&self) -> String {
+        common::string_from_bytes(&self.platform_id_bytes)
+    }
+}
 
 pub fn is_epk1_file(file: &File) -> bool {
     let header = common::read_file(&file, 0, 4).expect("Failed to read from file.");
@@ -12,11 +42,6 @@ pub fn is_epk1_file(file: &File) -> bool {
     } else {
         false
     }
-}
-
-struct Pak {
-    offset : u32,
-    size : u32,
 }
 
 pub fn extract_epk1(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -43,59 +68,39 @@ pub fn extract_epk1(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
     let mut paks: Vec<Pak> = Vec::new();
 
     if epk1_type == "be" {
-        let _epak = common::read_exact(&mut file, 4)?; //epak magic
-
-        let file_size_bytes = common::read_exact(&mut file, 4)?;
-        let file_size = u32::from_be_bytes(file_size_bytes.try_into().unwrap());
-
-        let pak_count_bytes = common::read_exact(&mut file, 4)?;
-        let pak_count = u32::from_be_bytes(pak_count_bytes.try_into().unwrap());
+        let header: CommonHeader = file.read_be()?;
 
         for _i in 0..10 { //header can fit max 10 pak entries
-            let pak_offset_bytes = common::read_exact(&mut file, 4)?;
-            let pak_offset = u32::from_be_bytes(pak_offset_bytes.try_into().unwrap());
+            let pak: Pak = file.read_be()?;
 
-            let pak_size_bytes = common::read_exact(&mut file, 4)?;
-            let pak_size = u32::from_be_bytes(pak_size_bytes.try_into().unwrap());
-
-            if pak_offset == 0 && pak_size == 0 {
+            if pak.offset == 0 && pak.size == 0 {
                 continue;
             }
 
-            paks.push(Pak { offset: pak_offset, size: pak_size });
+            paks.push(Pak { offset: pak.offset, size: pak.size });
         }
 
-        assert!(pak_count as usize == paks.len(), "Paks count in header does not match the amount of non empty pak entries!");
+        assert!(header.pak_count as usize == paks.len(), "Paks count in header does not match the amount of non empty pak entries!");
 
         let version = common::read_exact(&mut file, 4)?;
 
         println!("EPK info:\nFile size: {}\nPak count: {}\nVersion: {:02x?}.{:02x?}.{:02x?}",
-                file_size, pak_count, version[1], version[2], version[3]);
+                header.file_size, header.pak_count, version[1], version[2], version[3]);
 
     } else if epk1_type == "le" {
-        let _epak = common::read_exact(&mut file, 4)?; //epak magic
-
-        let file_size_bytes = common::read_exact(&mut file, 4)?;
-        let file_size = u32::from_le_bytes(file_size_bytes.try_into().unwrap());
-
-        let pak_count_bytes = common::read_exact(&mut file, 4)?;
-        let pak_count = u32::from_le_bytes(pak_count_bytes.try_into().unwrap());
+        let header: CommonHeader = file.read_le()?;
 
         for _i in 0..20 { //header can fit max 20 pak entries
-            let pak_offset_bytes = common::read_exact(&mut file, 4)?;
-            let pak_offset = u32::from_le_bytes(pak_offset_bytes.try_into().unwrap());
+            let pak: Pak = file.read_le()?;
 
-            let pak_size_bytes = common::read_exact(&mut file, 4)?;
-            let pak_size = u32::from_le_bytes(pak_size_bytes.try_into().unwrap());
-
-            if pak_offset == 0 && pak_size == 0 {
+            if pak.offset == 0 && pak.size == 0 {
                 continue;
             }
 
-            paks.push(Pak { offset: pak_offset, size: pak_size });
+            paks.push(Pak { offset: pak.offset, size: pak.size });
         }
 
-        assert!(pak_count as usize == paks.len(), "Paks count in header does not match the amount of non empty pak entries!");
+        assert!(header.pak_count as usize == paks.len(), "Paks count in header does not match the amount of non empty pak entries!");
 
         let version = common::read_exact(&mut file, 4)?;
 
@@ -103,29 +108,18 @@ pub fn extract_epk1(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
         let ota_id = common::string_from_bytes(&ota_id_bytes);
 
         println!("EPK info:\nFile size: {}\nPak count: {}\nOTA ID: {}\nVersion: {:02x?}.{:02x?}.{:02x?}", 
-                file_size, pak_count, ota_id, version[2], version[1], version[0]);
+                header.file_size, header.pak_count, ota_id, version[2], version[1], version[0]);
     }
 
     for (i, pak) in paks.iter().enumerate() {
-            let pak_name_bytes = common::read_file(&file, pak.offset as u64, 4)?;
-            let pak_name = common::string_from_bytes(&pak_name_bytes);
+            file.seek(SeekFrom::Start(pak.offset as u64))?;
+            let pak_header: PakHeader = if epk1_type == "be" {file.read_be()?} else {file.read_le()?};
 
-            let pak_actual_size_bytes = common::read_file(&file, pak.offset as u64 + 4, 4)?;
-            let pak_actual_size;
-            if epk1_type == "be" {
-                pak_actual_size = u32::from_be_bytes(pak_actual_size_bytes.try_into().unwrap());
-            } else {
-                pak_actual_size = u32::from_le_bytes(pak_actual_size_bytes.try_into().unwrap());
-            }
+            let data = common::read_file(&file, pak.offset as u64 + 128, pak.size as usize - 128)?;
 
-            let pak_platform_bytes = common::read_file(&file, pak.offset as u64 + 8, 15)?;
-            let pak_platform = common::string_from_bytes(&pak_platform_bytes);
+            println!("\nPak {}: {}, Offset: {}, Size: {}, Platform: {}", i + 1, pak_header.pak_name(), pak.offset, pak.size, pak_header.platform_id());
 
-            let data = common::read_file(&file, pak.offset as u64, pak.size as usize)?;
-
-            println!("\nPak {}: {}, Offset: {}, Size: {}, Platform: {}", i + 1, pak_name, pak.offset, pak.size, pak_platform);
-
-            let output_path = Path::new(&output_folder).join(pak_name + ".bin");
+            let output_path = Path::new(&output_folder).join(pak_header.pak_name() + ".bin");
 
             fs::create_dir_all(&output_folder)?;
             let mut out_file = OpenOptions::new()
@@ -133,7 +127,7 @@ pub fn extract_epk1(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
                 .create(true)
                 .open(output_path)?;
             
-            out_file.write_all(&data[128..pak_actual_size as usize + 128])?;
+            out_file.write_all(&data[..pak_header.stored_size as usize])?;
 
             println!("- Saved file!");
         }

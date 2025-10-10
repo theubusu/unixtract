@@ -12,8 +12,7 @@ use binrw::{BinRead, BinReaderExt};
 use crate::common;
 use crate::keys;
 
-#[derive(Debug, BinRead)]
-#[br(little)]
+#[derive(BinRead)]
 struct Header {
     #[br(count = 8)] _magic_bytes: Vec<u8>,
     header_size: u32,
@@ -24,15 +23,13 @@ struct Header {
 	_padding2: u32,
 	#[br(count = 512)] description_bytes: Vec<u8>,
 }
-
 impl Header {
     fn description(&self) -> String {
         common::string_from_bytes(&self.description_bytes)
     }
 }
 
-#[derive(Debug, BinRead)]
-#[br(little)]
+#[derive(BinRead)]
 struct FileHeader {
     #[br(count = 60)] file_name_bytes: Vec<u8>,
     real_size: u32,
@@ -40,7 +37,6 @@ struct FileHeader {
 	_header_size: u32,
     _attributes: u32,
 }
-
 impl FileHeader {
     fn file_name(&self) -> String {
         common::string_from_bytes(&self.file_name_bytes)

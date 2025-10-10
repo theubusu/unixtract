@@ -2,9 +2,40 @@ use std::fs::{self, File, OpenOptions};
 use std::path::{Path};
 use std::io::{Write, Seek, SeekFrom, Cursor};
 
+use binrw::{BinRead, BinReaderExt};
+
 use crate::common;
 use crate::keys;
 use crate::formats::epk::{decrypt_aes_ecb_auto, find_key};
+
+#[derive(BinRead)]
+struct Header {
+    #[br(count = 4)] _magic_bytes: Vec<u8>,
+    file_size: u32,
+	pak_count: u32,
+	#[br(count = 4)] _epk2_magic: Vec<u8>,
+	#[br(count = 4)] version: Vec<u8>,
+	#[br(count = 32)] ota_id_bytes: Vec<u8>,
+}
+impl Header {
+    fn ota_id(&self) -> String {
+        common::string_from_bytes(&self.ota_id_bytes)
+    }
+}
+
+#[derive(BinRead)]
+struct PakEntry {
+    offset: u32,
+	size: u32,
+	#[br(count = 4)] name_bytes: Vec<u8>,
+	#[br(count = 4)] _version: Vec<u8>,
+	segment_size: u32,
+}
+impl PakEntry {
+    fn name(&self) -> String {
+        common::string_from_bytes(&self.name_bytes)
+    }
+}
 
 pub fn is_epk2_file(file: &File) -> bool {
     let header = common::read_file(&file, 128, 4).expect("Failed to read from file.");
@@ -48,46 +79,20 @@ pub fn extract_epk2(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
         }    
     }
     //parse header
-    let mut hdr_reader = Cursor::new(header);
-
-    let _epk = common::read_exact(&mut hdr_reader, 4)?;
-
-    let file_size_bytes = common::read_exact(&mut hdr_reader, 4)?;
-    let file_size = u32::from_le_bytes(file_size_bytes.try_into().unwrap());
-
-    let pak_count_bytes = common::read_exact(&mut hdr_reader, 4)?;
-    let pak_count = u32::from_le_bytes(pak_count_bytes.try_into().unwrap());
-
-    let _epk2 = common::read_exact(&mut hdr_reader, 4)?; // EPK2 magic
-
-    let version = common::read_exact(&mut hdr_reader, 4)?;
-
-    let ota_id_bytes = common::read_exact(&mut hdr_reader, 32)?;
-    let ota_id = common::string_from_bytes(&ota_id_bytes);
+    let mut hdr_reader = Cursor::new(header); 
+    let hdr: Header = hdr_reader.read_le()?;
 
     println!("\nEPK info:\nFile size: {}\nPak count: {}\nOTA ID: {}\nVersion: {:02x?}.{:02x?}.{:02x?}\n", 
-                file_size, pak_count, ota_id, version[3], version[2], version[1]);
+                hdr.file_size, hdr.pak_count, hdr.ota_id(), hdr.version[3], hdr.version[2], hdr.version[1]);
  
     let mut paks: Vec<Pak> = Vec::new();
     //parse paks in header
-    for i in 0..pak_count {
-        let offset_bytes = common::read_exact(&mut hdr_reader, 4)?;
-        let offset = u32::from_le_bytes(offset_bytes.try_into().unwrap()) + 128; //add 128 bytes of initial signature
+    for i in 0..hdr.pak_count {
+        let pak: PakEntry = hdr_reader.read_le()?;
 
-        let size_bytes = common::read_exact(&mut hdr_reader, 4)?;
-        let size = u32::from_le_bytes(size_bytes.try_into().unwrap());
+        println!("Pak {}: {}, offset: {}, size: {}, segment size: {}", i + 1, pak.name(), pak.offset + 128, pak.size, pak.segment_size);
 
-        let name_bytes = common::read_exact(&mut hdr_reader, 4)?;
-        let name = common::string_from_bytes(&name_bytes);
-
-        let _version = common::read_exact(&mut hdr_reader, 4)?;
-
-        let segment_size_bytes = common::read_exact(&mut hdr_reader, 4)?;
-        let segment_size = u32::from_le_bytes(segment_size_bytes.try_into().unwrap());
-
-        println!("Pak {}: {}, offset: {}, size: {}, segment size: {}", i + 1, name, offset, size, segment_size);
-
-        paks.push(Pak { offset, size, name });
+        paks.push(Pak { offset: pak.offset + 128, size: pak.size, name: pak.name() });
     }
 
     let mut signature_count = 0;
