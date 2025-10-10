@@ -7,9 +7,45 @@ use std::fs::{self, OpenOptions};
 
 use aes::Aes256;
 use ecb::{Decryptor, cipher::{BlockDecryptMut, KeyInit, generic_array::GenericArray}};
+use binrw::{BinRead, BinReaderExt};
 
 use crate::common;
 use crate::keys;
+
+#[derive(Debug, BinRead)]
+#[br(little)]
+struct Header {
+    #[br(count = 8)] _magic_bytes: Vec<u8>,
+    header_size: u32,
+    data_size: u32,
+	#[br(count = 4)] _crc32: Vec<u8>,
+	mask: u32,
+	_data_size_decompressed: u32,
+	_padding2: u32,
+	#[br(count = 512)] description_bytes: Vec<u8>,
+}
+
+impl Header {
+    fn description(&self) -> String {
+        common::string_from_bytes(&self.description_bytes)
+    }
+}
+
+#[derive(Debug, BinRead)]
+#[br(little)]
+struct FileHeader {
+    #[br(count = 60)] file_name_bytes: Vec<u8>,
+    real_size: u32,
+	stored_size: u32,
+	_header_size: u32,
+    _attributes: u32,
+}
+
+impl FileHeader {
+    fn file_name(&self) -> String {
+        common::string_from_bytes(&self.file_name_bytes)
+    }
+}
 
 pub fn is_pfl_upg_file(file: &File) -> bool {
     let header = common::read_file(&file, 0, 8).expect("Failed to read from file.");
@@ -32,6 +68,7 @@ static AUTO_FWS: &[(&str, &str)] = &[
     ("Q582E", "q522e"),
     ("Q5481", "q5481"),
     ("Q5431", "q5431"),
+    ("S5551", "q5551"), //Sharp
 ];
 
 type Aes256EcbDec = Decryptor<Aes256>;
@@ -51,39 +88,19 @@ fn decrypt_aes256_ecb(key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, Box<dyn 
 }
 
 pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let _ = common::read_exact(&mut file, 8)?; //2SWU3TXV magic
-
-    let header_size_bytes = common::read_exact(&mut file, 4)?;
-    let header_size = u32::from_le_bytes(header_size_bytes.try_into().unwrap());
-
-    let data_size_bytes = common::read_exact(&mut file, 4)?;
-    let data_size = u32::from_le_bytes(data_size_bytes.try_into().unwrap());
-
-    let _crc32 = common::read_exact(&mut file, 4)?;
-
-    let mask_bytes = common::read_exact(&mut file, 4)?;
-    let mask = u32::from_le_bytes(mask_bytes.try_into().unwrap());
-
-    let _data_size_decompressed = common::read_exact(&mut file, 4)?;
-
-    let _padding2 = common::read_exact(&mut file, 4)?;
-
-    let description_bytes = common::read_exact(&mut file, 512)?;
-    let description = common::string_from_bytes(&description_bytes);
-    
+    let header: Header = file.read_le()?; 
     let signature = common::read_exact(&mut file, 128)?;
-
     let _ = common::read_exact(&mut file, 32)?; //unknown
 
-    let version_bytes = common::read_exact(&mut file, header_size as usize - 704)?;
+    let version_bytes = common::read_exact(&mut file, header.header_size as usize - 704)?;
     let version = common::string_from_bytes(&version_bytes);
 
     println!("\nVersion: {}", version);
-    println!("Description: \n{}", description);
-    println!("Data size: {}", data_size);
+    println!("Description: \n{}", header.description());
+    println!("Data size: {}", header.data_size);
 
     let decrypted_data;
-    if (mask & 0x2000_0000) != 0 {
+    if (header.mask & 0x2000_0000) != 0 {
         println!("File is encrypted.");
         let mut key = None;
         let mut n_hex = None;
@@ -122,33 +139,24 @@ pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<d
         let aes_key = &decrypted[20..52];
         println!("AES key: {}\n", hex::encode(aes_key));
 
-        let encrypted_data = common::read_exact(&mut file, data_size as usize)?;
+        let encrypted_data = common::read_exact(&mut file, header.data_size as usize)?;
         println!("Decrypting data...");
         decrypted_data = decrypt_aes256_ecb(aes_key, &encrypted_data)?;
     } else {
         println!("File is not encrypted.");
-        decrypted_data = common::read_exact(&mut file, data_size as usize)?;
+        decrypted_data = common::read_exact(&mut file, header.data_size as usize)?;
     }
 
     let mut data_reader = Cursor::new(decrypted_data);
 
     while (data_reader.position() as usize) < data_reader.get_ref().len() {
-        //file header
-        let file_header = common::read_exact(&mut data_reader, 76)?;
+        let file_header: FileHeader = data_reader.read_le()?; 
 
-        let file_name = common::string_from_bytes(&file_header[0..60]);
+        println!("\nFile: {}, Size: {}", file_header.file_name(), file_header.real_size);
 
-        let real_size = u32::from_le_bytes(file_header[60..64].try_into().unwrap());
+        let data = common::read_exact(&mut data_reader, file_header.stored_size as usize)?;
 
-        let stored_size = u32::from_le_bytes(file_header[64..68].try_into().unwrap());
-
-        let _header_size = u32::from_le_bytes(file_header[68..72].try_into().unwrap());
-
-        println!("\nFile: {}, Size: {}", file_name, real_size);
-
-        let data = common::read_exact(&mut data_reader, stored_size as usize)?;
-
-        let output_path = Path::new(&output_folder).join(file_name.trim_start_matches('/'));
+        let output_path = Path::new(&output_folder).join(file_header.file_name().trim_start_matches('/'));
 
         if let Some(parent) = output_path.parent() {
             fs::create_dir_all(parent)?;
@@ -160,7 +168,7 @@ pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<d
             .create(true)
             .open(output_path)?;
 
-        out_file.write_all(&data[..real_size as usize])?;
+        out_file.write_all(&data[..file_header.real_size as usize])?;
 
         println!("- Saved file!");
     }

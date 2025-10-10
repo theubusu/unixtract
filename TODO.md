@@ -10,3 +10,5 @@
 - Panasonic SDDL.SEC(2011+) - Complete
 - LG Epk2 (Crypted and plain header)- 100% complete (unless unencrypted versions exist  >)
 - LG epk3 - Probably fine??? but needs more testing     (and more stolen keys)
+
+Todo: use STRUCTS on everything
