@@ -13,3 +13,6 @@ pub mod epk;
 pub mod epk1;
 pub mod epk2;
 pub mod epk3;
+
+pub mod mtk_pkg;
+pub mod mtk_upgrade_loader;

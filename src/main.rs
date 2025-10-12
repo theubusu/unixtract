@@ -90,6 +90,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Mstar upgrade file detected!");
             formats::mstar::extract_mstar(&file, &output_path)?;
         } 
+        else if formats::mtk_pkg::is_mtk_pkg_file(&file) {
+            println!("MTK Pkg file detected!");
+            formats::mtk_pkg::extract_mtk_pkg(&file, &output_path)?;
+        } 
+        else if formats::mtk_upgrade_loader::is_mtk_upgrade_loader_file(&file) {
+            println!("MTK upgrade_loader file detected!");
+            formats::mtk_upgrade_loader::extract_mtk_upgrade_loader(&file, &output_path)?;
+        } 
         else {
             println!("Input format not recognized!");
         }
