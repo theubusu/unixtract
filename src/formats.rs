@@ -16,3 +16,4 @@ pub mod epk3;
 
 pub mod mtk_pkg;
 pub mod mtk_upgrade_loader;
+pub mod mtk_bdp;
