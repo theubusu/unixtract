@@ -43,16 +43,8 @@ pub fn extract_mtk_upgrade_loader(mut file: &File, output_folder: &str) -> Resul
 
         //strip iMtK thing
         let extra_header_len = if &data[0..4] == b"iMtK" {
-            let imtk_len = u32::from_le_bytes(data[8..12].try_into().unwrap());
-            let imtk_content = common::string_from_bytes(&data[12..12 + imtk_len as usize]);
-            println!("iMtK Info: {}", imtk_content);
-
-            if &data[12 + imtk_len as usize..(12 + imtk_len as usize) + 4] == b"iPAd" {
-                //println!("iPAd found!");
-                64
-            } else {
-                imtk_len + 12
-            }
+            let imtk_len = u32::from_le_bytes(data[4..8].try_into().unwrap());
+            imtk_len + 8
         } else {
             0
         };
