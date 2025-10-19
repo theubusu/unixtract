@@ -53,7 +53,7 @@ struct BlockEntry {
 
 pub fn is_pup_file(file: &File) -> bool {
     let header = common::read_file(&file, 0, 4).expect("Failed to read from file.");
-    if header == b"\x4F\x15\x3D\x1D" {
+    if header == b"\x4F\x15\x3D\x1D" || header == b"\x54\x14\xF5\xEE" { //ps4, ps5
         true
     } else {
         false
@@ -94,6 +94,7 @@ pub fn extract_pup(mut file: &File, output_folder: &str) -> Result<(), Box<dyn s
         if entry.is_blocked() && entry.is_compressed() {
             let block_size = 2_u32.pow(((entry.flags & 0xF000) >> 12) + 12);
             let block_count = (block_size + entry.uncompressed_size as u32 - 1) / block_size;
+            let last_block_size = entry.uncompressed_size % block_size as u64;
             let mut my_block_table: Option<Entry> = None;
             println!("Block size: {}, Block count: {}", block_size, block_count);
 
@@ -118,8 +119,16 @@ pub fn extract_pup(mut file: &File, output_folder: &str) -> Result<(), Box<dyn s
                 let current_pos = file.stream_position()?;
 
                 let padding = block.size & 0xF;
-                let data_size = block.size - padding;
-                let compressed = if data_size == block_size {false} else {true};
+                let data_size =  // last block in the entire file will be filesize - offste
+                if (i == block_count - 1) && (e_i as usize + 1 == entries.len()) {
+                    header.file_size as u32 - initial_offset as u32 - block.offset
+                } else {
+                    block.size - padding
+                };
+                // last block will have smaller block size
+                let ac_block_size = if i == block_count - 1 {last_block_size as u32} else {block_size};
+
+                let compressed = if data_size == ac_block_size {false} else {true};
                 println!("Block {}/{}: Offset: {}, Data Size: {}, Padding: {}, Compressed: {}", i + 1, block_count, block.offset, data_size, padding, compressed);
 
                 file.seek(std::io::SeekFrom::Start(initial_offset + block.offset as u64))?;
