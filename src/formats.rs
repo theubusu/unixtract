@@ -4,6 +4,7 @@ pub mod tpv_timg;
 pub mod pfl_upg;
 pub mod sddl_sec;
 pub mod novatek;
+pub mod ruf;
 
 pub mod msd;
 pub mod msd10;

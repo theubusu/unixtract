@@ -82,6 +82,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("EPK file detected!");
             formats::epk::extract_epk(&file, &output_path)?;
         }
+        else if formats::ruf::is_ruf_file(&file) {
+            println!("RUF file detected!");
+            formats::ruf::extract_ruf(&file, &output_path)?;
+        }
         else if formats::pfl_upg::is_pfl_upg_file(&file) {
             println!("PFL UPG file detected!");
             formats::pfl_upg::extract_pfl_upg(&file, &output_path)?;

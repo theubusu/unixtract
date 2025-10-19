@@ -1,10 +1,54 @@
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path};
 use std::io::{Write, Seek, SeekFrom, Cursor};
+use binrw::{BinRead, BinReaderExt};
 
 use crate::common;
 use crate::keys;
 use crate::formats::epk::{decrypt_aes_ecb_auto, find_key};
+
+#[derive(BinRead)]
+struct Header {
+    #[br(count = 4)] _magic_bytes: Vec<u8>,
+    #[br(count = 4)] version: Vec<u8>,
+	#[br(count = 32)] ota_id_bytes: Vec<u8>,
+    package_info_size: u32,
+}
+impl Header {
+    fn ota_id(&self) -> String {
+        common::string_from_bytes(&self.ota_id_bytes)
+    }
+}
+
+#[derive(BinRead)]
+struct PkgInfoHeader {
+    package_info_list_size: u32,
+    package_info_count: u32,
+}
+
+#[derive(BinRead)]
+struct PkgInfoEntry {
+    _package_type: u32,
+    _package_info_size: u32,
+    #[br(count = 128)] package_name_bytes: Vec<u8>,
+    #[br(count = 96)] _package_version_bytes: Vec<u8>,
+	#[br(count = 32)] _package_architecture_bytes: Vec<u8>,
+    #[br(count = 32)] _checksum: Vec<u8>,
+    package_size: u32,
+    _dipk: u32,
+    //segment info
+    _is_segmented: u32,
+    segment_index: u32,
+    segment_count: u32,
+    segment_size: u32,
+    //
+    _unk: u32,
+}
+impl PkgInfoEntry {
+    fn package_name(&self) -> String {
+        common::string_from_bytes(&self.package_name_bytes)
+    }
+}
 
 pub fn extract_epk3(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
     file.seek(SeekFrom::Start(128))?; //inital signature
@@ -42,86 +86,45 @@ pub fn extract_epk3(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
 
     //parse header
     let mut hdr_reader = Cursor::new(header);
-
     if new_type {let _signature = common::read_exact(&mut hdr_reader, 128)?;};
-
-    let _epk3 = common::read_exact(&mut hdr_reader, 4)?; //EPK3 magic
-
-    let version = common::read_exact(&mut hdr_reader, 4)?;
-
-    let ota_id_bytes = common::read_exact(&mut hdr_reader, 32)?;
-    let ota_id = common::string_from_bytes(&ota_id_bytes);
-
-    let package_info_size_bytes = common::read_exact(&mut hdr_reader, 4)?;
-    let package_info_size = u32::from_le_bytes(package_info_size_bytes.try_into().unwrap());
+    let hdr: Header = hdr_reader.read_le()?;
 
     println!("\nEPK info:\nOTA ID: {}\nVersion: {:02x?}.{:02x?}.{:02x?}\nPackage Info size: {}\n", 
-                ota_id, version[3], version[2], version[1], package_info_size);
+                hdr.ota_id(), hdr.version[3], hdr.version[2], hdr.version[1], hdr.package_info_size);
     //
-
     let _versions = common::read_exact(&mut file, 36)?;
-
     let _signature = common::read_exact(&mut file, signature_size)?;
 
     //PKG INFO
-    let pkg_info_encrypted = common::read_exact(&mut file, package_info_size as usize)?;
+    let pkg_info_encrypted = common::read_exact(&mut file, hdr.package_info_size as usize)?;
     let pkg_info = decrypt_aes_ecb_auto(matching_key_bytes, &pkg_info_encrypted)?;
-
     let mut pkg_info_reader = Cursor::new(pkg_info);
-
-    let package_info_list_size_b = common::read_exact(&mut pkg_info_reader, 4)?;
-    let package_info_list_size = u32::from_le_bytes(package_info_list_size_b.try_into().unwrap());
-
-    let package_info_count_b = common::read_exact(&mut pkg_info_reader, 4)?;
-    let package_info_count = u32::from_le_bytes(package_info_count_b.try_into().unwrap());
+    let pkg_info_hdr: PkgInfoHeader = pkg_info_reader.read_le()?;
 
     println!("Package info list size: {}\nPackage info count: {}", 
-                package_info_list_size, package_info_count);
+                pkg_info_hdr.package_info_list_size, pkg_info_hdr.package_info_count);
 
-    if new_type {let _unknown = common::read_exact(&mut pkg_info_reader, 4)?;}; //uncertain if this is only in new type, but i think it is
+    if new_type {let _unknown = common::read_exact(&mut pkg_info_reader, 4)?;}; //new type has additional value
 
     while (pkg_info_reader.position() as usize) < pkg_info_reader.get_ref().len() {
-        let segment = common::read_exact(&mut pkg_info_reader, 324)?;
-
-        let package_name_b = &segment[8..136];
-        let package_name = common::string_from_bytes(&package_name_b);
-
-        let package_size_b = &segment[296..300];
-        let package_size = u32::from_le_bytes(package_size_b.try_into().unwrap());
-
-        //Package segment info
-        let segment_index_b = &segment[308..312];
-        let mut segment_index = u32::from_le_bytes(segment_index_b.try_into().unwrap());
-
-        let segment_count_b = &segment[312..316];
-        let segment_count = u32::from_le_bytes(segment_count_b.try_into().unwrap());
-
-        let segment_size_b = &segment[316..320];
-        let mut segment_size = u32::from_le_bytes(segment_size_b.try_into().unwrap());
-        //
+        let mut entry: PkgInfoEntry = pkg_info_reader.read_le()?;
 
         println!("\nPak - {}, Size: {}, Segments: {}",
-                package_name, package_size, segment_count);
+                entry.package_name(), entry.package_size, entry.segment_count);
         
-        for i in 0..segment_count {
+        for i in 0..entry.segment_count {
             if i > 0 {
-                let segment = common::read_exact(&mut pkg_info_reader, 324)?;
-
-                let segment_index_b = &segment[308..312];
-                segment_index = u32::from_le_bytes(segment_index_b.try_into().unwrap());
-
-                let segment_size_b = &segment[316..320];
-                segment_size = u32::from_le_bytes(segment_size_b.try_into().unwrap()); 
+                entry = pkg_info_reader.read_le()?;
             }   
             
-            println!("- Segment {}/{}, Size: {}", segment_index + 1, segment_count, segment_size);
+            println!("- Segment {}/{}, Size: {}", entry.segment_index + 1, entry.segment_count, entry.segment_size);
 
             let _signature = common::read_exact(&mut file, signature_size)?;
 
-            let encrypted_data = common::read_exact(&mut file, segment_size as usize + extra_segment_size)?;
+            let encrypted_data = common::read_exact(&mut file, entry.segment_size as usize + extra_segment_size)?;
             let out_data = decrypt_aes_ecb_auto(matching_key_bytes, &encrypted_data)?;
 
-            let output_path = Path::new(&output_folder).join(package_name.clone() + ".bin");
+            let output_path = Path::new(&output_folder).join(entry.package_name().clone() + ".bin");
 
             fs::create_dir_all(&output_folder)?;
             let mut out_file = OpenOptions::new()
@@ -136,6 +139,5 @@ pub fn extract_epk3(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
     }
 
     println!("\nExtraction finished!");
-
     Ok(())
 }
