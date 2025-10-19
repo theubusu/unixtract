@@ -3,6 +3,7 @@ use std::path::{Path};
 use std::fs::{self, OpenOptions};
 use std::io::{Seek, SeekFrom, Read, Write};
 use binrw::{BinRead, BinReaderExt};
+use std::sync::OnceLock;
 
 use crate::common;
 
@@ -39,37 +40,62 @@ impl PartEntry {
 
 static ITIP_MAGIC: [u8; 8] = [0x69, 0x54, 0x49, 0x50, 0x69, 0x54, 0x49, 0x50];
 
+static ITIP_OFFSET: OnceLock<usize> = OnceLock::new();
+
 fn find_bytes(data: &[u8], pattern: &[u8]) -> Option<usize> {
     data.windows(pattern.len()).position(|window| window == pattern)
 }
 
-pub fn is_mtk_bdp_file(mut file: &File) -> Option<usize> {
+pub fn is_mtk_bdp_file(mut file: &File) -> bool {
     let file_size = file.metadata().expect("REASON").len();
     let mut data = Vec::new();
 
-    let start_offset = file_size.saturating_sub(file_size / 20); // only search in the last 5% of file (lets not waste time)
+    // I wish there was a better way
+    let start_offset = file_size.saturating_sub(file_size / 20);
     let _ = file.seek(SeekFrom::Start(start_offset));
 
     file.read_to_end(&mut data).expect("Failed to read from file.");
 
     if let Some(pos) = find_bytes(&data, &ITIP_MAGIC) {
-        Some(start_offset as usize + pos)
+        ITIP_OFFSET.set(start_offset as usize + pos).unwrap();
+        true 
     } else {
-        None
+        false
     }
 }
 
-pub fn extract_mtk_bdp(mut file: &File, output_folder: &str, offset_opt: Option<usize>) -> Result<(), Box<dyn std::error::Error>> {
-    let offset = offset_opt.unwrap();
+pub fn extract_mtk_bdp(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+    //check if its a philips file which has a 106 byte header that offsets everything
+    let base_offset;
+    let magic = common::read_file(&file, 0, 7)?;
+    if magic == b"PHILIPS" {
+        base_offset = 106;
+        println!("Philips variant detected!\n")
+    } else {
+        base_offset = 0;
+    }
+
+    let offset = ITIP_OFFSET.get().unwrap();
     println!("Reading PIT at: {}", offset);
 
-    file.seek(SeekFrom::Start(offset as u64 + 8))?;
+    file.seek(SeekFrom::Start(*offset as u64 + 8))?;
 
     let ittp_check = common::read_exact(&mut file, 8)?;
-    let toc_offset;
+    let mut toc_offset = 0;
     if ittp_check == ITIP_MAGIC {
         //old pit
-        toc_offset = offset + 80;
+        for i in 0..10 {
+            let line = common::read_exact(&mut file, 16)?;
+            //line that ends the old PIT, TOC appears directly after
+            if line == b"\x50\x49\x54\x69\x50\x49\x54\x69\x50\x49\x54\x69\x50\x49\x54\x69" {
+                toc_offset = offset + (16* (i + 2));
+                break
+            }   
+        }
+        if toc_offset == 0 {
+            println!("Failed to find TOC!");
+            return Ok(());
+        }
     } else {
         //new pit
         let _ = common::read_exact(&mut file, 16)?;
@@ -78,7 +104,7 @@ pub fn extract_mtk_bdp(mut file: &File, output_folder: &str, offset_opt: Option<
     }
 
     println!("\nReading TOC at: {}", toc_offset);
-    file.seek(SeekFrom::Start(toc_offset as u64))?;
+    file.seek(SeekFrom::Start(base_offset + toc_offset as u64))?;
 
     let toc_check = common::read_exact(&mut file, 20)?;
     if toc_check != b"\xCD\xAB\x30\x85\xCD\xAB\x30\x85\xCD\xAB\x30\x85\xCD\xAB\x30\x85\xCD\xAB\x30\x85" {
@@ -111,7 +137,7 @@ pub fn extract_mtk_bdp(mut file: &File, output_folder: &str, offset_opt: Option<
 
     println!("\nReading partition table at: {}", part_table_offset.unwrap());
 
-    file.seek(SeekFrom::Start(part_table_offset.unwrap()))?;
+    file.seek(SeekFrom::Start(base_offset + part_table_offset.unwrap()))?;
     let part_header: PartHeader = file.read_le()?;
     println!("Part count: {}", part_header.part_count);
 
@@ -123,7 +149,7 @@ pub fn extract_mtk_bdp(mut file: &File, output_folder: &str, offset_opt: Option<
             if entry.id == part_entry.id && entry.size == part_entry.size {
                 //println!("- Saving {}.bin, Offset: {}, Size: {}", part_entry.name(), entry.offset, entry.size);
                 let current_pos = file.stream_position()?;
-                file.seek(SeekFrom::Start(entry.offset as u64))?;
+                file.seek(SeekFrom::Start(base_offset + entry.offset as u64))?;
                 let data = common::read_exact(&mut file, entry.size as usize)?;
 
                 let output_path = Path::new(&output_folder).join(part_entry.name() + ".bin");

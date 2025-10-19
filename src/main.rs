@@ -102,15 +102,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("MTK upgrade_loader file detected!");
             formats::mtk_upgrade_loader::extract_mtk_upgrade_loader(&file, &output_path)?;
         }
+        else if formats::mtk_bdp::is_mtk_bdp_file(&file) {
+            println!("MTK BDP file detected!");
+            formats::mtk_bdp::extract_mtk_bdp(&file, &output_path)?;
+        }
         else {
-            // I dont like this   need to pass result from search to avoid searching twice
-            let mtk_bdp_result = formats::mtk_bdp::is_mtk_bdp_file(&file);    
-            if mtk_bdp_result.is_some() {
-                println!("MTK BDP file detected!\n");
-                formats::mtk_bdp::extract_mtk_bdp(&file, &output_path, mtk_bdp_result)?;
-            } else {
-                println!("Input format not recognized!");
-            }
+            println!("Input format not recognized!");
         }
     }
 
