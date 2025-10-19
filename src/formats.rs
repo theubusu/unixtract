@@ -6,6 +6,8 @@ pub mod sddl_sec;
 pub mod novatek;
 pub mod ruf;
 
+pub mod pup;
+
 pub mod msd;
 pub mod msd10;
 pub mod msd11;

@@ -94,6 +94,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Mstar upgrade file detected!");
             formats::mstar::extract_mstar(&file, &output_path)?;
         } 
+        else if formats::pup::is_pup_file(&file) {
+            println!("PUP file detected!");
+            formats::pup::extract_pup(&file, &output_path)?;
+        } 
         else if formats::mtk_pkg::is_mtk_pkg_file(&file) {
             println!("MTK Pkg file detected!");
             formats::mtk_pkg::extract_mtk_pkg(&file, &output_path)?;
