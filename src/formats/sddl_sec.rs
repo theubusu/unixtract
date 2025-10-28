@@ -155,25 +155,22 @@ pub fn extract_sddl_sec(file: &File, output_folder: &str) -> Result<(), Box<dyn 
             let source_offset = u32::from_be_bytes([0x00, out_data[6], out_data[7], out_data[8]]);
 
             let path: PathBuf; 
-            let msg: &str;
+            let msg: String;
 
-            if filename.starts_with("PEAKS.F") {
-                if source_offset == 270 {   //unique for 2014-2018 files
-                    let embedded_file_name_string = String::from_utf8_lossy(&out_data[14..270]);
-                    let embedded_file_name = embedded_file_name_string.split("\0").next().unwrap();
-                    println!("--- Embedded file: {}", embedded_file_name);
+            let source_name = filename.split(".").next().unwrap();
+
+            if source_offset == 270 {   //unique for 2014-2018 files
+                let embedded_file_name_string = String::from_utf8_lossy(&out_data[14..270]);
+                let embedded_file_name = embedded_file_name_string.split("\0").next().unwrap();
+                println!("--- Embedded file: {}", embedded_file_name);
     
-                    let folder_path = Path::new(&output_folder).join("PEAKS");
-                    fs::create_dir_all(&folder_path)?;
-                    path = Path::new(&folder_path).join(embedded_file_name);
-                    msg = "to PEAKS";
-                } else {
-                    path = Path::new(&output_folder).join("PEAKS.bin");
-                    msg = "to PEAKS.bin";
-                }            
+                let folder_path = Path::new(&output_folder).join(source_name);
+                fs::create_dir_all(&folder_path)?;
+                path = Path::new(&folder_path).join(embedded_file_name);
+                msg = format!("to {}", source_name);
             } else {
-                path = Path::new(&output_folder).join(filename);
-                msg = "file";
+                path = Path::new(&output_folder).join(format!("{}.bin", source_name));
+                msg = format!("to {}.bin", source_name);
             }
 
             fs::create_dir_all(&output_folder)?;

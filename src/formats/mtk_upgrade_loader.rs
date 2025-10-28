@@ -7,7 +7,7 @@ use crate::common;
 
 pub fn is_mtk_upgrade_loader_file(file: &File) -> bool {
     let header = common::read_file(&file, 152, 4).expect("Failed to read from file.");
-    if header == b"cfig" { //cfig is always(?) the first partition in upgrade_loader
+    if header == b"cfig" || header == b"load" { //cfig or load is always(?) the first partition in upgrade_loader
         true
     } else {
         false

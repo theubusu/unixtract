@@ -52,6 +52,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("SDDL.SEC file detected!");
             formats::sddl_sec::extract_sddl_sec(&file, &output_path)?;
         } 
+        if formats::invincible_image::is_invincible_image_file(&file) {
+            println!("INVINCIBLE_IMAGE file detected!");
+            formats::invincible_image::extract_invincible_image(&file, &output_path)?;
+        } 
         else if formats::msd10::is_msd10_file(&file) {
             println!("MSD10 file detected!");
             formats::msd10::extract_msd10(&file, &output_path)?;

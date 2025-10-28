@@ -5,6 +5,7 @@ pub mod pfl_upg;
 pub mod sddl_sec;
 pub mod novatek;
 pub mod ruf;
+pub mod invincible_image;
 
 pub mod pup;
 
