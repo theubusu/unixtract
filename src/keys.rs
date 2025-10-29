@@ -23,8 +23,8 @@ pub static MSD10: &[(&str, &str, &str)] = &[
 //MSD11 keys
 //github.com/bugficks/msddecrypt
 pub static MSD11: &[(&str, &str)] = &[
-    ("T-JZM",   "9b1d077c0d137d406c79ddacb6b159fe"), //2015
-    ("T-HKMFK", "c7097975e8ab994beb5eaae57e0ba77c"), //2016
+    ("T-JZM",   "9b1d077c0d137d406c79ddacb6b159fe"), //2016
+    ("T-HKM",   "c7097975e8ab994beb5eaae57e0ba77c"), //2016
     ("T-KTM2L", "46b04f5e794ca4377a20951c9ea00427"), //2018
     ("T-KTM2",  "29110e0ce940b3a9b67d3e158f3f1342"), //2018
     ("T-KTM",   "d0d49d5f36f5c0da50062fbf32168f5b"), //2017
