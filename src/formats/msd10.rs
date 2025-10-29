@@ -1,18 +1,35 @@
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path};
 use std::io::{Cursor, Write, Seek, SeekFrom};
+use binrw::{BinRead, BinReaderExt};
 
 use crate::common;
 use crate::keys;
-
 use crate::formats::msd::{decrypt_aes_salted_old, decrypt_aes_salted_tizen, decrypt_aes_tizen};
 
-pub fn is_msd10_file(file: &File) -> bool {
-    let header = common::read_file(&file, 0, 6).expect("Failed to read from file.");
-    if header == b"MSDU10" {
-        true
-    } else {
-        false
+#[derive(BinRead)]
+struct FileHeader {
+    #[br(count = 6)] _magic_bytes: Vec<u8>,
+    section_count: u32
+}
+
+#[derive(BinRead)]
+struct SectionEntry {
+    index: u32,
+    offset: u32,
+    size: u32,
+}
+
+#[derive(BinRead)]
+struct HeaderEntry {
+    offset: u32,
+    size: u32,
+    _name_length: u8,
+    #[br(count = _name_length)] name_bytes: Vec<u8>,
+}
+impl HeaderEntry {
+    fn name(&self) -> String {
+        common::string_from_bytes(&self.name_bytes)
     }
 }
 
@@ -23,60 +40,72 @@ struct Section {
     name: String,
 }
 
-pub fn extract_msd10(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
-    
-    let _magic = common::read_exact(&mut file, 6)?; //MSDU10 magic
+#[derive(BinRead)]
+struct TizenTocEntry {
+    #[br(count = 44)] _unk1: Vec<u8>,
+    _name_length: u8,
+    #[br(count = _name_length)] name_bytes: Vec<u8>,
+    #[br(count = 314)] _unk2: Vec<u8>,
+    #[br(count = 8)] salt: Vec<u8>,
+    #[br(count = 13)] _unk3: Vec<u8>,
+}
+impl TizenTocEntry {
+    fn name(&self) -> String {
+        common::string_from_bytes(&self.name_bytes)
+    }
+}
 
-    let section_count_bytes = common::read_exact(&mut file, 4)?;
-    let section_count = u32::from_le_bytes(section_count_bytes.try_into().unwrap());
-    println!("\nNumber of sections: {}", section_count);
+#[derive(BinRead)]
+struct OldTocEntry {
+    #[br(count = 4)] _magic: Vec<u8>,
+    segment_length: u32,
+    segment_size: u32,
+    #[br(count = 26)] _unk: Vec<u8>,
+    name_lenght: u8,
+    #[br(count = name_lenght)] name_bytes: Vec<u8>,
+}
+impl OldTocEntry {
+    fn name(&self) -> String {
+        common::string_from_bytes(&self.name_bytes)
+    }
+}
+
+pub fn is_msd10_file(file: &File) -> bool {
+    let header = common::read_file(&file, 0, 6).expect("Failed to read from file.");
+    if header == b"MSDU10" {
+        true
+    } else {
+        false
+    }
+}
+
+pub fn extract_msd10(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let header: FileHeader = file.read_le()?;
+    println!("\nNumber of sections: {}", header.section_count);
 
     let mut sections: Vec<Section> = Vec::new();
 
-    //parse sections
-    for _i in 0..section_count {
-        let index_bytes = common::read_exact(&mut file, 4)?;
-        let index = u32::from_le_bytes(index_bytes.try_into().unwrap());
-        
-        let offset_bytes = common::read_exact(&mut file, 4)?;
-        let offset = u32::from_le_bytes(offset_bytes.try_into().unwrap());
-        
-        let size_bytes = common::read_exact(&mut file, 4)?;
-        let size = u32::from_le_bytes(size_bytes.try_into().unwrap());
-
-        println!("Section {}: offset: {}, size: {}", index, offset, size);
-        sections.push(Section { index, offset, size , name: "".to_string() });
+    for _i in 0..header.section_count {
+        let section: SectionEntry = file.read_le()?;
+        println!("Section {}: offset: {}, size: {}", section.index, section.offset, section.size);
+        sections.push(Section {index: section.index, offset: section.offset, size: section.size, name: "".to_owned()});
     }
 
     let _0 = common::read_exact(&mut file, 4)?; //0000
-
     let header_count_bytes = common::read_exact(&mut file, 4)?;
     let header_count = u32::from_le_bytes(header_count_bytes.try_into().unwrap());
     println!("\nNumber of headers: {}", header_count);
 
-    let mut headers: Vec<Section> = Vec::new();
+    let mut headers: Vec<HeaderEntry> = Vec::new();
 
-    //parse headers
     for i in 0..header_count {
-        let offset_bytes = common::read_exact(&mut file, 4)?;
-        let offset = u32::from_le_bytes(offset_bytes.try_into().unwrap());
-
-        let size_bytes = common::read_exact(&mut file, 4)?;
-        let size = u32::from_le_bytes(size_bytes.try_into().unwrap());
-
-        let name_length_byte = common::read_exact(&mut file, 1)?;
-        let name_length = u8::from_le_bytes(name_length_byte.try_into().unwrap());
-
-        let name_bytes = common::read_exact(&mut file, name_length as usize)?;
-        let name = String::from_utf8(name_bytes)?;
-
-        println!("Header {}: {}, offset: {}, size: {}", i + 1, name, offset, size);
-
-        headers.push(Section { index: 0, offset, size , name });
+        let header: HeaderEntry = file.read_le()?;
+        println!("Header {}: {}, offset: {}, size: {}", i + 1, header.name(), header.offset, header.size);
+        headers.push(header);
     }
 
     //use first header
-    let firmware_name = &headers[0].name;
+    let firmware_name = &headers[0].name();
     println!("\nFirmware name: {}", firmware_name);
 
     let mut passphrase: Option<&str> = None;
@@ -112,32 +141,19 @@ pub fn extract_msd10(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
         toc_reader.seek(SeekFrom::Current(256))?; // probably signature
         toc_reader.seek(SeekFrom::Current(50))?; // Tizen Software Upgrade Tree Binary Format ver. 1.8
 
-        for i in 0..section_count {
-            toc_reader.seek(SeekFrom::Current(44))?; //unknown
+        for i in 0..header.section_count {
+            let entry: TizenTocEntry = toc_reader.read_le()?;
 
-            let name_length_byte = common::read_exact(&mut toc_reader, 1)?;
-            let name_length = u8::from_le_bytes(name_length_byte.try_into().unwrap());
-
-            let name_bytes = common::read_exact(&mut toc_reader, name_length as usize)?;
-            let name = String::from_utf8(name_bytes)?;
-
-            toc_reader.seek(SeekFrom::Current(314))?; //unknown
-
-            let salt = common::read_exact(&mut toc_reader, 8)?;
-
-            toc_reader.seek(SeekFrom::Current(13))?; //unknown
-
-            println!("\nSection {}: {}", sections[i as usize].index, name);
+            println!("\nSection {}: {}", sections[i as usize].index, entry.name());
 
             let offset = sections[i as usize].offset;
             let size = sections[i as usize].size;
             let encrypted_data = common::read_file(&file, offset as u64, size as usize)?;
 
             println!("- Decrypting...");
-            let decrypted_data = decrypt_aes_tizen(&encrypted_data, &passphrase_bytes, &salt)?;
+            let decrypted_data = decrypt_aes_tizen(&encrypted_data, &passphrase_bytes, &entry.salt)?;
 
-            let output_path = Path::new(&output_folder).join(name);
-
+            let output_path = Path::new(&output_folder).join(entry.name());
             fs::create_dir_all(&output_folder)?;
             let mut out_file = OpenOptions::new()
                 .write(true)
@@ -154,38 +170,22 @@ pub fn extract_msd10(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
         let toc = decrypt_aes_salted_old(&toc_data, &passphrase_bytes)?;
         let mut toc_reader = Cursor::new(toc);
 
-        toc_reader.seek(SeekFrom::Current(128))?; // probably signature
+        toc_reader.seek(SeekFrom::Current(124))?; //probably signature + first magic
 
-        for i in 0..section_count {
-            if i != 0 { //isnt on first segment
-                toc_reader.seek(SeekFrom::Current(4))?; //some magic? seems to be 00 00 03 E8 always
-            }
+        for i in 0..header.section_count {            
+            let entry: OldTocEntry = toc_reader.read_be()?;
 
-            let segment_length_bytes = common::read_exact(&mut toc_reader, 4)?;
-            let segment_length = u32::from_be_bytes(segment_length_bytes.try_into().unwrap());
+            toc_reader.seek(SeekFrom::Current((entry.segment_length - entry.name_lenght as u32 - 31).into()))?;
 
-            let segment_size_bytes = common::read_exact(&mut toc_reader, 4)?;
-            let segment_size = u32::from_be_bytes(segment_size_bytes.try_into().unwrap());
+            assert!(entry.segment_size == sections[i as usize].size, "size in TOC does not match size from header!");
+            sections[i as usize].name = entry.name().clone();
 
-            assert!(segment_size == sections[i as usize].size, "size in TOC does not match size from header!");
-
-            toc_reader.seek(SeekFrom::Current(26))?; //unknown now
-
-            let name_length_byte = common::read_exact(&mut toc_reader, 1)?;
-            let name_length = u8::from_be_bytes(name_length_byte.try_into().unwrap());
-
-            let name_bytes = common::read_exact(&mut toc_reader, name_length as usize)?;
-            let name = String::from_utf8(name_bytes)?;
-            sections[i as usize].name = name.clone();
-
-            toc_reader.seek(SeekFrom::Current((segment_length - name_length as u32 - 31).into()))?;
-
-            println!("\nSection {}: {}", sections[i as usize].index, name);
+            println!("\nSection {}: {}", sections[i as usize].index, entry.name());
             
             let offset = sections[i as usize].offset;
             let size = sections[i as usize].size;
 
-            if i != 0 && name == sections[i as usize - 1].name { //second section with the same name is some sort of signature
+            if i != 0 && entry.name() == sections[i as usize - 1].name { //second section with the same name is some sort of signature
                 println!("- Skipping signature file...");
                 continue;
             }
@@ -195,8 +195,7 @@ pub fn extract_msd10(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
             println!("- Decrypting...");
             let out_data = decrypt_aes_salted_old(&encrypted_data, &passphrase_bytes)?; 
 
-            let output_path = Path::new(&output_folder).join(name);
-
+            let output_path = Path::new(&output_folder).join(entry.name());
             fs::create_dir_all(&output_folder)?;
             let mut out_file = OpenOptions::new()
                 .write(true)
@@ -207,7 +206,6 @@ pub fn extract_msd10(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
 
             println!("-- Saved file!");
         }
-
     }
 
     println!("\nExtraction finished!");
