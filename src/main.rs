@@ -72,6 +72,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Novatek file detected!");
             formats::novatek::extract_novatek(&file, &output_path)?;
         } 
+        else if formats::slp::is_slp_file(&file) {
+            println!("SLP file detected!");
+            formats::slp::extract_slp(&file, &output_path)?;
+        } 
         else if formats::epk1::is_epk1_file(&file) {
             println!("EPK1 file detected!");
             formats::epk1::extract_epk1(&file, &output_path)?;

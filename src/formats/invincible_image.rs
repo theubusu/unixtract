@@ -139,5 +139,7 @@ pub fn extract_invincible_image(mut file: &File, output_folder: &str) -> Result<
         i += 1;
     }
 
+    println!("\nExtraction finished!");
+
     Ok(())
 }
