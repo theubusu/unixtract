@@ -7,6 +7,7 @@ pub mod novatek;
 pub mod ruf;
 pub mod invincible_image;
 pub mod slp;
+pub mod roku;
 
 pub mod pup;
 

@@ -2,12 +2,10 @@ use std::path::{Path};
 use std::fs::{self, File, OpenOptions};
 use binrw::{BinRead, BinReaderExt};
 use std::io::{Write, Seek, SeekFrom, Cursor};
-use aes::Aes128;
-use cbc::{Decryptor, cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit}};
-type Aes128CbcDec = Decryptor<Aes128>;
 
 use crate::common;
 use crate::keys;
+use crate::utils::aes::{decrypt_aes128_cbc_pcks7};
 
 #[derive(BinRead)]
 struct RufHeader {
@@ -80,15 +78,6 @@ pub fn is_ruf_file(file: &File) -> bool {
     }
 }
 
-fn decrypt(encrypted_data: &[u8], key: &[u8; 16], iv: &[u8; 16]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut data = encrypted_data.to_vec();
-    let decryptor = Aes128CbcDec::new(key.into(), iv.into());
-    let decrypted = decryptor.decrypt_padded_mut::<Pkcs7>(&mut data)
-        .map_err(|e| format!("!!Decryption error!!: {:?}", e))?;
-    
-    Ok(decrypted.to_vec())
-}
-
 pub fn extract_ruf(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
     let header: RufHeader = file.read_be()?;
     if header.is_dual_ruf() {
@@ -157,7 +146,7 @@ fn actually_extract_ruf(mut file: &File, output_folder: &str, start_offset: u64)
     file.seek(SeekFrom::Start(start_offset + 2048))?;
     let encrypted_data = common::read_exact(&mut file, header.data_size as usize)?;
     println!("Decrypting data...");
-    let decrypted_data = decrypt(&encrypted_data, &key_bytes, &iv_bytes)?;
+    let decrypted_data = decrypt_aes128_cbc_pcks7(&encrypted_data, &key_bytes, &iv_bytes)?;
 
     let mut data_reader = Cursor::new(decrypted_data);
 

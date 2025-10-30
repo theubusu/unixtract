@@ -1,6 +1,7 @@
 mod common;
 mod formats;
 mod keys;
+mod utils;
 
 use clap::Parser;
 use std::path::{PathBuf};
@@ -105,7 +106,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         else if formats::pup::is_pup_file(&file) {
             println!("PUP file detected!");
             formats::pup::extract_pup(&file, &output_path)?;
-        } 
+        }
+        else if formats::roku::is_roku_file(&file) {
+            println!("Roku file detected!");
+            formats::roku::extract_roku(&file, &output_path)?;
+        }
         else if formats::mtk_pkg::is_mtk_pkg_file(&file) {
             println!("MTK Pkg file detected!");
             formats::mtk_pkg::extract_mtk_pkg(&file, &output_path)?;

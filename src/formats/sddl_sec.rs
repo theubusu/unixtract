@@ -1,14 +1,10 @@
 use std::path::{Path, PathBuf};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
-
-use aes::Aes128;
 use flate2::read::ZlibDecoder;
-use cbc::{Decryptor, cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit}};
-
-type Aes128CbcDec = Decryptor<Aes128>;
 
 use crate::common;
+use crate::utils::aes::{decrypt_aes128_cbc_pcks7};
 
 pub fn is_sddl_sec_file(file: &File) -> bool {
     let header = common::read_file(&file, 0, 8).expect("Failed to read from file.");
@@ -17,15 +13,6 @@ pub fn is_sddl_sec_file(file: &File) -> bool {
     } else {
         false
     }
-}
-
-fn decrypt(encrypted_data: &[u8], key: &[u8; 16], iv: &[u8; 16]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut data = encrypted_data.to_vec();
-    let decryptor = Aes128CbcDec::new(key.into(), iv.into());
-    let decrypted = decryptor.decrypt_padded_mut::<Pkcs7>(&mut data)
-        .map_err(|e| format!("!!Decryption error!!: {:?}", e))?;
-    
-    Ok(decrypted.to_vec())
 }
 
 //ported from original from https://nese.team/posts/justctf/
@@ -97,7 +84,7 @@ pub fn extract_sddl_sec(file: &File, output_folder: &str) -> Result<(), Box<dyn 
         let header = common::read_file(&file, offset, 32)?;
         let decrypted_header: Vec<u8>; 
 
-        match decrypt(&header, &key, &iv) {
+        match decrypt_aes128_cbc_pcks7(&header, &key, &iv) {
             Ok(v) => decrypted_header = v,
             Err(_) => {
                 // SDDL files can have a footer(signature?) of 0x80 OR 0x100 lenght in later ones, and there is no good way to detect it before entering the while loop and the footer has no common header.
@@ -124,7 +111,7 @@ pub fn extract_sddl_sec(file: &File, output_folder: &str) -> Result<(), Box<dyn 
         offset += 32;
 
         let data = common::read_file(&file, offset, size.try_into().unwrap())?;
-        let decrypted_data = decrypt(&data, &key, &iv)?;
+        let decrypted_data = decrypt_aes128_cbc_pcks7(&data, &key, &iv)?;
 
         if decrypted_data.starts_with(&[0x11, 0x22, 0x33, 0x44]) && filename != "SDIT.FDI"{ // header of obfuscated file, SDIT.FDI also has this header but seems to work differently so its skipped
 

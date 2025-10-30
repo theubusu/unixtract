@@ -2,10 +2,8 @@ use std::path::{Path};
 use std::fs::{self, File, OpenOptions};
 use std::io::{Write, Read, Seek, SeekFrom, Cursor};
 use binrw::{BinRead, BinReaderExt};
-use aes::Aes128;
-use cbc::{Decryptor, cipher::{block_padding::NoPadding, BlockDecryptMut, KeyIvInit}};
-type Aes128CbcDec = Decryptor<Aes128>;
 
+use crate::utils::aes::{decrypt_aes128_cbc_nopad};
 use crate::common;
 
 #[derive(BinRead)]
@@ -67,17 +65,6 @@ pub fn is_invincible_image_file(file: &File) -> bool {
     }
 }
 
-fn decrypt_aes_nopad(encrypted_data: &[u8], key: &[u8; 16], iv: &[u8; 16]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut data = encrypted_data.to_vec();
-    let decryptor = Aes128CbcDec::new(key.into(), iv.into());
-
-    let decrypted = decryptor
-        .decrypt_padded_mut::<NoPadding>(&mut data)
-        .map_err(|e| format!("UnpadError: {:?}", e))?;
-
-    Ok(decrypted.to_vec())
-}
-
 pub fn extract_invincible_image(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
     let header: Header = file.read_le()?;
 
@@ -116,7 +103,7 @@ pub fn extract_invincible_image(mut file: &File, output_folder: &str) -> Result<
     let iv  = b"\xe3\x9f\x36\x39\x56\x9a\x6b\x8d\x3f\x2e\xc9\x44\xd9\xbc\xec\x43";
 
     println!("\nDecrypting data...");
-    let decrypted_data = decrypt_aes_nopad(&encrypted_data, &key, &iv)?;
+    let decrypted_data = decrypt_aes128_cbc_nopad(&encrypted_data, &key, &iv)?;
 
     let mut data_reader = Cursor::new(decrypted_data);
 

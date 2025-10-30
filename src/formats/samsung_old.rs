@@ -2,15 +2,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::fs::{File, OpenOptions};
 use std::io::{Write};
-use aes::Aes128;
 use hex::decode;
-use cbc::{Decryptor, cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit}};
 use sha1::{Digest, Sha1};
-
-type Aes128CbcDec = Decryptor<Aes128>;
 
 use crate::common;
 use crate::keys;
+use crate::utils::aes::{decrypt_aes128_cbc_pcks7};
 
 use md5;
 
@@ -20,15 +17,6 @@ pub fn is_samsung_old_dir(path: &PathBuf) -> bool {
     } else {
         false
     }
-}
-
-fn decrypt_aes(encrypted_data: &[u8], key: &[u8; 16], iv: &[u8; 16]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut data = encrypted_data.to_vec();
-    let decryptor = Aes128CbcDec::new(key.into(), iv.into());
-    let decrypted = decryptor.decrypt_padded_mut::<Pkcs7>(&mut data)
-        .map_err(|e| format!("!!Decryption error!!: {:?}", e))?;
-    
-    Ok(decrypted.to_vec())
 }
 
 fn decrypt_xor(data: &[u8], key: &str) -> Vec<u8> {
@@ -120,7 +108,7 @@ pub fn extract_samsung_old(path: &PathBuf, output_folder: &str) -> Result<(), Bo
                     //println!("IV: {:02x?}", iv_md5);
                     let end = file_size - 260;
                     println!("- Decrypting file...");
-                    let decrypted_data = decrypt_aes(&data[16..end.try_into().unwrap()], &key_md5, &iv_md5)?;
+                    let decrypted_data = decrypt_aes128_cbc_pcks7(&data[16..end.try_into().unwrap()], &key_md5, &iv_md5)?;
 
                     println!("-- DeXORing file...");
                     let xor_key = fw_info.split_whitespace().next().unwrap();

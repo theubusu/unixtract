@@ -1,12 +1,10 @@
 use std::path::Path;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Write, Cursor, Seek};
-
-use aes::Aes128;
-use cbc::{Decryptor, cipher::{block_padding::NoPadding, BlockDecryptMut, KeyIvInit}};
 use binrw::{BinRead, BinReaderExt};
 
 use crate::common;
+use crate::utils::aes::{decrypt_aes128_cbc_nopad};
 
 #[derive(BinRead)]
 struct Header {
@@ -51,13 +49,13 @@ static HEADER_IV: [u8; 16] = [0x00; 16];
 
 pub fn is_mtk_pkg_file(file: &File) -> bool {
     let mut encrypted_header = common::read_file(&file, 0, 144).expect("Failed to read from file.");
-    let mut header = decrypt_aes_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV).expect("Decryption error!");
+    let mut header = decrypt_aes128_cbc_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV).expect("Decryption error!");
     if &header[4..12] == b"#DH@FiRm" {
         true
     } else {
         // try for philips which has additional 128 bytes at beginning
         encrypted_header = common::read_file(&file, 128, 144).expect("Failed to read from file.");
-        header = decrypt_aes_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV).expect("Decryption error!");
+        header = decrypt_aes128_cbc_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV).expect("Decryption error!");
         if &header[4..12] == b"#DH@FiRm" {
             true
         } else {
@@ -67,21 +65,9 @@ pub fn is_mtk_pkg_file(file: &File) -> bool {
     }
 }
 
-type Aes128CbcDec = Decryptor<Aes128>;
-fn decrypt_aes_nopad(encrypted_data: &[u8], key: &[u8; 16], iv: &[u8; 16]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut data = encrypted_data.to_vec();
-    let decryptor = Aes128CbcDec::new(key.into(), iv.into());
-
-    let decrypted = decryptor
-        .decrypt_padded_mut::<NoPadding>(&mut data)
-        .map_err(|e| format!("UnpadError: {:?}", e))?;
-
-    Ok(decrypted.to_vec())
-}
-
 pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
     let encrypted_header = common::read_exact(&mut file, 144)?;
-    let header = decrypt_aes_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV)?;
+    let header = decrypt_aes128_cbc_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV)?;
     let mut hdr_reader = Cursor::new(header); 
     let hdr: Header = hdr_reader.read_le()?;
 
@@ -107,11 +93,11 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
             }
 
             let crypted_header = &data[..48];
-            let try_decrypt = decrypt_aes_nopad(&crypted_header, &key, &HEADER_IV)?;
+            let try_decrypt = decrypt_aes128_cbc_nopad(&crypted_header, &key, &HEADER_IV)?;
 
             if try_decrypt.starts_with(b"reserved mtk inc") {
                 println!("- Decrypting with 4xVendor magic...");
-                out_data = decrypt_aes_nopad(&data[..data.len() & !15], &key, &HEADER_IV)?;
+                out_data = decrypt_aes128_cbc_nopad(&data[..data.len() & !15], &key, &HEADER_IV)?;
             } else {
                 println!("- Failed to decrypt data!");
                 continue
