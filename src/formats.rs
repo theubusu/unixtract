@@ -9,6 +9,7 @@ pub mod invincible_image;
 pub mod slp;
 pub mod roku;
 pub mod sony_bdp;
+pub mod rvp;
 
 pub mod pup;
 

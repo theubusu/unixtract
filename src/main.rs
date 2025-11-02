@@ -107,6 +107,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Sony BDP file detected!");
             formats::sony_bdp::extract_sony_bdp(&file, &output_path)?;
         }
+        else if formats::rvp::is_rvp_file(&file) {
+            println!("RVP/MVP file detected!");
+            formats::rvp::extract_rvp(&file, &output_path)?;
+        }
         else if formats::mstar::is_mstar_file(&file) {
             println!("Mstar upgrade file detected!");
             formats::mstar::extract_mstar(&file, &output_path)?;
