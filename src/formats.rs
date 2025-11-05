@@ -10,6 +10,7 @@ pub mod slp;
 pub mod roku;
 pub mod sony_bdp;
 pub mod rvp;
+pub mod funai_upg;
 
 pub mod pup;
 

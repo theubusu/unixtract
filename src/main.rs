@@ -95,6 +95,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("RUF file detected!");
             formats::ruf::extract_ruf(&file, &output_path)?;
         }
+        else if formats::funai_upg::is_funai_upg_file(&file) {
+            println!("Funai UPG file detected!");
+            formats::funai_upg::extract_funai_upg(&file, &output_path)?;
+        }
         else if formats::pfl_upg::is_pfl_upg_file(&file) {
             println!("PFL UPG file detected!");
             formats::pfl_upg::extract_pfl_upg(&file, &output_path)?;
