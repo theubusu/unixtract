@@ -103,6 +103,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("PFL UPG file detected!");
             formats::pfl_upg::extract_pfl_upg(&file, &output_path)?;
         } 
+        else if formats::pana_dvd::is_pana_dvd_file(&file) {
+            println!("PANA_DVD file detected!");
+            formats::pana_dvd::extract_pana_dvd(&file, &output_path)?;
+        }
         else if formats::pup::is_pup_file(&file) {
             println!("PUP file detected!");
             formats::pup::extract_pup(&file, &output_path)?;

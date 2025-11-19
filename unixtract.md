@@ -12,6 +12,7 @@
 | Mediatek PKG					| Many Mediatek-based TVs (Hisense, Sony, Panasonic, Philips...)					| Only files with 144 byte header and using 4xVendor magic as enc key are supported		| https://github.com/openlgtv/epk2extract               |
 | Mediatek upgrade_loader		| Older Mediatek-based TVs															| All files should be supported providing they are not encrypted						| -                                                     |
 | Novatek pkg					| Some Novatek-based TVs (Philips, LG..)											| All files should be supported															| https://github.com/openlgtv/epk2extract               |
+| Panasonic Blu-Ray (PANA_DVD)	| Panasonic Blu-Ray Players/Recorders												| Only some files are supported (**depends on keys**)									| -               										|
 | Philips UPG					| Philips pre-TPVision TVS 2008-2013												| Only some files are supported (**depends on keys**)									| https://github.com/frederic/pflupg-tool               |
 | PUP							| Sony PlayStation 4/ PlayStation 5													| File has to be decrypted																| https://github.com/Zer0xFF/ps4-pup-unpacker           |
 | RUF							| Samsung Broadcom-based Blu-Ray players											| Only BD-P1600 is supported (**depends on keys**)										| -                                                     |

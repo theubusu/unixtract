@@ -75,3 +75,8 @@ pub static EPK3: &[(&str, &str)] = &[
     ("34CC219D3AFC102433109BBC1DA44095", "m14 (m14tv) - LX webOS 1 (2014)"),
     ("52A208FA24E7E70730A40999B1C22C148F4920484BC50B515D243E35D14689F1", "o24n - LX webOS 10 (2025)")
 ];
+
+//pana dvd keys (no AES)
+pub static PANA_DVD_KEYONLY: &[&str] = &[
+    ("08E03D859AF9F3EE"), //B3A25A0B9D864F08 # 87 devices, ..-~2011
+];
