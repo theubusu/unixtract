@@ -80,3 +80,8 @@ pub static EPK3: &[(&str, &str)] = &[
 pub static PANA_DVD_KEYONLY: &[&str] = &[
     ("08E03D859AF9F3EE"), //B3A25A0B9D864F08 # 87 devices, ..-~2011
 ];
+
+//pana dvd keys (PANAEUSB pair (AES + cust))
+pub static PANA_DVD_AESPAIR: &[(&str, &str)] = &[
+    ("62A39E1C5594AE09244EB326EF7938FA", "06C943F3B997F7E0"), //# 8 devices, ~2018
+];

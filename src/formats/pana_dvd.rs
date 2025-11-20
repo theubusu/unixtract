@@ -10,6 +10,7 @@ use binrw::{BinRead, BinReaderExt};
 use crate::keys;
 use crate::common;
 use crate::utils::pana_dvd_crypto::{decrypt_data};
+use crate::utils::aes::{decrypt_aes128_cbc_nopad};
 use crate::utils::lzss::{decompress_lzss};
 
 #[derive(BinRead)]
@@ -107,12 +108,38 @@ pub fn find_key<'a>(key_array: &'a [&'a str], data: &[u8], expected_magic: &[u8]
     Ok(None)
 }
 
+pub fn find_aes_key_pair<'a>(key_array: &'a [(&'a str, &'a str)], data: &[u8], expected_magic: &[u8], magic_offset: usize) -> Result<Option<(Vec<u8>, [u8; 8])>, Box<dyn std::error::Error>> {
+    for (aes_key_hex, cust_key_hex) in key_array {
+        let aes_key_bytes = hex::decode(aes_key_hex)?;
+        let aes_key_array: [u8; 16] = match aes_key_bytes.as_slice().try_into() {
+            Ok(k) => k,
+            Err(_) => continue,
+        };
+        let iv = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+        let aes_decrypted = decrypt_aes128_cbc_nopad(data, &aes_key_array, iv)?;
+
+        let key_bytes = hex::decode(cust_key_hex)?;
+        let key_array: [u8; 8] = match key_bytes.as_slice().try_into() {
+            Ok(k) => k,
+            Err(_) => continue,
+        };
+        let decrypted = decrypt_data(&aes_decrypted, &key_array);
+     
+        if decrypted[magic_offset..].starts_with(expected_magic) {
+            return Ok(Some((aes_key_bytes, key_array)));
+        }
+    }
+    Ok(None)
+}
+
 pub fn is_pana_dvd_file(mut file: &File) -> bool {
-    let header = common::read_file(&file, 0, 16).expect("Failed to read from file.");
+    let header = common::read_file(&file, 0, 64).expect("Failed to read from file.");
     if header.starts_with(b"PANASONIC\x00\x00\x00") {
         file.seek(std::io::SeekFrom::Start(48)).expect("Failed to seek"); //skip rest of header
         true
     } else if find_key(&keys::PANA_DVD_KEYONLY, &header, b"PROG").expect("Failed to decrypt header.").is_some() {
+        true
+    } else if find_aes_key_pair(&keys::PANA_DVD_AESPAIR, &header, b"PANASONIC", 32).expect("Failed to decrypt header.").is_some() {
         true
     } else {
         false
@@ -135,6 +162,11 @@ pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<
         println!("Found valid key: {}\n", hex::encode_upper(key_array));
         matching_key = Some(key_array);
         header = decrypt_data(&enc_header, &key_array);
+    } else if let Some((aes_key_bytes, key_array)) = find_aes_key_pair(&keys::PANA_DVD_AESPAIR, &enc_header, b"PROG", 96)? {
+        println!("Found AES key pair: aes={} cust={}\n", hex::encode_upper(aes_key_bytes), hex::encode_upper(key_array));
+        //matching_key = Some(key_array);
+        unimplemented!();
+        //we need to *somehow* set the file stream to the AES decrypted one here (also excluding first 48 bytes)
     } else {
         println!("No valid key found!\n");
         return Ok(());
@@ -240,9 +272,11 @@ pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<
             println!("- (2/2) Decompressing LZSS... (Compressed size: {}, Decompressed size: {})", header.compressed_size, header.decompressed_size);
             let compressed_lzss = common::read_exact(&mut decompressed_gzip_reader, header.compressed_size as usize)?;
             decompressed_data = decompress_lzss(&compressed_lzss);
+            assert!(decompressed_data.len() == header.decompressed_size as usize, "Decompressed size does not match size in header, decompression failed!");
         } else if header.compression_type_byte == 2 { //only lzss
             println!("- Decompressing LZSS...");
             decompressed_data = decompress_lzss(&compressed_data);
+            assert!(decompressed_data.len() == header.decompressed_size as usize, "Decompressed size does not match size in header, decompression failed!");
         } else if header.compression_type_byte == 0 { //no compression. havent encountered one yet
             decompressed_data = compressed_data;
         } else {
