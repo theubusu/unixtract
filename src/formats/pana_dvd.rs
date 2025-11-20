@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::path::Path;
 use std::fs::{self, OpenOptions};
-use std::io::{Write, Read, Cursor, Seek};
+use std::io::{Write, Read, Cursor, Seek, SeekFrom};
 
 use simd_adler32::adler32;
 use flate2::read::GzDecoder;
@@ -157,74 +157,72 @@ pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<
         modules.push(entry);
     }
 
-    let mut main_data: Option<Vec<u8>> = None;
+    let mut main_offset: Option<u32> = None;
     for module in modules {
         println!("\nSave module {}, Offset: {}, Size: {}, Expected checksum: {:#010x}",
                 module.name(), module.offset, module.size, module.data_checksum);
 
-        let mut data = common::read_file(&file, module.offset as u64, module.size as usize)?;
+        let data = common::read_file(&file, module.offset as u64, module.size as usize)?;
         let checksum = adler32(&data.as_slice());
-        println!("Calculated checksum: {:#010x}", checksum);
-        if checksum == module.data_checksum {
-            println!("[OK] Checksum correct without decrypt");
-        } else {
-            println!("Checksum incorrect, try with decrypt...");
-            let dec_data = decrypt_data(&data, &matching_key_array);
-            let checksum = adler32(&dec_data.as_slice());
-            println!("Calculated checksum: {:#010x}", checksum);
-            if checksum == module.data_checksum { 
-                println!("[OK] Checksum correct with decrypt");
-                data = dec_data;
-            } else {
-                println!("[NG] Checksum incorrect, unknown data")
-            }
-        }
 
         if module.name() == "MAIN" {
-            main_data = Some(data);
-            println!("MAIN found - will extract later...");
-            continue
+            if checksum == module.data_checksum {
+                main_offset = Some(module.offset);
+                println!("- Valid MAIN data found - will extract later...");
+                continue
+            } else {
+                println!("- WARNING: Invalid/unsupported MAIN data!")
+            } 
         }
+
+        println!("- Decrypting...");
+        let dec_data = decrypt_data(&data, &matching_key_array);
 
         let output_path = Path::new(&output_folder).join(format!("{}.bin", module.name()));
 
         fs::create_dir_all(&output_folder)?;
         let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
-        out_file.write_all(&data)?;
+        out_file.write_all(&dec_data)?;
         
-        println!("- Saved file!");
+        println!("-- Saved file!");
   
     }
 
-    if !main_data.is_some() {
-        println!("\nMAIN data not found, Extraction finished!");
+    if !main_offset.is_some() {
+        println!("\nExtraction finished!");
         return Ok(())
     }
     println!("\nExtracting MAIN section...");
 
-    let main_data_unwrap = main_data.as_ref().unwrap();
-    let mut main_reader = Cursor::new(main_data_unwrap);
+    let main_offset_unwrap = main_offset.unwrap();
+    file.seek(SeekFrom::Start(main_offset_unwrap as u64))?;
 
-    let main_list_hdr: MainListHeader = main_reader.read_le()?;
+    let main_list_hdr: MainListHeader = file.read_le()?;
     println!("MAIN entry count: {}", main_list_hdr.entry_count());
 
     let mut main_entries: Vec<MainListEntry> = Vec::new();
     for i in 0..main_list_hdr.entry_count() {
-        let main_entry: MainListEntry = main_reader.read_le()?;
+        let main_entry: MainListEntry = file.read_le()?;
         println!("- Entry {}/{} - Size: {}, Checksum: {:#010x}",
                 i + 1, main_list_hdr.entry_count(), main_entry.size, main_entry.checksum);
         main_entries.push(main_entry);
     }
 
     for entry in main_entries {
-        let mut data = common::read_exact(&mut main_reader, entry.size as usize)?;
-        //decrypt first and last 5kb
-        let first_decrypted = decrypt_data(&data[..5120], &matching_key_array);
-        data[..5120].copy_from_slice(&first_decrypted);
+        let mut data = common::read_exact(&mut file, entry.size as usize)?;
+        if entry.size > 5120 {
+            //decrypt first and last 5kb
+            let first_decrypted = decrypt_data(&data[..5120], &matching_key_array);
+            data[..5120].copy_from_slice(&first_decrypted);
 
-        let last_decrypted = decrypt_data(&data[entry.size as usize - 5120..], &matching_key_array);
-        data[entry.size as usize - 5120..].copy_from_slice(&last_decrypted);
-        //
+            let last_decrypted = decrypt_data(&data[entry.size as usize - 5120..], &matching_key_array);
+            data[entry.size as usize - 5120..].copy_from_slice(&last_decrypted);
+            //
+        } else {
+            let decrypted = decrypt_data(&data, &matching_key_array);
+            data.copy_from_slice(&decrypted);
+        }
+        
 
         let mut data_reader = Cursor::new(data);
         let header: MainEntryHeader = data_reader.read_le()?;
