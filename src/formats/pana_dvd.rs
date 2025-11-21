@@ -108,7 +108,7 @@ pub fn find_key<'a>(key_array: &'a [&'a str], data: &[u8], expected_magic: &[u8]
     Ok(None)
 }
 
-pub fn find_aes_key_pair<'a>(key_array: &'a [(&'a str, &'a str)], data: &[u8], expected_magic: &[u8], magic_offset: usize) -> Result<Option<(Vec<u8>, [u8; 8])>, Box<dyn std::error::Error>> {
+pub fn find_aes_key_pair<'a>(key_array: &'a [(&'a str, &'a str)], data: &[u8], expected_magic: &[u8], magic_offset: usize) -> Result<Option<([u8; 16], [u8; 8])>, Box<dyn std::error::Error>> {
     for (aes_key_hex, cust_key_hex) in key_array {
         let aes_key_bytes = hex::decode(aes_key_hex)?;
         let aes_key_array: [u8; 16] = match aes_key_bytes.as_slice().try_into() {
@@ -126,7 +126,7 @@ pub fn find_aes_key_pair<'a>(key_array: &'a [(&'a str, &'a str)], data: &[u8], e
         let decrypted = decrypt_data(&aes_decrypted, &key_array);
      
         if decrypted[magic_offset..].starts_with(expected_magic) {
-            return Ok(Some((aes_key_bytes, key_array)));
+            return Ok(Some((aes_key_array, key_array)));
         }
     }
     Ok(None)
@@ -154,7 +154,16 @@ fn decompress_gzip(data: &[u8]) -> std::io::Result<Vec<u8>> {
 }
 
 pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let enc_header = common::read_exact(&mut file, 8192)?;
+    let init_pos = file.stream_position()?;
+    file.seek(SeekFrom::Start(0))?;
+
+    let mut data = Vec::new();  // we need to load the entire file into a cursor so we can swap it with AES decrypted data if its AES encrypted because im not making temp files
+    file.read_to_end(&mut data)?;
+
+    let mut file_reader = Cursor::new(data);
+    file_reader.seek(SeekFrom::Start(init_pos))?;
+
+    let enc_header = common::read_exact(&mut file_reader, 8192)?;
     let matching_key;
     let header;
     // find the key, knowing that the first entry is always "PROG"
@@ -162,11 +171,20 @@ pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<
         println!("Found valid key: {}\n", hex::encode_upper(key_array));
         matching_key = Some(key_array);
         header = decrypt_data(&enc_header, &key_array);
-    } else if let Some((aes_key_bytes, key_array)) = find_aes_key_pair(&keys::PANA_DVD_AESPAIR, &enc_header, b"PROG", 96)? {
-        println!("Found AES key pair: aes={} cust={}\n", hex::encode_upper(aes_key_bytes), hex::encode_upper(key_array));
-        //matching_key = Some(key_array);
-        unimplemented!();
-        //we need to *somehow* set the file stream to the AES decrypted one here (also excluding first 48 bytes)
+
+    } else if let Some((aes_key_array, key_array)) = find_aes_key_pair(&keys::PANA_DVD_AESPAIR, &enc_header, b"PROG", 96)? {
+        println!("Found AES key pair: aes={} cust={}", hex::encode_upper(aes_key_array), hex::encode_upper(key_array));
+        matching_key = Some(key_array);
+        let iv = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+
+        println!("Decrypting AES...\n");
+        let aes_decrypted = decrypt_aes128_cbc_nopad(&file_reader.get_ref()[48..], &aes_key_array, iv)?;
+        file_reader = Cursor::new(aes_decrypted); //set the file reader to use AES decrypted stream
+
+        file_reader.seek(SeekFrom::Start(48))?;
+        let enc_header = common::read_exact(&mut file_reader, 8192)?;
+        header = decrypt_data(&enc_header, &key_array);
+
     } else {
         println!("No valid key found!\n");
         return Ok(());
@@ -194,7 +212,8 @@ pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<
         println!("\nSave module {}, Offset: {}, Size: {}, Expected checksum: {:#010x}",
                 module.name(), module.offset, module.size, module.data_checksum);
 
-        let data = common::read_file(&file, module.offset as u64, module.size as usize)?;
+        file_reader.seek(SeekFrom::Start(module.offset as u64))?;
+        let data = common::read_exact(&mut file_reader, module.size as usize)?;
         let checksum = adler32(&data.as_slice());
 
         if module.name() == "MAIN" {
@@ -227,21 +246,21 @@ pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<
     println!("\nExtracting MAIN section...");
 
     let main_offset_unwrap = main_offset.unwrap();
-    file.seek(SeekFrom::Start(main_offset_unwrap as u64))?;
+    file_reader.seek(SeekFrom::Start(main_offset_unwrap as u64))?;
 
-    let main_list_hdr: MainListHeader = file.read_le()?;
+    let main_list_hdr: MainListHeader = file_reader.read_le()?;
     println!("MAIN entry count: {}", main_list_hdr.entry_count());
 
     let mut main_entries: Vec<MainListEntry> = Vec::new();
     for i in 0..main_list_hdr.entry_count() {
-        let main_entry: MainListEntry = file.read_le()?;
+        let main_entry: MainListEntry = file_reader.read_le()?;
         println!("- Entry {}/{} - Size: {}, Checksum: {:#010x}",
                 i + 1, main_list_hdr.entry_count(), main_entry.size, main_entry.checksum);
         main_entries.push(main_entry);
     }
 
     for entry in main_entries {
-        let mut data = common::read_exact(&mut file, entry.size as usize)?;
+        let mut data = common::read_exact(&mut file_reader, entry.size as usize)?;
         if entry.size > 5120 {
             //decrypt first and last 5kb
             let first_decrypted = decrypt_data(&data[..5120], &matching_key_array);
