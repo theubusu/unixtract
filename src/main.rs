@@ -65,9 +65,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("MSD11 file detected!");
             formats::msd11::extract_msd11(&file, &output_path)?;
         } 
-        else if formats::tpv_timg::is_tpv_timg_file(&file) {
-            println!("TPV TIMG file detected!");
-            formats::tpv_timg::extract_tpv_timg(&file, &output_path)?;
+        else if formats::nvt_timg::is_nvt_timg_file(&file) {
+            println!("Novatek TIMG file detected!");
+            formats::nvt_timg::extract_nvt_timg(&file, &output_path)?;
         } 
         else if formats::novatek::is_novatek_file(&file) {
             println!("Novatek file detected!");

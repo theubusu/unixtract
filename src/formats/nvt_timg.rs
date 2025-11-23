@@ -32,7 +32,7 @@ impl PIMG {
     }
 }
 
-pub fn is_tpv_timg_file(file: &File) -> bool {
+pub fn is_nvt_timg_file(file: &File) -> bool {
     let header = common::read_file(&file, 0, 4).expect("Failed to read from file.");
     if header == b"TIMG" {
         true
@@ -48,7 +48,7 @@ fn decompress_gzip(compressed_data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error
     Ok(decompressed)
 }
 
-pub fn extract_tpv_timg(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_nvt_timg(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
     let _timg = common::read_exact(&mut file, 288)?; //TIMG magic + header
 
     loop {
@@ -62,7 +62,7 @@ pub fn extract_tpv_timg(mut file: &File, output_folder: &str) -> Result<(), Box<
 
         let out_data;
 
-        if pimg.comp_type() == "gzip" {
+        if pimg.comp_type() == "gzip" && data.starts_with(b"\x1F\x8B") { //additionally check for gzip header, because sometimes its deceptive
             println!("- Decompressing gzip...");
             out_data = decompress_gzip(&data)?;
         } else if pimg.comp_type() == "none" {

@@ -1,6 +1,6 @@
 pub mod mstar;
 pub mod samsung_old;
-pub mod tpv_timg;
+pub mod nvt_timg;
 pub mod pfl_upg;
 pub mod sddl_sec;
 pub mod novatek;
