@@ -5,6 +5,13 @@ use lz4::block::decompress;
 use lzma_rs::lzma_decompress;
 
 use crate::common;
+use crate::utils::lzop::{decompress_lzop};
+use crate::utils::sparse::{unsparse_to_file};
+
+//change whether the "userdata" partition is skipped
+// this is because the userdata partition is sometimes enourmous sizes like 27gb, and it will fail to allocate memory on most computers
+// if you want to attempt to extract "userdata" you can enable the option
+static CONFIG_SKIP_USERDATA: bool = true;
 
 pub fn is_mstar_file(file: &File) -> bool {
     let header = common::read_file(&file, 0, 32768).expect("Failed to read from file.");
@@ -80,11 +87,12 @@ pub fn extract_mstar(file: &File, output_folder: &str) -> Result<(), Box<dyn std
                 let size = parse_number(parts[4]).unwrap_or(0);
 
                 //try to get partname from comment
-                let mut partname = if let Some(idx) = line.find('#') {
-                    line[idx + 1..].trim()
-                } else {
-                    "unknown"
-                };
+                //let mut partname = if let Some(idx) = line.find('#') {
+                //    line[idx + 1..].trim()
+                //} else {
+                //    "unknown"
+                //};
+                let mut partname = "unknown";
 
                 let mut compression = "none";
                 let mut lz4_expect_size = 0;
@@ -114,6 +122,14 @@ pub fn extract_mstar(file: &File, output_folder: &str) -> Result<(), Box<dyn std
                             partname = parts[4]
                         }
                     }
+                    if lines[j].starts_with("sparse_write"){
+                        compression = "sparse"; //its not really compression but anyway
+                        let parts: Vec<&str> = lines[j].split_whitespace().collect();
+                        // get part name from sparse_write
+                        if partname == "unknown" {
+                            partname = parts[3]
+                        }
+                    }
 
                     // check if its boot partition
                     if lines[j].starts_with("mmc write.boot") {
@@ -133,13 +149,16 @@ pub fn extract_mstar(file: &File, output_folder: &str) -> Result<(), Box<dyn std
                     j += 1;
                 }
 
-                println!("\nPart: Offset: {}, Size: {} --> {}", offset, size, partname);
+                println!("\nPart - Offset: {}, Size: {} --> {}", offset, size, partname);
 
-                if partname == "unknown"{
+                if partname == "unknown" {
                     println!("- Unknown destination, skipping!");
+                } else if partname == "userdata" && CONFIG_SKIP_USERDATA {
+                    println!("- Skipping userdata according to config!")
                 } else {
                     let data = common::read_file(&file, offset, size.try_into().unwrap())?;
-                    let out_data;
+                    let out_data; 
+                    let output_path = Path::new(&output_folder).join(format!("{}.bin", partname));
 
                     if compression == "lzma" {
                         println!("- Decompressing LZMA...");
@@ -153,14 +172,18 @@ pub fn extract_mstar(file: &File, output_folder: &str) -> Result<(), Box<dyn std
                         println!("- Decompressing lz4, expected size: {}", lz4_expect_size);
                         out_data = decompress_lz4(&data, lz4_expect_size.try_into().unwrap())?;
                     } else if compression == "lzo" {
-                        // nothing in rust to parse lzo file with header
-                        println!("- lzo compression is not supported yet!");
-                        out_data = data;
-                    }else {
+                        println!("- Decompessing LZO..");
+                        out_data = decompress_lzop(&data)?;
+                    } else if compression == "sparse" {
+                        println!("- Unsparsing...");
+                        unsparse_to_file(&data, output_path)?;
+                        println!("-- Saved file!");
+                        i += 1;
+                        continue
+                        //out_data = unsparse(&data)?;
+                    } else {
                         out_data = data;
                     }
-
-                    let output_path = Path::new(&output_folder).join(partname.to_owned() + ".bin");
 
                     fs::create_dir_all(&output_folder)?;
                     let mut out_file = OpenOptions::new()

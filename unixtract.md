@@ -7,7 +7,7 @@
 | INVINCIBLE_IMAGE				| LG Broadcom-based Blu-Ray players													| Only version 3 is supported (2011+)													| -                                                     |
 | MSD v1.0						| Samsung TVs 2013-2015																| Only some files are supported (**depends on keys**)									| https://github.com/bugficks/msddecrypt                |
 | MSD v1.1						| Samsung TVs 2016+																	| Only some files are supported (**depends on keys**)									| https://github.com/bugficks/msddecrypt                |
-| Mstar upgrade bin				| Many MStar-based TVs (Hisense, Toshiba..)											| Files not using sparse_write and LZO compression are supported						| -                                                     |
+| Mstar upgrade bin				| Many MStar-based TVs (Hisense, Toshiba..)											| Most files should be supported														| -                                                     |
 | Mediatek BDP					| Many Mediatek-based Blu-Ray players (LG, Samsung, Philips, Panasonic...)			| Some older files may not be supported													| -                                                     |
 | Mediatek PKG					| Many Mediatek-based TVs (Hisense, Sony, Panasonic, Philips...)					| Only files with 144 byte header and using 4xVendor magic as enc key are supported		| https://github.com/openlgtv/epk2extract               |
 | Mediatek upgrade_loader		| Older Mediatek-based TVs															| All files should be supported providing they are not encrypted						| -                                                     |
