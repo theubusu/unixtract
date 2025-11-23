@@ -1,5 +1,7 @@
 use binrw::{BinRead, BinReaderExt};
-use std::io::{Cursor};
+use std::fs::OpenOptions;
+use std::path::{PathBuf};
+use std::io::{Cursor, Write};
 
 use simd_adler32::adler32;
 use crate::common;
@@ -28,7 +30,7 @@ struct SegmentHeader {
     checksum: u32,
 }
 
-pub fn decompress_lzop(data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+pub fn unlzop_to_file(data: &[u8], file_path: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let mut data_reader = Cursor::new(data);
     let header: LzopHeader = data_reader.read_be()?;
     if header.magic_bytes != b"\x89LZO\x00\x0D\x0A\x1A\x0A" {
@@ -39,7 +41,7 @@ pub fn decompress_lzop(data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error
     }
 
     let lzo = minilzo_rs::LZO::init()?;
-    let mut decompressed_output = Vec::new();
+    let mut out_file = OpenOptions::new().create(true).append(true).open(file_path)?;
     loop {
         if (data.len() as u64 - data_reader.position()) < 12 { //check if there are enough bytes to read a segment header
             break;
@@ -66,8 +68,8 @@ pub fn decompress_lzop(data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error
             return Err("Invalid segment checksum! Data corrupted?".into());
         };
 
-        decompressed_output.extend_from_slice(&out_data);
+        out_file.write_all(&out_data)?;
     }
 
-    Ok(decompressed_output)
+    Ok(())
 }
