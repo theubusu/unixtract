@@ -3,7 +3,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{Write, Seek};
 use binrw::{BinRead, BinReaderExt};
 
-use crate::common;
+use crate::utils::common;
 
 pub fn is_mtk_upgrade_loader_file(file: &File) -> bool {
     let header = common::read_file(&file, 152, 4).expect("Failed to read from file.");

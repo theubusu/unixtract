@@ -9,7 +9,7 @@ use aes::Aes256;
 use ecb::{Decryptor, cipher::{BlockDecryptMut, KeyInit, generic_array::GenericArray}};
 use binrw::{BinRead, BinReaderExt};
 
-use crate::common;
+use crate::utils::common;
 use crate::keys;
 
 #[derive(BinRead)]

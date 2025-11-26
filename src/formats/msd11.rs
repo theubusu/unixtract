@@ -3,7 +3,7 @@ use std::path::{Path};
 use std::io::{Cursor, Write, Seek, SeekFrom};
 use binrw::{BinRead, BinReaderExt};
 
-use crate::common;
+use crate::utils::common;
 use crate::keys;
 use crate::formats::msd::{decrypt_aes_salted_tizen, decrypt_aes_tizen};
 

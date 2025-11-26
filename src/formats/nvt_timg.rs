@@ -1,12 +1,11 @@
 use std::str;
 use std::path::{Path};
-use std::io::{Read, Write};
+use std::io::{Write};
 use std::fs::{self, File, OpenOptions};
-
 use binrw::{BinRead, BinReaderExt};
-use flate2::read::GzDecoder;
 
-use crate::common;
+use crate::utils::common;
+use crate::utils::compression::{decompress_gzip};
 
 #[derive(Debug, BinRead)]
 struct PIMG {
@@ -39,13 +38,6 @@ pub fn is_nvt_timg_file(file: &File) -> bool {
     } else {
         false
     }
-}
-
-fn decompress_gzip(compressed_data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut decoder = GzDecoder::new(compressed_data);
-    let mut decompressed = Vec::new();
-    decoder.read_to_end(&mut decompressed)?;
-    Ok(decompressed)
 }
 
 pub fn extract_nvt_timg(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {

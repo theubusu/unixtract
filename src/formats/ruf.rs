@@ -3,7 +3,7 @@ use std::fs::{self, File, OpenOptions};
 use binrw::{BinRead, BinReaderExt};
 use std::io::{Write, Seek, SeekFrom, Cursor};
 
-use crate::common;
+use crate::utils::common;
 use crate::keys;
 use crate::utils::aes::{decrypt_aes128_cbc_pcks7};
 
@@ -126,7 +126,7 @@ fn actually_extract_ruf(mut file: &File, output_folder: &str, start_offset: u64)
 
     let mut key: Option<&str> = None;
     let key_bytes;
-    let iv_bytes = hex::decode("00000000000000000000000000000000")?.as_slice().try_into()?;
+    let iv_bytes: [u8; 16] = [0x00; 16];
 
     //find key
     for (prefix, value) in keys::RUF {

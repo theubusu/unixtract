@@ -4,7 +4,7 @@ use std::path::{PathBuf};
 use std::io::{Cursor, Write};
 
 use simd_adler32::adler32;
-use crate::common;
+use crate::utils::common;
 
 #[derive(BinRead)]
 struct LzopHeader {

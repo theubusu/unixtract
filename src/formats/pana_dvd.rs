@@ -2,15 +2,14 @@ use std::fs::File;
 use std::path::Path;
 use std::fs::{self, OpenOptions};
 use std::io::{Write, Read, Cursor, Seek, SeekFrom};
-
 use simd_adler32::adler32;
-use flate2::read::GzDecoder;
 use binrw::{BinRead, BinReaderExt};
 
 use crate::keys;
-use crate::common;
+use crate::utils::common;
 use crate::utils::pana_dvd_crypto::{decrypt_data};
 use crate::utils::aes::{decrypt_aes128_cbc_nopad};
+use crate::utils::compression::{decompress_gzip};
 use crate::utils::lzss::{decompress_lzss};
 
 #[derive(BinRead)]
@@ -95,10 +94,7 @@ impl MainEntryHeader {
 pub fn find_key<'a>(key_array: &'a [&'a str], data: &[u8], expected_magic: &[u8]) -> Result<Option<[u8; 8]>, Box<dyn std::error::Error>> {
     for key_hex in key_array {
         let key_bytes = hex::decode(key_hex)?;
-        let key_array: [u8; 8] = match key_bytes.as_slice().try_into() {
-            Ok(k) => k,
-            Err(_) => continue,
-        };
+        let key_array: [u8; 8] = key_bytes.as_slice().try_into()?;
         let decrypted = decrypt_data(data, &key_array);
      
         if decrypted.starts_with(expected_magic) {
@@ -111,18 +107,12 @@ pub fn find_key<'a>(key_array: &'a [&'a str], data: &[u8], expected_magic: &[u8]
 pub fn find_aes_key_pair<'a>(key_array: &'a [(&'a str, &'a str)], data: &[u8], expected_magic: &[u8], magic_offset: usize) -> Result<Option<([u8; 16], [u8; 8])>, Box<dyn std::error::Error>> {
     for (aes_key_hex, cust_key_hex) in key_array {
         let aes_key_bytes = hex::decode(aes_key_hex)?;
-        let aes_key_array: [u8; 16] = match aes_key_bytes.as_slice().try_into() {
-            Ok(k) => k,
-            Err(_) => continue,
-        };
-        let iv = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
-        let aes_decrypted = decrypt_aes128_cbc_nopad(data, &aes_key_array, iv)?;
+        let aes_key_array: [u8; 16] = aes_key_bytes.as_slice().try_into()?;
+        let iv: [u8; 16] = [0x00; 16];
+        let aes_decrypted = decrypt_aes128_cbc_nopad(data, &aes_key_array, &iv)?;
 
         let key_bytes = hex::decode(cust_key_hex)?;
-        let key_array: [u8; 8] = match key_bytes.as_slice().try_into() {
-            Ok(k) => k,
-            Err(_) => continue,
-        };
+        let key_array: [u8; 8] = key_bytes.as_slice().try_into()?;
         let decrypted = decrypt_data(&aes_decrypted, &key_array);
      
         if decrypted[magic_offset..].starts_with(expected_magic) {
@@ -144,13 +134,6 @@ pub fn is_pana_dvd_file(mut file: &File) -> bool {
     } else {
         false
     }
-}
-
-fn decompress_gzip(data: &[u8]) -> std::io::Result<Vec<u8>> {
-    let mut decoder = GzDecoder::new(data);
-    let mut decompressed = Vec::new();
-    decoder.read_to_end(&mut decompressed)?;
-    Ok(decompressed)
 }
 
 pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -175,10 +158,10 @@ pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<
     } else if let Some((aes_key_array, key_array)) = find_aes_key_pair(&keys::PANA_DVD_AESPAIR, &enc_header, b"PROG", 96)? {
         println!("Found AES key pair: aes={} cust={}", hex::encode_upper(aes_key_array), hex::encode_upper(key_array));
         matching_key = Some(key_array);
-        let iv = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+        let iv: [u8; 16] = [0x00; 16];
 
         println!("Decrypting AES...\n");
-        let aes_decrypted = decrypt_aes128_cbc_nopad(&file_reader.get_ref()[48..], &aes_key_array, iv)?;
+        let aes_decrypted = decrypt_aes128_cbc_nopad(&file_reader.get_ref()[48..], &aes_key_array, &iv)?;
         file_reader = Cursor::new(aes_decrypted); //set the file reader to use AES decrypted stream
 
         file_reader.seek(SeekFrom::Start(48))?;

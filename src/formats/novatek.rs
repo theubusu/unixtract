@@ -5,7 +5,7 @@ use std::io::{Write, Seek};
 
 use binrw::{BinRead, BinReaderExt};
 
-use crate::common;
+use crate::utils::common;
 
 #[derive(BinRead)]
 struct Header {

@@ -3,7 +3,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{Write, Seek, SeekFrom};
 use binrw::{BinRead, BinReaderExt};
 
-use crate::common;
+use crate::utils::common;
 
 #[derive(BinRead)]
 struct Header {

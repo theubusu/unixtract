@@ -1,6 +1,6 @@
 use std::fs::File;
 
-use crate::common;
+use crate::utils::common;
 use crate::formats;
 
 pub fn is_epk_file(file: &File) -> bool {

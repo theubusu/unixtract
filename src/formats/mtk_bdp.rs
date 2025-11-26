@@ -5,7 +5,7 @@ use std::io::{Seek, SeekFrom, Read, Write};
 use binrw::{BinRead, BinReaderExt};
 use std::sync::OnceLock;
 
-use crate::common;
+use crate::utils::common;
 
 #[derive(BinRead)]
 struct TocEntry {

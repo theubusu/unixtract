@@ -4,7 +4,7 @@ use std::fs::{self, OpenOptions};
 use std::io::{Write};
 use binrw::{BinRead, BinReaderExt};
 
-use crate::common;
+use crate::utils::common;
 
 #[derive(BinRead)]
 struct Header {

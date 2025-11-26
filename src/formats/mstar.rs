@@ -1,10 +1,9 @@
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path};
-use std::io::{Write, Cursor};
-use lz4::block::decompress;
-use lzma_rs::lzma_decompress;
+use std::io::{Write};
 
-use crate::common;
+use crate::utils::common;
+use crate::utils::compression::{decompress_lzma, decompress_lz4};
 use crate::utils::lzop::{unlzop_to_file};
 use crate::utils::sparse::{unsparse_to_file};
 
@@ -29,21 +28,6 @@ fn parse_number(s: &str) -> Option<u64> {
         u64::from_str_radix(hex_str, 16).ok()
     } else {
         u64::from_str_radix(s, 16).ok()
-    }
-}
-
-fn decompress_lzma(compressed_data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut input = Cursor::new(compressed_data);
-    let mut output = Vec::new();
-    
-    lzma_decompress(&mut input, &mut output)?;
-    Ok(output)
-}
-
-fn decompress_lz4(compressed_data: &[u8], original_size: i32) -> Result<Vec<u8>, std::io::Error> {
-    match decompress(compressed_data, Some(original_size)) {
-        Ok(decompressed) => Ok(decompressed),
-        Err(e) => Err(std::io::Error::new(std::io::ErrorKind::InvalidData, e)),
     }
 }
 

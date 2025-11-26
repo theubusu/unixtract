@@ -16,6 +16,7 @@
 | Panasonic Blu-Ray (PANA_DVD)	| Panasonic Blu-Ray Players/Recorders												| Only some files are supported (**depends on keys**)									| -               										|
 | Philips UPG					| Philips pre-TPVision TVS 2008-2013												| Only some files are supported (**depends on keys**)									| https://github.com/frederic/pflupg-tool               |
 | PUP							| Sony PlayStation 4/ PlayStation 5													| File has to be decrypted																| https://github.com/Zer0xFF/ps4-pup-unpacker           |
+| Roku							| Roku TVs/players																	| Most files should work, but encrypted images contained within will not be decrypted.	| -											            |
 | RUF							| Samsung Broadcom-based Blu-Ray players											| Only BD-P1600 is supported (**depends on keys**)										| -                                                     |
 | RVP/MVP						| Sharp Blu-Ray players/recorders													| Only supports older files (XOR encrypted)												| -                                                     |
 | Samsung						| Old Samsung TV firmwares pre 2013													| Only some files are supported (**depends on keys**)									| https://github.com/george-hopkins/samygo-patcher      |

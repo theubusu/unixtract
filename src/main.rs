@@ -1,4 +1,3 @@
-mod common;
 mod formats;
 mod keys;
 mod utils;

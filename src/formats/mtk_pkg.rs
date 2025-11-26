@@ -3,7 +3,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{Write, Cursor, Seek};
 use binrw::{BinRead, BinReaderExt};
 
-use crate::common;
+use crate::utils::common;
 use crate::utils::aes::{decrypt_aes128_cbc_nopad};
 
 #[derive(BinRead)]

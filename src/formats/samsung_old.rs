@@ -5,7 +5,7 @@ use std::io::{Write};
 use hex::decode;
 use sha1::{Digest, Sha1};
 
-use crate::common;
+use crate::utils::common;
 use crate::keys;
 use crate::utils::aes::{decrypt_aes128_cbc_pcks7};
 

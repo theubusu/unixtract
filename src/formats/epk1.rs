@@ -2,10 +2,9 @@ use std::fs::File;
 use std::path::{Path};
 use std::fs::{self, OpenOptions};
 use std::io::{Write, Seek, SeekFrom};
-
 use binrw::{BinRead, BinReaderExt};
 
-use crate::common;
+use crate::utils::common;
 
 #[derive(BinRead)]
 struct CommonHeader {

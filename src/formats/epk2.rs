@@ -1,10 +1,9 @@
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path};
 use std::io::{Write, Seek, SeekFrom, Cursor};
-
 use binrw::{BinRead, BinReaderExt};
 
-use crate::common;
+use crate::utils::common;
 use crate::keys;
 use crate::formats::epk::{decrypt_aes_ecb_auto, find_key};
 

@@ -1,10 +1,10 @@
 use std::path::{Path, PathBuf};
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, Read, Seek, SeekFrom, Write};
-use flate2::read::ZlibDecoder;
+use std::io::{Seek, SeekFrom, Write};
 
-use crate::common;
+use crate::utils::common;
 use crate::utils::aes::{decrypt_aes128_cbc_pcks7};
+use crate::utils::compression::{decompress_zlib};
 
 pub fn is_sddl_sec_file(file: &File) -> bool {
     let header = common::read_file(&file, 0, 8).expect("Failed to read from file.");
@@ -54,14 +54,6 @@ fn decipher(s: &[u8], len_: usize) -> Vec<u8> {
     }
     
     out
-}
-
-fn decompress_zlib(data: &[u8]) -> io::Result<Vec<u8>> {
-    let mut decoder = ZlibDecoder::new(data);
-    let mut decompressed = Vec::new();
-    decoder.read_to_end(&mut decompressed)?;
-
-    Ok(decompressed)
 }
 
 pub fn extract_sddl_sec(file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {

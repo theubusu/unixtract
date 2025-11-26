@@ -4,7 +4,7 @@ use std::fs::{self, OpenOptions};
 use std::io::{Cursor, Write};
 use binrw::{BinRead, BinReaderExt};
 
-use crate::common;
+use crate::utils::common;
 use crate::formats;
 
 //thx sony
@@ -59,7 +59,7 @@ struct Entry {
 
 pub fn is_sony_bdp_file(file: &File) -> bool {
     let header = common::read_file(&file, 0, 4).expect("Failed to read from file.");
-    if header == b"\x01\x73\xEC\xC9" || header == b"\x01\x73\xEC\x1F" { //MSB1x, MSB0x
+    if header == b"\x01\x73\xEC\xC9" || header == b"\x01\x73\xEC\x1F" || header == b"\xEC\x7D\xB0\xB0" { //MSB1x, MSB0x, BDPPxx
         true
     } else {
         false

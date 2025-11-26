@@ -3,7 +3,7 @@ use std::fs::OpenOptions;
 use std::path::{PathBuf};
 use std::io::{Cursor, Seek, SeekFrom, Write};
 
-use crate::common;
+use crate::utils::common;
 
 #[derive(BinRead)]
 struct SparseHeader {

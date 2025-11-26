@@ -4,7 +4,7 @@ use std::io::{Write, Seek, Read, Cursor};
 use tar::Archive;
 use binrw::{BinRead, BinReaderExt};
 
-use crate::common;
+use crate::utils::common;
 use crate::utils::aes::{decrypt_aes128_cbc_nopad, decrypt_aes128_cbc_pcks7};
 
 static FILE_KEY: [u8; 16] = [

@@ -4,7 +4,7 @@ use std::io::{Write, Read, Seek, SeekFrom, Cursor};
 use binrw::{BinRead, BinReaderExt};
 
 use crate::utils::aes::{decrypt_aes128_cbc_nopad};
-use crate::common;
+use crate::utils::common;
 
 #[derive(BinRead)]
 struct Header {
@@ -99,8 +99,9 @@ pub fn extract_invincible_image(mut file: &File, output_folder: &str) -> Result<
         file.seek(SeekFrom::Current(header.skip_size.into()))?;
     }
 
-    let key = b"\x32\xe5\x26\x1e\x22\x67\x5e\x93\x20\xcf\x35\x91\x7c\x63\x7a\x36";
-    let iv  = b"\xe3\x9f\x36\x39\x56\x9a\x6b\x8d\x3f\x2e\xc9\x44\xd9\xbc\xec\x43";
+    //v3 key + iv
+    let key: [u8; 16] = [0x32, 0xe5, 0x26, 0x1e, 0x22, 0x67, 0x5e, 0x93, 0x20, 0xcf, 0x35, 0x91, 0x7c, 0x63, 0x7a, 0x36];
+    let iv:  [u8; 16] = [0xe3, 0x9f, 0x36, 0x39, 0x56, 0x9a, 0x6b, 0x8d, 0x3f, 0x2e, 0xc9, 0x44, 0xd9, 0xbc, 0xec, 0x43];
 
     println!("\nDecrypting data...");
     let decrypted_data = decrypt_aes128_cbc_nopad(&encrypted_data, &key, &iv)?;

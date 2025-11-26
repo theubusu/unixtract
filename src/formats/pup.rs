@@ -1,11 +1,10 @@
 use std::path::{Path};
 use std::fs::{self, File, OpenOptions};
-use std::io;
 use binrw::{BinRead, BinReaderExt};
-use flate2::read::ZlibDecoder;
-use std::io::{Write, Read, Seek, SeekFrom};
+use std::io::{Write, Seek, SeekFrom};
 
-use crate::common;
+use crate::utils::common;
+use crate::utils::compression::{decompress_zlib};
 
 #[derive(BinRead)]
 struct Header {
@@ -58,14 +57,6 @@ pub fn is_pup_file(file: &File) -> bool {
     } else {
         false
     }
-}
-
-fn decompress_zlib(data: &[u8]) -> io::Result<Vec<u8>> {
-    let mut decoder = ZlibDecoder::new(data);
-    let mut decompressed = Vec::new();
-    decoder.read_to_end(&mut decompressed)?;
-
-    Ok(decompressed)
 }
 
 pub fn extract_pup(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
