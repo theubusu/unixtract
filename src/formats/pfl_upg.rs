@@ -153,7 +153,20 @@ pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<d
 
         let data = common::read_exact(&mut data_reader, file_header.stored_size as usize)?;
 
-        let output_path = Path::new(&output_folder).join(file_header.file_name().trim_start_matches('/'));
+        let mut output_path = Path::new(&output_folder).join(file_header.file_name().trim_start_matches('/'));
+        let output_path_parent = output_path.parent().expect("Failed to get parent of the output path!");
+
+        //prevent collisions because philips is dumb
+        if output_path_parent.exists() && output_path_parent.is_file() {
+            let fixed_file_name = if let Some((a, b)) = file_header.file_name().rsplit_once('/') {
+                format!("{}_{}", a, b)
+            } else {
+                file_header.file_name()
+            };
+
+            output_path = Path::new(&output_folder).join(file_header.file_name().trim_start_matches('/'));
+            println!("[!] Warning: File collision detected, this file will be saved to: {}", fixed_file_name);
+        }
 
         if let Some(parent) = output_path.parent() {
             fs::create_dir_all(parent)?;
