@@ -1,14 +1,107 @@
+//sddl_dec 5.0
+
 use std::path::{Path, PathBuf};
 use std::fs::{self, File, OpenOptions};
-use std::io::{Seek, SeekFrom, Write};
+use std::io::{Cursor, Seek, SeekFrom, Write};
+use binrw::{BinRead, BinReaderExt};
 
 use crate::utils::common;
 use crate::utils::aes::{decrypt_aes128_cbc_pcks7};
 use crate::utils::compression::{decompress_zlib};
 
+#[derive(BinRead)]
+struct SddlSecHeader {
+    #[br(count = 4)] _magic_bytes: Vec<u8>, //0x11, 0x22, 0x33, 0x44
+    #[br(count = 4)] _unused: Vec<u8>,
+    #[br(count = 4)] info_entries_count_str_bytes: Vec<u8>,
+    #[br(count = 4)] module_entries_count_str_bytes: Vec<u8>,
+    #[br(count = 16)] _unk: Vec<u8>,
+}
+impl SddlSecHeader {
+    fn info_entry_count(&self) -> u32 {
+        let string = common::string_from_bytes(&self.info_entries_count_str_bytes);
+        string.parse().unwrap()
+    }
+    fn module_entries_count(&self) -> u32 {
+        let string = common::string_from_bytes(&self.module_entries_count_str_bytes);
+        string.parse().unwrap()
+    }
+}
+
+#[derive(BinRead)]
+struct EntryHeader {
+    #[br(count = 12)] name_str_bytes: Vec<u8>,
+    #[br(count = 12)] size_str_bytes: Vec<u8>,
+}
+impl EntryHeader {
+    fn name(&self) -> String {
+        common::string_from_bytes(&self.name_str_bytes)
+    }
+    fn size(&self) -> u64 {
+        let string = common::string_from_bytes(&self.size_str_bytes);
+        string.parse().unwrap()
+    }
+}
+
+#[derive(BinRead)]
+struct ModuleHeader {
+    #[br(count = 4)] _magic_bytes: Vec<u8>, //0x11, 0x22, 0x33, 0x44
+    _unk1: u8,
+    _id: u8,
+    #[br(count = 10)] _unused: Vec<u8>,
+    #[br(count = 4)] _file_base_version: Vec<u8>,
+    #[br(count = 4)] _file_previous_version: Vec<u8>,
+    #[br(count = 4)] file_version: Vec<u8>,
+    #[br(count = 4)] _unused2: Vec<u8>,
+    _index: u16,
+    #[br(count = 2)] control_bytes: Vec<u8>,
+    compressed_data_size: u32,
+    _uncompressed_data_size: u32,
+    _checksum: u32,
+}
+impl ModuleHeader {
+    fn is_compressed(&self) -> bool {
+        self.control_bytes[0] == 0x3
+    }
+}
+
+#[derive(BinRead)]
+struct ContentHeader {
+    _magic1: u8,
+    #[br(count = 4)] dest_offset_bytes: Vec<u8>,
+    #[br(count = 4)] source_offset_bytes: Vec<u8>,
+    size: u32,
+    _magic2: u8,
+}
+impl ContentHeader {
+    fn dest_offset(&self) -> u32 {
+        let first_byte;
+        if self.dest_offset_bytes[0] & 0xF0 == 0xD0 {
+            first_byte = self.dest_offset_bytes[0] & 0x0F;
+        } else {
+            first_byte = self.dest_offset_bytes[0];
+        }
+        u32::from_be_bytes([first_byte, self.dest_offset_bytes[1], self.dest_offset_bytes[2], self.dest_offset_bytes[3]])
+    }
+    fn source_offset(&self) -> u32 {
+        u32::from_be_bytes([0x00, self.source_offset_bytes[1], self.source_offset_bytes[2], self.source_offset_bytes[3]])
+    }
+}
+
+static DEC_KEY: [u8; 16] = [
+    0x26, 0xE0, 0x96, 0xD3, 0xEF, 0x8A, 0x8F, 0xBB,
+    0xAA, 0x5E, 0x51, 0x6F, 0x77, 0x26, 0xC2, 0x2C,
+];
+    
+static DEC_IV: [u8; 16] = [
+    0x3E, 0x4A, 0xE2, 0x3A, 0x69, 0xDB, 0x81, 0x54,
+    0xCD, 0x88, 0x38, 0xC4, 0xB9, 0x0C, 0x76, 0x66,
+];
+
 pub fn is_sddl_sec_file(file: &File) -> bool {
-    let header = common::read_file(&file, 0, 8).expect("Failed to read from file.");
-    if header == b"\x12\xB8\x02\x8C\x6F\xC6\xBD\x15" {
+    let header = common::read_file(&file, 0, 32).expect("Failed to read from file.");
+    let deciph_header = decipher(&header);
+    if deciph_header.starts_with(b"\x11\x22\x33\x44") {
         true
     } else {
         false
@@ -16,7 +109,8 @@ pub fn is_sddl_sec_file(file: &File) -> bool {
 }
 
 //ported from original from https://nese.team/posts/justctf/
-fn decipher(s: &[u8], len_: usize) -> Vec<u8> {
+fn decipher(s: &[u8]) -> Vec<u8> {
+    let len_ = s.len();
     let mut v3: u32 = 904;
     let mut out = s.to_vec();
     let mut cnt = 0;
@@ -56,132 +150,81 @@ fn decipher(s: &[u8], len_: usize) -> Vec<u8> {
     out
 }
 
-pub fn extract_sddl_sec(file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_sddl_sec(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let mut hdr_reader = Cursor::new(decipher(&common::read_exact(&mut file, 32)?));
+    let hdr: SddlSecHeader = hdr_reader.read_be()?;
 
-    let file_size = file.metadata()?.len();
+    //SDIT.FDI + info files + module files
+    let total_entry_count = 1 + hdr.info_entry_count() + hdr.module_entries_count();
+    println!("File info:\nInfo entry count: {}\nModule entry count: {}\nTotal entry count: {}",
+            hdr.info_entry_count(), hdr.module_entries_count(), total_entry_count);
 
-    let key = [
-        0x26, 0xE0, 0x96, 0xD3, 0xEF, 0x8A, 0x8F, 0xBB,
-        0xAA, 0x5E, 0x51, 0x6F, 0x77, 0x26, 0xC2, 0x2C,
-    ];
-    
-    let iv = [
-        0x3E, 0x4A, 0xE2, 0x3A, 0x69, 0xDB, 0x81, 0x54,
-        0xCD, 0x88, 0x38, 0xC4, 0xB9, 0x0C, 0x76, 0x66,
-    ];
+    for i in 0..total_entry_count {
+        let mut entry_header_reader = Cursor::new(decrypt_aes128_cbc_pcks7(&common::read_exact(&mut file, 32)?, &DEC_KEY, &DEC_IV)?);
+        let entry_header: EntryHeader = entry_header_reader.read_be()?;
 
-    let mut offset = 32;
+        println!("\n({}/{}) File: {}, Size: {}", i + 1, total_entry_count, entry_header.name(), entry_header.size());
 
-    while offset < file_size {
-        let header = common::read_file(&file, offset, 32)?;
-        let decrypted_header: Vec<u8>; 
+        let data = common::read_exact(&mut file, entry_header.size() as usize)?;
+        let dec_data = decrypt_aes128_cbc_pcks7(&data, &DEC_KEY, &DEC_IV)?;
 
-        match decrypt_aes128_cbc_pcks7(&header, &key, &iv) {
-            Ok(v) => decrypted_header = v,
-            Err(_) => {
-                // SDDL files can have a footer(signature?) of 0x80 OR 0x100 lenght in later ones, and there is no good way to detect it before entering the while loop and the footer has no common header.
-                // so we can assume if a file fails to decode at negative offsets 0x80 or 0x100, that is the footer and it can be skipped.
-                if offset == file_size - 128 {
-                    break
-                } else if offset == file_size - 256{
-                    break
-                } else {
-                    println!("!!Decryption error!! This file is invalid or not compatible!");
-                    std::process::exit(0)
-                }
-            },
-        }
+        fs::create_dir_all(&output_folder)?;
+        //detect the file type based on the counts of each file
+        if i == 0 { //SDIT.FDI file
+            let output_path = Path::new(&output_folder).join(entry_header.name());
+            let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
+            out_file.write_all(&dec_data)?;
+            println!("-- Saved file!");
 
-        let decrypted_string = String::from_utf8_lossy(&decrypted_header);
+        } else if i - 1 < hdr.info_entry_count() { //.TXT info file
+            println!("{}", String::from_utf8_lossy(&dec_data));
+            continue
 
-        let filename = decrypted_string.split("\0").next().unwrap();
-        let size_str = &decrypted_string[decrypted_string.len() - 12..];
-        let size: u64 = size_str.parse().unwrap();
+        } else { //Module file
+            let name = entry_header.name();
+            let source_name = name.split(".").next().unwrap();
 
-        println!("\nFile: {}, Size: {}", filename, size);
-        
-        offset += 32;
+            let mut module_reader = Cursor::new(dec_data);
+            let module_header: ModuleHeader = module_reader.read_be()?;
+            println!("- Version: {}.{}{}{}", module_header.file_version[0], module_header.file_version[1], module_header.file_version[2], module_header.file_version[3]);
 
-        let data = common::read_file(&file, offset, size.try_into().unwrap())?;
-        let decrypted_data = decrypt_aes128_cbc_pcks7(&data, &key, &iv)?;
-
-        if decrypted_data.starts_with(&[0x11, 0x22, 0x33, 0x44]) && filename != "SDIT.FDI"{ // header of obfuscated file, SDIT.FDI also has this header but seems to work differently so its skipped
-
-            println!("- Version: {}.{}{}{}", decrypted_data[24], decrypted_data[25], decrypted_data[26], decrypted_data[27]);
+            let module_data = common::read_exact(&mut module_reader, module_header.compressed_data_size as usize)?;
             println!("- Deciphering...");
-            let deciphered_data = decipher(&decrypted_data[48..], decrypted_data[48..].len());
+            let deciphered_data = decipher(&module_data);
 
-            let control_byte = decrypted_data[34];
-            let out_data: Vec<u8>; 
-
-            if control_byte == 3 {
+            let content: Vec<u8>;
+            if module_header.is_compressed() {
                 println!("-- Decompressing...");
-                out_data = decompress_zlib(&deciphered_data)?;
+                content = decompress_zlib(&deciphered_data)?;
             } else {
                 println!("-- Uncompressed...");
-                out_data = deciphered_data;
+                content = deciphered_data;
             }
 
-            let first_byte;
-            if out_data[1] & 0xF0 == 0xD0 {
-                first_byte = out_data[1] & 0x0F;
+            let mut content_reader = Cursor::new(content);
+            let content_header: ContentHeader = content_reader.read_be()?;
+
+            let output_path: PathBuf; 
+            if content_header.source_offset() == 270 {
+                let file_name_bytes = common::read_exact(&mut content_reader, 256)?;
+                let file_name = common::string_from_bytes(&file_name_bytes);
+                println!("--- File name: {}", file_name);
+
+                let out_folder_path = Path::new(&output_folder).join(source_name);
+                fs::create_dir_all(&out_folder_path)?;
+                output_path = Path::new(&out_folder_path).join(file_name);
             } else {
-                first_byte = out_data[1];
+                output_path = Path::new(&output_folder).join(format!("{}.bin", source_name));
             }
 
-            let dest_offset = u32::from_be_bytes([first_byte, out_data[2], out_data[3], out_data[4]]);
+            let data = common::read_exact(&mut content_reader, content_header.size as usize)?;
 
-            let source_offset = u32::from_be_bytes([0x00, out_data[6], out_data[7], out_data[8]]);
+            let mut out_file = OpenOptions::new().read(true).write(true).create(true).open(output_path)?;
+            out_file.seek(SeekFrom::Start(content_header.dest_offset() as u64))?;
+            out_file.write_all(&data)?;
+            println!("--- Saved!");
 
-            let path: PathBuf; 
-            let msg: String;
-
-            let source_name = filename.split(".").next().unwrap();
-
-            if source_offset == 270 {   //unique for 2014-2018 files
-                let embedded_file_name_string = String::from_utf8_lossy(&out_data[14..270]);
-                let embedded_file_name = embedded_file_name_string.split("\0").next().unwrap();
-                println!("--- Embedded file: {}", embedded_file_name);
-    
-                let folder_path = Path::new(&output_folder).join(source_name);
-                fs::create_dir_all(&folder_path)?;
-                path = Path::new(&folder_path).join(embedded_file_name);
-                msg = format!("to {}", source_name);
-            } else {
-                path = Path::new(&output_folder).join(format!("{}.bin", source_name));
-                msg = format!("to {}.bin", source_name);
-            }
-
-            fs::create_dir_all(&output_folder)?;
-            let mut file = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .open(path)?;
-    
-            file.seek(SeekFrom::Start(dest_offset as u64))?;
-            file.write_all(&out_data[source_offset as usize..])?;
-            println!("--- Saved {}!", msg);
-
-        } else {
-            let out_data = decrypted_data;
-            if filename.ends_with(".TXT") {
-                println!("{}", String::from_utf8_lossy(&out_data));
-            } else {
-                let path = Path::new(&output_folder).join(filename);
-
-                fs::create_dir_all(&output_folder)?;
-                let mut file = OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .open(path)?;
-  
-                file.write_all(&out_data)?;
-                println!("-- Saved file!");
-            } 
         }
-
-        offset += size;
     }
 
     println!("\nExtraction finished!");
