@@ -2,7 +2,7 @@ use std::fs::{File};
 use rsa::{RsaPublicKey, BigUint};
 use hex::decode;
 use std::path::Path;
-use std::io::{Cursor, Write};
+use std::io::{Read, Cursor, Write};
 use std::fs::{self, OpenOptions};
 
 use aes::Aes256;
@@ -35,7 +35,7 @@ struct FileHeader {
     real_size: u32,
 	stored_size: u32,
 	_header_size: u32,
-    _attributes: u32,
+    #[br(count = 4)] attributes: Vec<u8>,
 }
 impl FileHeader {
     fn file_name(&self) -> String {
@@ -96,7 +96,7 @@ pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<d
     println!("Description: \n{}", header.description());
     println!("Data size: {}", header.data_size);
 
-    let decrypted_data;
+    let mut decrypted_data;
     if (header.mask & 0x2000_0000) != 0 {
         println!("File is encrypted.");
         let mut key = None;
@@ -136,9 +136,14 @@ pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<d
         let aes_key = &decrypted[20..52];
         println!("AES key: {}\n", hex::encode(aes_key));
 
-        let encrypted_data = common::read_exact(&mut file, header.data_size as usize)?;
+        //for encrypted data we need to read file to end
+        let mut encrypted_data = Vec::new();
+        file.read_to_end(&mut encrypted_data)?;
+
         println!("Decrypting data...");
         decrypted_data = decrypt_aes256_ecb(aes_key, &encrypted_data)?;
+        decrypted_data.truncate(header.data_size as usize);
+        
     } else {
         println!("File is not encrypted.");
         decrypted_data = common::read_exact(&mut file, header.data_size as usize)?;
@@ -149,23 +154,24 @@ pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<d
     while (data_reader.position() as usize) < data_reader.get_ref().len() {
         let file_header: FileHeader = data_reader.read_le()?; 
 
-        println!("\nFile: {}, Size: {}", file_header.file_name(), file_header.real_size);
+        //its a folder not a file
+        if (file_header.attributes[3] & (1 << 1)) != 0 {
+            println!("\nFolder: {}", file_header.file_name());
+            let output_path = Path::new(&output_folder).join(file_header.file_name().trim_start_matches('/'));
+            fs::create_dir_all(output_path)?;
+            continue
+        }
 
+        println!("\nFile: {}, Size: {}", file_header.file_name(), file_header.real_size);
         let data = common::read_exact(&mut data_reader, file_header.stored_size as usize)?;
 
-        let mut output_path = Path::new(&output_folder).join(file_header.file_name().trim_start_matches('/'));
+        let output_path = Path::new(&output_folder).join(file_header.file_name().trim_start_matches('/'));
         let output_path_parent = output_path.parent().expect("Failed to get parent of the output path!");
 
-        //prevent collisions because philips is dumb
+        //prevent collisions
         if output_path_parent.exists() && output_path_parent.is_file() {
-            let fixed_file_name = if let Some((a, b)) = file_header.file_name().rsplit_once('/') {
-                format!("{}_{}", a, b)
-            } else {
-                file_header.file_name()
-            };
-
-            output_path = Path::new(&output_folder).join(file_header.file_name().trim_start_matches('/'));
-            println!("[!] Warning: File collision detected, this file will be saved to: {}", fixed_file_name);
+            println!("[!] Warning: File collision detected, Skipping this file!");
+            continue
         }
 
         if let Some(parent) = output_path.parent() {
