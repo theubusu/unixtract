@@ -35,7 +35,7 @@ pub fn extract_funai_upg(mut file: &File, output_folder: &str) -> Result<(), Box
 
     for i in 0..header.entry_count {
         let entry: Entry = file.read_le()?;
-        println!("\nEntry {}/{} - Type: {}, Size: {}", i + 1, header.entry_count, entry.entry_type, entry.entry_size);
+        println!("\n({}/{}) - Type: {}, Size: {}", i + 1, header.entry_count, entry.entry_type, entry.entry_size);
 
         let data = common::read_exact(&mut file, entry.entry_size as usize - 2 - 4)?; //size has the unk field + crc32 at the end
         let _crc32 = common::read_exact(&mut file, 4)?; //btw the CRC32 includes the entry header

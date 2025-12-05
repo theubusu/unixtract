@@ -58,7 +58,7 @@ pub fn is_slp_file(file: &File) -> bool {
 pub fn extract_slp(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
     let header: Header = file.read_le()?;
 
-    println!("\nFile info:\nModel: {}\nVersion: {}\nFirmware: {}\nNew type: {}\n",
+    println!("File info:\nModel: {}\nVersion: {}\nFirmware: {}\nNew type: {}\n",
             header.model(), header.version(), header.firmware(), header.is_new_type());
 
     let mut first_entry_offset = 0;
@@ -88,7 +88,7 @@ pub fn extract_slp(mut file: &File, output_folder: &str) -> Result<(), Box<dyn s
 
     let mut i = 1;
     for entry in &entries {
-        println!("\nExtracting {}/{}", i, &entries.len());
+        println!("\n({}/{}) - Offset: {}, Size: {}", i, &entries.len(), entry.offset, entry.size);
         file.seek(SeekFrom::Start(entry.offset.into()))?;
         let data = common::read_exact(&mut file, entry.size as usize)?;
 

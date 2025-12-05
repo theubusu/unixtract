@@ -71,7 +71,7 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
     let mut hdr_reader = Cursor::new(header); 
     let hdr: Header = hdr_reader.read_le()?;
 
-    println!("\nFile info:\nFile size: {}\nVendor magic: {}\nVersion info: {}\nProduct name: {}" , 
+    println!("File info:\nFile size: {}\nVendor magic: {}\nVersion info: {}\nProduct name: {}" , 
             hdr.file_size, hdr.vendor_magic(), hdr.version(), hdr.product_name());
 
     let mut part_n = 0;
@@ -80,7 +80,7 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
         let part_entry: PartEntry = file.read_le()?;
         let is_encrypted = if (part_entry.flags & 1 << 0) == 1 << 0 {true} else {false};
 
-        println!("\nPart {} - {}{}, Size: {}", part_n, part_entry.name(), if is_encrypted {" (Encrypted)"} else {""} ,part_entry.size);
+        println!("\n{} - {}, Size: {} {}", part_n, part_entry.name(), part_entry.size, if is_encrypted {"[ENCRYPTED]"} else {""} );
 
         let data = common::read_exact(&mut file, part_entry.size as usize + 48)?;
 
@@ -114,7 +114,7 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
             0
         };
 
-        println!("Extra header size: {}", extra_header_len);
+        //println!("Extra header size: {}", extra_header_len);
         
         let output_path = Path::new(&output_folder).join(part_entry.name() + ".bin");
 

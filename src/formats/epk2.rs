@@ -126,7 +126,7 @@ pub fn extract_epk2(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
         let segment_count = u32::from_le_bytes(header[84..88].try_into().unwrap());
         let mut segment_size = u32::from_le_bytes(header[88..92].try_into().unwrap());
 
-        println!("\nPak {}/{} - {}, Size: {}, Segments: {}", pak_n + 1, paks.len(), pak.name, pak.size, segment_count);
+        println!("\n({}/{}) - {}, Size: {}, Segments: {}", pak_n + 1, paks.len(), pak.name, pak.size, segment_count);
 
         for i in 0..segment_count {
             // for first segment we already read the header so skip doing that for it
@@ -161,7 +161,7 @@ pub fn extract_epk2(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
             let segment_data = common::read_exact(&mut file, actual_segment_size as usize)?;
             let out_data = decrypt_aes_ecb_auto(&matching_key_bytes, &segment_data)?;
 
-            println!("- Segment {}/{}, size: {}", i + 1, segment_count, actual_segment_size);
+            println!("- Segment {}/{} - Size: {}", i + 1, segment_count, actual_segment_size);
 
             let output_path = Path::new(&output_folder).join(pak.name.clone() + ".bin");
 

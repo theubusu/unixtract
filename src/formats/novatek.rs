@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::path::Path;
 use std::fs::{self, OpenOptions};
-use std::io::{Write, Seek};
+use std::io::{Write};
 
 use binrw::{BinRead, BinReaderExt};
 
@@ -38,18 +38,22 @@ pub fn is_novatek_file(file: &File) -> bool {
 pub fn extract_novatek(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
     let header: Header = file.read_le()?;
 
-    println!("\nPart count: {}", header.part_count);
+    println!("Part count: {}", header.part_count);
+    let mut entries: Vec<PartEntry> = Vec::new();
 
-    for i in 0..header.part_count {
+    for _i in 0..header.part_count {
         let part: PartEntry = file.read_le()?;
+        entries.push(part);
+    }
 
-        let current_pos = file.stream_position()?;
+    let mut e_i = 0;
+    for entry in &entries {
+        e_i += 1;
+        println!("\n({}/{}) - Index: {}, Offset: {}, Size: {}", e_i, entries.len(), entry.index, entry.offset, entry.size);
 
-        let data = common::read_file(&file, part.offset as u64, part.size as usize)?;
+        let data = common::read_file(&file, entry.offset as u64, entry.size as usize)?;
 
-        println!("\nPart {}: index: {}, size: {}, offset: {}", i + 1, part.index, part.size, part.offset);
-
-        let output_path = Path::new(&output_folder).join(format!("part_{}.bin", i + 1));
+        let output_path = Path::new(&output_folder).join(format!("{}.bin", e_i));
 
         fs::create_dir_all(&output_folder)?;
         let mut out_file = OpenOptions::new()
@@ -60,9 +64,6 @@ pub fn extract_novatek(mut file: &File, output_folder: &str) -> Result<(), Box<d
         out_file.write_all(&data)?;
 
         println!("- Saved file!");
-
-        file.seek(std::io::SeekFrom::Start(current_pos))?;
-
     }
 
     Ok(())

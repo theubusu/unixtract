@@ -62,7 +62,7 @@ pub fn is_pup_file(file: &File) -> bool {
 pub fn extract_pup(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
     let header: Header = file.read_le()?;
 
-    println!("\nFile info:\nFile size: {}\nEntry count: {}",
+    println!("File info:\nFile size: {}\nEntry count: {}",
             header.file_size, header.entry_count);
 
     let mut entries: Vec<Entry> = Vec::new();
@@ -78,7 +78,7 @@ pub fn extract_pup(mut file: &File, output_folder: &str) -> Result<(), Box<dyn s
 
     let mut e_i = 0;
     for entry in &entries {
-        println!("\n{}/{}: ID: {} Offset: {}, Compressed Size: {}, Uncompressed Size: {}\nCompressed: {}, Blocked: {}, Block table: {}",
+        println!("\n({}/{}) - ID: {} Offset: {}, Compressed Size: {}, Uncompressed Size: {}\nCompressed: {}, Blocked: {}, Block table: {}",
             e_i + 1, entries.len(), entry.id(), entry.offset, entry.compressed_size, entry.uncompressed_size, entry.is_compressed(), entry.is_blocked(), entry.is_block_table());
 
         if !entry.is_block_table () {

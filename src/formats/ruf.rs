@@ -152,7 +152,7 @@ fn actually_extract_ruf(mut file: &File, output_folder: &str, start_offset: u64)
 
     let mut ei = 1;
     for entry in entries {
-        println!("\nEntry {}/{}: {} - {}, Size: {}",
+        println!("\n({}/{}) - {}({}), Size: {}",
             ei, header.payload_count, entry.payload_type_bytes, entry.payload_type(), entry.size);
 
         let data = common::read_exact(&mut data_reader, entry.size as usize)?;

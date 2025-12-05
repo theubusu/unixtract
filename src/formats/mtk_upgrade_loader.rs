@@ -37,7 +37,7 @@ pub fn extract_mtk_upgrade_loader(mut file: &File, output_folder: &str) -> Resul
         let part_entry: PartEntry = file.read_le()?;
         let is_encrypted = if (part_entry.flags & 1 << 0) == 1 << 0 {true} else {false};
 
-        println!("\nPart {} - {}{}, Size: {}", part_n, part_entry.name(), if is_encrypted {" (Encrypted)"} else {""} ,part_entry.size);
+        println!("\n{} - {}, Size: {} {}", part_n, part_entry.name(), part_entry.size, if is_encrypted {"[ENCRYPTED]"} else {""} );
 
         let data = common::read_exact(&mut file, part_entry.size as usize)?;
 
@@ -49,7 +49,7 @@ pub fn extract_mtk_upgrade_loader(mut file: &File, output_folder: &str) -> Resul
             0
         };
 
-        println!("Extra header size: {}", extra_header_len);
+        //println!("Extra header size: {}", extra_header_len);
 
         let output_path = Path::new(&output_folder).join(part_entry.name() + ".bin");
 

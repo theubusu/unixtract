@@ -163,7 +163,7 @@ pub fn extract_sddl_sec(mut file: &File, output_folder: &str) -> Result<(), Box<
         let mut entry_header_reader = Cursor::new(decrypt_aes128_cbc_pcks7(&common::read_exact(&mut file, 32)?, &DEC_KEY, &DEC_IV)?);
         let entry_header: EntryHeader = entry_header_reader.read_be()?;
 
-        println!("\n({}/{}) File: {}, Size: {}", i + 1, total_entry_count, entry_header.name(), entry_header.size());
+        println!("\n({}/{}) - {}, Size: {}", i + 1, total_entry_count, entry_header.name(), entry_header.size());
 
         let data = common::read_exact(&mut file, entry_header.size() as usize)?;
         let dec_data = decrypt_aes128_cbc_pcks7(&data, &DEC_KEY, &DEC_IV)?;

@@ -68,7 +68,7 @@ pub fn is_invincible_image_file(file: &File) -> bool {
 pub fn extract_invincible_image(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
     let header: Header = file.read_le()?;
 
-    println!("\nFile info:\nFile Version: {}.{}\nVersion(1): {}\nVersion(2): {}\nVersion(3): {}\nVersion(4): {}\nData size: {}\nData start offset: {}\nKeep data size: {}\nSkip data size: {}\n\nPayload Count: {}",
+    println!("File info:\nFile Version: {}.{}\nVersion(1): {}\nVersion(2): {}\nVersion(3): {}\nVersion(4): {}\nData size: {}\nData start offset: {}\nKeep data size: {}\nSkip data size: {}\n\nPayload Count: {}",
             header.file_version[0], header.file_version[1], header.ver1(), header.ver2(), header.ver3(), header.ver4(), header.data_size, header.data_start_offset, header.keep_size, header.skip_size, header.payload_count);
 
     let mut entries: Vec<Entry> = Vec::new();
@@ -110,7 +110,7 @@ pub fn extract_invincible_image(mut file: &File, output_folder: &str) -> Result<
 
     let mut i = 1;
     for entry in entries {
-        println!("\nExtracting {}/{} - {}", i, header.payload_count, entry.name());
+        println!("\n({}/{}) - {}, Size: {}", i, header.payload_count, entry.name(), entry.size);
         let data = common::read_exact(&mut data_reader, entry.size as usize)?;
 
         let output_path = Path::new(&output_folder).join(entry.name() + ".bin");

@@ -162,7 +162,7 @@ pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<d
             continue
         }
 
-        println!("\nFile: {}, Size: {}", file_header.file_name(), file_header.real_size);
+        println!("\nFile - {}, Size: {}", file_header.file_name(), file_header.real_size);
         let data = common::read_exact(&mut data_reader, file_header.stored_size as usize)?;
 
         let output_path = Path::new(&output_folder).join(file_header.file_name().trim_start_matches('/'));

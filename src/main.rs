@@ -21,14 +21,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Input target: {}", target_path);
 
     let output_path = args.output_folder;
-    println!("Output folder: {}", output_path);
+    println!("Output folder: {}\n", output_path);
 
     let output_folder_path = PathBuf::from(&output_path);
     if output_folder_path.exists() {
         if output_folder_path.is_dir() {
             let is_empty = fs::read_dir(&output_folder_path)?.next().is_none();
             if !is_empty {
-                println!("\nWarning: Output folder exists and is NOT empty! Files may be overwritten!");
+                println!("Warning: Output folder exists and is NOT empty! Files may be overwritten!");
                 println!("Press Enter if you want to continue...");
                 io::stdin().read_line(&mut String::new())?;
             }
@@ -45,9 +45,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     } else {
         let file = File::open(path)?;
-
-        println!();
-
         if formats::sddl_sec::is_sddl_sec_file(&file) {
             println!("SDDL.SEC file detected!");
             formats::sddl_sec::extract_sddl_sec(&file, &output_path)?;

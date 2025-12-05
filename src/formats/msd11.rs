@@ -122,11 +122,11 @@ pub fn extract_msd11(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
 
     for i in 0..header.section_count {
         let entry: TocEntry = toc_reader.read_le()?;
-
-        println!("\nSection {}: {}", sections[i as usize].index, entry.name());
-
         let offset = sections[i as usize].offset;
         let size = sections[i as usize].size;
+
+        println!("\n({}/{}) - {}, Size: {}", sections[i as usize].index, sections.len(), entry.name(), size);
+
         let encrypted_data = common::read_file(&file, offset as u64, size as usize)?;
 
         println!("- Decrypting...");

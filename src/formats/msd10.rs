@@ -143,11 +143,11 @@ pub fn extract_msd10(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
 
         for i in 0..header.section_count {
             let entry: TizenTocEntry = toc_reader.read_le()?;
-
-            println!("\nSection {}: {}", sections[i as usize].index, entry.name());
-
             let offset = sections[i as usize].offset;
             let size = sections[i as usize].size;
+
+            println!("\n({}/{}) - {}, Size: {}", sections[i as usize].index, sections.len(), entry.name(), size);
+
             let encrypted_data = common::read_file(&file, offset as u64, size as usize)?;
 
             println!("- Decrypting...");
@@ -179,12 +179,11 @@ pub fn extract_msd10(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
 
             assert!(entry.segment_size == sections[i as usize].size, "size in TOC does not match size from header!");
             sections[i as usize].name = entry.name().clone();
-
-            println!("\nSection {}: {}", sections[i as usize].index, entry.name());
-            
             let offset = sections[i as usize].offset;
             let size = sections[i as usize].size;
 
+            println!("\n({}/{}) - {}, Size: {}", sections[i as usize].index, sections.len(), entry.name(), size);
+            
             if i != 0 && entry.name() == sections[i as usize - 1].name { //second section with the same name is some sort of signature
                 println!("- Skipping signature file...");
                 continue;

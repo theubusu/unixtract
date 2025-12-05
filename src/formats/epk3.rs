@@ -106,11 +106,12 @@ pub fn extract_epk3(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
 
     if new_type {let _unknown = common::read_exact(&mut pkg_info_reader, 4)?;}; //new type has additional value
 
+    let mut pak_i = 1;
     while (pkg_info_reader.position() as usize) < pkg_info_reader.get_ref().len() {
         let mut entry: PkgInfoEntry = pkg_info_reader.read_le()?;
 
-        println!("\nPak - {}, Size: {}, Segments: {}",
-                entry.package_name(), entry.package_size, entry.segment_count);
+        println!("\n({}) - {}, Size: {}, Segments: {}",
+                pak_i, entry.package_name(), entry.package_size, entry.segment_count);
         
         for i in 0..entry.segment_count {
             if i > 0 {
@@ -136,6 +137,7 @@ pub fn extract_epk3(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
 
             println!("-- Saved to file!");
         }
+        pak_i += 1;
     }
 
     println!("\nExtraction finished!");

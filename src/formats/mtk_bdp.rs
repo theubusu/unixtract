@@ -143,7 +143,7 @@ pub fn extract_mtk_bdp(mut file: &File, output_folder: &str) -> Result<(), Box<d
 
     for i in 0..part_header.part_count {
         let part_entry: PartEntry = file.read_le()?;
-        println!("\n{}/{}. {}, ID: {:02x}, Size: {}", i + 1, part_header.part_count, part_entry.name(), part_entry.id, part_entry.size);
+        println!("\n({}/{}) - {}, ID: {:02x}, Size: {}", i + 1, part_header.part_count, part_entry.name(), part_entry.id, part_entry.size);
 
         for entry in &entries{
             if entry.id == part_entry.id && entry.size == part_entry.size {

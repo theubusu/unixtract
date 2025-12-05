@@ -190,10 +190,12 @@ pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<
         modules.push(entry);
     }
 
+    let mut mod_i = 0;
     let mut main_offset: Option<u32> = None;
-    for module in modules {
-        println!("\nSave module {}, Offset: {}, Size: {}, Expected checksum: {:#010x}",
-                module.name(), module.offset, module.size, module.data_checksum);
+    for module in &modules {
+        mod_i += 1;
+        println!("\n({}/{}) - {}, Offset: {}, Size: {}, Expected checksum: {:#010x}",
+                mod_i, modules.len(), module.name(), module.offset, module.size, module.data_checksum);
 
         file_reader.seek(SeekFrom::Start(module.offset as u64))?;
         let data = common::read_exact(&mut file_reader, module.size as usize)?;
@@ -219,7 +221,6 @@ pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<
         out_file.write_all(&dec_data)?;
         
         println!("-- Saved file!");
-  
     }
 
     if !main_offset.is_some() {
@@ -242,7 +243,9 @@ pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<
         main_entries.push(main_entry);
     }
 
-    for entry in main_entries {
+    let mut maine_i = 0;
+    for entry in &main_entries {
+        maine_i += 1;
         let mut data = common::read_exact(&mut file_reader, entry.size as usize)?;
         if entry.size > 5120 {
             //decrypt first and last 5kb
@@ -260,8 +263,8 @@ pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<
 
         let mut data_reader = Cursor::new(data);
         let header: MainEntryHeader = data_reader.read_le()?;
-        println!("\nSaving entry - Compressed size: {}, Decompressed size: {}, Compression type: {}({})", 
-                header.compressed_size, header.decompressed_size, header.compression_type_byte, header.compression_type());
+        println!("\nMAIN ({}/{}) - Compressed size: {}, Decompressed size: {}, Compression type: {}({})", 
+                maine_i, main_entries.len(), header.compressed_size, header.decompressed_size, header.compression_type_byte, header.compression_type());
         let compressed_data = common::read_exact(&mut data_reader, header.compressed_size as usize)?;
 
         let decompressed_data;

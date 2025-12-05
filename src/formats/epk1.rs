@@ -116,7 +116,8 @@ pub fn extract_epk1(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
 
             let data = common::read_file(&file, pak.offset as u64 + 128, pak.size as usize - 128)?;
 
-            println!("\nPak {}: {}, Offset: {}, Size: {}, Platform: {}", i + 1, pak_header.pak_name(), pak.offset, pak.size, pak_header.platform_id());
+            println!("\n({}/{}) - {}, Offset: {}, Size: {}, Platform: {}", 
+                    i + 1, paks.len(), pak_header.pak_name(), pak.offset, pak.size, pak_header.platform_id());
 
             let output_path = Path::new(&output_folder).join(pak_header.pak_name() + ".bin");
 

@@ -60,7 +60,7 @@ pub fn extract_samsung_old(path: &PathBuf, output_folder: &str) -> Result<(), Bo
                     let file = File::open(&path)?;
                     let filename = path.file_name().unwrap().to_str().unwrap();
                     let file_size = file.metadata()?.len();
-                    println!("\nFile: {}", filename);
+                    println!("\nFile - {}", filename);
 
                     let data = common::read_file(&file, 0, file_size.try_into().unwrap())?;
                     let salt = &data[8..16];

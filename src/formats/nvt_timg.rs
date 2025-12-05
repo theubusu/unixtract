@@ -43,6 +43,7 @@ pub fn is_nvt_timg_file(file: &File) -> bool {
 pub fn extract_nvt_timg(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
     let _timg = common::read_exact(&mut file, 288)?; //TIMG magic + header
 
+    let mut pimg_i = 1;
     loop {
         let pimg = match file.read_le::<PIMG>() {
             Ok(val) => val,
@@ -50,7 +51,7 @@ pub fn extract_nvt_timg(mut file: &File, output_folder: &str) -> Result<(), Box<
         };
         let data = common::read_exact(&mut file, pimg.size as usize)?;
 
-        println!("\nPIMG: Name: {}, Size: {}, Dest: {}, Compression: {}", pimg.name(), pimg.size, pimg.dest_dev(), pimg.comp_type());
+        println!("\n({}) - {}, Size: {}, Dest: {}, Compression: {}", pimg_i, pimg.name(), pimg.size, pimg.dest_dev(), pimg.comp_type());
 
         let out_data;
 
@@ -75,6 +76,7 @@ pub fn extract_nvt_timg(mut file: &File, output_folder: &str) -> Result<(), Box<
         out_file.write_all(&out_data)?;
 
         println!("-- Saved file!");
+        pimg_i += 1;
     }
 
     println!("\nExtraction finished!");

@@ -72,7 +72,7 @@ pub fn extract_sony_bdp(mut file: &File, output_folder: &str) -> Result<(), Box<
     let mut hdr_reader = Cursor::new(header);
     let hdr: Header = hdr_reader.read_le()?;
 
-    println!("\nFile info:\nFirmware: {}\nVersion: {}\nDate: {}\nFile size: {}", 
+    println!("File info:\nFirmware: {}\nVersion: {}\nDate: {}\nFile size: {}", 
             hdr.firmware_name(), hdr.firmware_version(), hdr.date(), hdr.file_size);
 
     let mut last_file_path: Option<PathBuf> = None;
@@ -88,7 +88,7 @@ pub fn extract_sony_bdp(mut file: &File, output_folder: &str) -> Result<(), Box<
             continue
         }
 
-        println!("\nEntry {} - Offset: {}, Size: {}", i, entry.offset, entry.size);
+        println!("\n({}) - Offset: {}, Size: {}", i, entry.offset, entry.size);
         if i == 1 {
             first_entry_offset = entry.offset as u64;
         }
