@@ -10,7 +10,7 @@ use std::fs::{self, File};
 #[derive(Parser, Debug)]
 struct Args {
     input_target: String,
-    output_folder: String,
+    output_folder: Option<String>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,8 +19,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let target_path = args.input_target;
     println!("Input target: {}", target_path);
+    let path = PathBuf::from(target_path);
 
-    let output_path = args.output_folder;
+
+    let output_path = if args.output_folder.is_some() {
+        args.output_folder.unwrap()
+    } else {
+        format!("_{}", path.file_name().and_then(|s| s.to_str()).unwrap())
+    };
     println!("Output folder: {}\n", output_path);
 
     let output_folder_path = PathBuf::from(&output_path);
@@ -28,14 +34,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if output_folder_path.is_dir() {
             let is_empty = fs::read_dir(&output_folder_path)?.next().is_none();
             if !is_empty {
-                println!("Warning: Output folder exists and is NOT empty! Files may be overwritten!");
+                println!("Warning: Output folder already exists and is NOT empty! Files may be overwritten!");
                 println!("Press Enter if you want to continue...");
                 io::stdin().read_line(&mut String::new())?;
             }
         }
     }
-
-    let path = PathBuf::from(target_path);
+ 
     if path.is_dir() {
         if formats::samsung_old::is_samsung_old_dir(&path) {
             println!("Samsung old firmware dir detected!\n");

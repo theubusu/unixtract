@@ -12,10 +12,17 @@ struct Header {
     #[br(count = 4)] _magic_bytes: Vec<u8>,
     #[br(count = 4)] _flags: Vec<u8>,
     _header_size: u32,
-    #[br(count = 40)] _unknown1: Vec<u8>,
+    _unused: u32,
+    #[br(count = 16)] firmware_name_bytes: Vec<u8>,
+    #[br(count = 20)] _unknown1: Vec<u8>,
     part_count: u32,
     _first_part_offset: u32,
     #[br(count = 116)] _unknown2: Vec<u8>,
+}
+impl Header {
+    fn firmware_name(&self) -> String {
+        common::string_from_bytes(&self.firmware_name_bytes)
+    }
 }
 
 #[derive(BinRead)]
@@ -38,7 +45,7 @@ pub fn is_novatek_file(file: &File) -> bool {
 pub fn extract_novatek(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
     let header: Header = file.read_le()?;
 
-    println!("Part count: {}", header.part_count);
+    println!("File info:\nFirmware name: {}\nPart count: {}", header.firmware_name(), header.part_count);
     let mut entries: Vec<PartEntry> = Vec::new();
 
     for _i in 0..header.part_count {

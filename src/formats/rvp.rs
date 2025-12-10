@@ -46,7 +46,7 @@ pub fn extract_rvp(mut file: &File, output_folder: &str) -> Result<(), Box<dyn s
         i += 1;
         let header_size_bytes = common::read_exact(&mut data_reader, 4)?;
         let header_size = u32::from_be_bytes(header_size_bytes.try_into().unwrap());
-        println!("\n({}) - Offset: {}, Header size: {}", i, data_reader.position() - 4, header_size);
+        println!("\n#{} - Offset: {}, Header size: {}", i, data_reader.position() - 4, header_size);
         let hdr = common::read_exact(&mut data_reader, header_size as usize)?;
 
         let size;

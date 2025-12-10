@@ -51,7 +51,7 @@ pub fn extract_nvt_timg(mut file: &File, output_folder: &str) -> Result<(), Box<
         };
         let data = common::read_exact(&mut file, pimg.size as usize)?;
 
-        println!("\n({}) - {}, Size: {}, Dest: {}, Compression: {}", pimg_i, pimg.name(), pimg.size, pimg.dest_dev(), pimg.comp_type());
+        println!("\n#{} - {}, Size: {}, Dest: {}, Compression: {}", pimg_i, pimg.name(), pimg.size, pimg.dest_dev(), pimg.comp_type());
 
         let out_data;
 

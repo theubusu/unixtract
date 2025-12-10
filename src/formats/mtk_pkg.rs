@@ -5,6 +5,7 @@ use binrw::{BinRead, BinReaderExt};
 
 use crate::utils::common;
 use crate::utils::aes::{decrypt_aes128_cbc_nopad};
+use crate::keys;
 
 #[derive(BinRead)]
 struct Header {
@@ -26,6 +27,7 @@ impl Header {
     fn product_name(&self) -> String {
         common::string_from_bytes(&self.product_name_bytes)
     }
+
 }
 
 #[derive(BinRead)]
@@ -37,6 +39,12 @@ struct PartEntry {
 impl PartEntry {
     fn name(&self) -> String {
         common::string_from_bytes(&self.name_bytes)
+    }
+    fn is_valid(&self) -> bool {
+        self.name().is_ascii()
+    }
+    fn is_encrypted(&self) -> bool {
+        (self.flags & 1 << 0) == 1 << 0
     }
 }
 
@@ -66,6 +74,7 @@ pub fn is_mtk_pkg_file(file: &File) -> bool {
 }
 
 pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let file_size = file.metadata()?.len();
     let encrypted_header = common::read_exact(&mut file, 144)?;
     let header = decrypt_aes128_cbc_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV)?;
     let mut hdr_reader = Cursor::new(header); 
@@ -75,32 +84,56 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
             hdr.file_size, hdr.vendor_magic(), hdr.version(), hdr.product_name());
 
     let mut part_n = 0;
-    while file.stream_position()? < hdr.file_size as u64 {
+    while file.stream_position()? < file_size as u64 {        
         part_n += 1;
         let part_entry: PartEntry = file.read_le()?;
-        let is_encrypted = if (part_entry.flags & 1 << 0) == 1 << 0 {true} else {false};
+        if !part_entry.is_valid() {
+            break
+        }
 
-        println!("\n{} - {}, Size: {} {}", part_n, part_entry.name(), part_entry.size, if is_encrypted {"[ENCRYPTED]"} else {""} );
+        println!("\n#{} - {}, Size: {} {}", part_n, part_entry.name(), part_entry.size, if part_entry.is_encrypted() {"[ENCRYPTED]"} else {""} );
 
         let data = common::read_exact(&mut file, part_entry.size as usize + 48)?;
+        
+        if part_entry.size == 0 {
+            println!("- Empty entry, skipping!");
+            continue
+        }
 
-        let out_data;
-        if is_encrypted {
-            // try decrypting with vendor magic repeated 4 times (works for sony and hisense)
+        let mut out_data = Vec::new(); 
+        if part_entry.is_encrypted() {
+            let crypted_header = &data[..48];
+
+            // try decrypting with vendor magic repeated 4 times (works for most)
             let mut key = [0u8; 16];
             for i in 0..4 {
                 key[i * 4..(i + 1) * 4].copy_from_slice(&hdr.vendor_magic_bytes);
             }
-
-            let crypted_header = &data[..48];
             let try_decrypt = decrypt_aes128_cbc_nopad(&crypted_header, &key, &HEADER_IV)?;
 
             if try_decrypt.starts_with(b"reserved mtk inc") {
                 println!("- Decrypting with 4xVendor magic...");
                 out_data = decrypt_aes128_cbc_nopad(&data[..data.len() & !15], &key, &HEADER_IV)?;
-            } else {
-                println!("- Failed to decrypt data!");
-                continue
+            } else { 
+                //try decrypting with one of custom keys
+                let mut decrypted = false;
+                for (key_hex, iv_hex, name) in keys::MTK_PKG_CUST {
+                    let key_array: [u8; 16] = hex::decode(key_hex)?.as_slice().try_into()?;
+                    let iv_array: [u8; 16] = hex::decode(iv_hex)?.as_slice().try_into()?;
+                    let try_decrypt = decrypt_aes128_cbc_nopad(&crypted_header, &key_array, &iv_array)?;
+
+                    if try_decrypt.starts_with(b"reserved mtk inc") {    
+                        println!("- Decrypting with key {}...", name);
+                        out_data = decrypt_aes128_cbc_nopad(&data[..data.len() & !15], &key_array, &iv_array)?;
+                        decrypted = true;
+                        break
+                    }
+                }
+
+                if !decrypted {
+                    println!("- Failed to decrypt data!");
+                    continue
+                }
             };  
         } else {
             out_data = data;
@@ -113,17 +146,10 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
         } else {
             0
         };
-
-        //println!("Extra header size: {}", extra_header_len);
         
         let output_path = Path::new(&output_folder).join(part_entry.name() + ".bin");
-
         fs::create_dir_all(&output_folder)?;
-        let mut out_file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(output_path)?;
-
+        let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
         out_file.write_all(&out_data[48 + extra_header_len as usize..])?;
 
         println!("-- Saved file!");

@@ -88,7 +88,7 @@ pub fn extract_sony_bdp(mut file: &File, output_folder: &str) -> Result<(), Box<
             continue
         }
 
-        println!("\n({}) - Offset: {}, Size: {}", i, entry.offset, entry.size);
+        println!("\n#{} - Offset: {}, Size: {}", i, entry.offset, entry.size);
         if i == 1 {
             first_entry_offset = entry.offset as u64;
         }
