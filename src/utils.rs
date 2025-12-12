@@ -5,3 +5,4 @@ pub mod lzss;
 pub mod lzop;
 pub mod sparse;
 pub mod compression;
+pub mod android_ota_update_metadata;

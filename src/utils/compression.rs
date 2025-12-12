@@ -4,6 +4,8 @@ use flate2::read::ZlibDecoder;
 use flate2::read::GzDecoder;
 use lzma_rs::lzma_decompress;
 use lz4::block::decompress;
+use bzip2::read::BzDecoder;
+use liblzma::read::XzDecoder;
 
 pub fn decompress_zlib(data: &[u8]) -> io::Result<Vec<u8>> {
     let mut decoder = ZlibDecoder::new(data);
@@ -33,4 +35,18 @@ pub fn decompress_lz4(compressed_data: &[u8], original_size: i32) -> Result<Vec<
         Ok(decompressed) => Ok(decompressed),
         Err(e) => Err(std::io::Error::new(std::io::ErrorKind::InvalidData, e)),
     }
+}
+
+pub fn decompress_bzip(compressed: &[u8]) -> std::io::Result<Vec<u8>> {
+    let mut decoder = BzDecoder::new(compressed);
+    let mut decompressed = Vec::new();
+    decoder.read_to_end(&mut decompressed)?;
+    Ok(decompressed)
+}
+
+pub fn decompress_xz(compressed: &[u8]) -> std::io::Result<Vec<u8>> {
+    let mut decoder = XzDecoder::new(compressed);
+    let mut decompressed = Vec::new();
+    decoder.read_to_end(&mut decompressed)?;
+    Ok(decompressed)
 }
