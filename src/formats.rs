@@ -26,5 +26,5 @@ pub mod epk2;
 pub mod epk3;
 
 pub mod mtk_pkg;
-pub mod mtk_upgrade_loader;
+pub mod mtk_pkg_old;
 pub mod mtk_bdp;

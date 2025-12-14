@@ -133,12 +133,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             formats::roku::extract_roku(&file, &output_path)?;
         }
         else if formats::mtk_pkg::is_mtk_pkg_file(&file) {
-            println!("MTK Pkg file detected!");
+            println!("MTK PKG file detected!");
             formats::mtk_pkg::extract_mtk_pkg(&file, &output_path)?;
         } 
-        else if formats::mtk_upgrade_loader::is_mtk_upgrade_loader_file(&file) {
-            println!("MTK upgrade_loader file detected!");
-            formats::mtk_upgrade_loader::extract_mtk_upgrade_loader(&file, &output_path)?;
+        else if formats::mtk_pkg_old::is_mtk_pkg_old_file(&file) {
+            println!("MTK PKG (Old) file detected!");
+            formats::mtk_pkg_old::extract_mtk_pkg_old(&file, &output_path)?;
         }
         else if formats::mtk_bdp::is_mtk_bdp_file(&file) {
             println!("MTK BDP file detected!");

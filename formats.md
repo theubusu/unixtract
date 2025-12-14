@@ -10,8 +10,8 @@
 | MSD v1.1						| Samsung TVs 2016+																	| **Depends on keys** - see keys.rs														| https://github.com/bugficks/msddecrypt              											|
 | Mstar upgrade bin				| Many MStar-based TVs (Hisense, Toshiba..)											| Most files should be supported														| -                                                   											|
 | Mediatek BDP					| Many Mediatek-based Blu-Ray players (LG, Samsung, Philips, Panasonic...)			| Some older files may not be supported													| -                                                   											|
+| Mediatek PKG (Old)			| Older Mediatek-based TVs															| All files should be supported															| -                                                   											|
 | Mediatek PKG					| Many Mediatek-based TVs (Hisense, Sony, Panasonic, Philips...)					| Newer files with larger header are not supported. **Depends on keys** - see keys.rs	| https://github.com/openlgtv/epk2extract             											|
-| Mediatek upgrade_loader		| Older Mediatek-based TVs															| All files should be supported providing they are not encrypted						| -                                                   											|
 | Novatek PKG (NFWB)			| Some Novatek-based TVs (Philips, LG..)											| All files should be supported															| https://github.com/openlgtv/epk2extract             											|
 | Novatek TIMG					| Later Novatek Based TVs (Philips TitanOS/Hisense)									| All files should be supported															| -                                                   											|
 | Panasonic Blu-Ray (PANA_DVD)	| Panasonic Blu-Ray Players/Recorders												| **Depends on keys** - see keys.rs														| -               																				|
