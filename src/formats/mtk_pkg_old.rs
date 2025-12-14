@@ -49,10 +49,18 @@ impl PartEntry {
     }
 }
 
-pub fn is_mtk_pkg_old_file(file: &File) -> bool {
+pub fn is_mtk_pkg_old_file(mut file: &File) -> bool {
     let encrypted_header = common::read_file(&file, 0, 152).expect("Failed to read from file.");
     let header = decrypt(&encrypted_header, KEY, Some(HEADER_XOR_MASK));
     if &header[4..12] == b"#DH@FiRm" {
+        true
+    } else if &header[68..76] == b"#DH@FiRm" {
+        //check for 64 byte additional header used in some Sony and Philips firmwares and skip it
+        file.seek(std::io::SeekFrom::Start(64)).expect("Failed to seek");
+        true
+    } else if &header[132..140] == b"#DH@FiRm" {
+        //check for 128 byte additional header used in some Philips firmwares and skip it
+        file.seek(std::io::SeekFrom::Start(128)).expect("Failed to seek");
         true
     } else {
         false
