@@ -20,6 +20,7 @@ pub static MSD10: &[(&str, &str, &str)] = &[
     ("T-NT14M", "old",   "95d01e0bae861a05695bc8a6edb2ea835a09accd"),
     ("T-HKM",   "tizen", "1ac8989ff57db5e75ea67b033050871c"),
     ("T-HKP",   "tizen", "cce8a3ef92f3e94895999e928f4dd6c3"),
+	("T-ECP",   "old"  , "3ef6067262cf0c678598bff22169d1f1ea57c284"),
 ];
 
 //MSD11 keys
