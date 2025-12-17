@@ -81,9 +81,8 @@ pub fn extract_mtk_pkg_old(mut file: &File, output_folder: &str) -> Result<(), B
     while file.stream_position()? < file_size as u64 {
         part_n += 1;
         let part_entry: PartEntry = file.read_le()?;
-        let is_encrypted = if (part_entry.flags & 1 << 0) == 1 << 0 {true} else {false};
 
-        println!("\n#{} - {}, Size: {} {}", part_n, part_entry.name(), part_entry.size, if is_encrypted {"[ENCRYPTED]"} else {""} );
+        println!("\n#{} - {}, Size: {} {}", part_n, part_entry.name(), part_entry.size, if part_entry.is_encrypted() {"[ENCRYPTED]"} else {""} );
 
         let data = common::read_exact(&mut file, part_entry.size as usize)?;
         let out_data; 
@@ -99,9 +98,11 @@ pub fn extract_mtk_pkg_old(mut file: &File, output_folder: &str) -> Result<(), B
         //strip iMtK thing and get version
         let extra_header_len = if &out_data[0..4] == b"iMtK" {
             let imtk_len = u32::from_le_bytes(out_data[4..8].try_into().unwrap());
-            let version_len = u32::from_le_bytes(out_data[8..12].try_into().unwrap());
-            let version = common::string_from_bytes(&out_data[12..12 + version_len as usize]);
-            println!("- Version: {}", version);
+            if &out_data[56..60] != b"iPAd" {
+                let version_len = u32::from_le_bytes(out_data[8..12].try_into().unwrap());
+                let version = common::string_from_bytes(&out_data[12..12 + version_len as usize]);
+                println!("- Version: {}", version);
+            }
             imtk_len + 8
         } else {
             0

@@ -44,7 +44,10 @@ impl PartEntry {
         self.name().is_ascii()
     }
     fn is_encrypted(&self) -> bool {
-        (self.flags & 1 << 0) == 1 << 0
+        (self.flags & 1 << 0) != 0
+    }
+    fn is_compressed(&self) -> bool { //lzhs fs
+        (self.flags & 1 << 8) != 0
     }
 }
 
@@ -91,7 +94,8 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
             break
         }
 
-        println!("\n#{} - {}, Size: {} {}", part_n, part_entry.name(), part_entry.size, if part_entry.is_encrypted() {"[ENCRYPTED]"} else {""} );
+        println!("\n#{} - {}, Size: {}{} {}", 
+                part_n, part_entry.name(), part_entry.size, if part_entry.is_compressed() {" [COMPRESSED]"} else {""}, if part_entry.is_encrypted() {"[ENCRYPTED]"} else {""} );
 
         let data = common::read_exact(&mut file, part_entry.size as usize + 48)?;
         
@@ -142,9 +146,11 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
         //strip iMtK thing and get version
         let extra_header_len = if &out_data[48..52] == b"iMtK" {
             let imtk_len = u32::from_le_bytes(out_data[52..56].try_into().unwrap());
-            let version_len = u32::from_le_bytes(out_data[56..60].try_into().unwrap());
-            let version = common::string_from_bytes(&out_data[60..60 + version_len as usize]);
-            println!("- Version: {}", version);
+            if &out_data[56..60] != b"iPAd" {
+                let version_len = u32::from_le_bytes(out_data[56..60].try_into().unwrap());
+                let version = common::string_from_bytes(&out_data[60..60 + version_len as usize]);
+                println!("- Version: {}", version);
+            }
             imtk_len + 8
         } else {
             0

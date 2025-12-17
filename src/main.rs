@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Novatek TIMG file detected!");
             formats::nvt_timg::extract_nvt_timg(&file, &output_path)?;
         }
-        if formats::android_ota_payload::is_android_ota_payload_file(&file) {
+        else if formats::android_ota_payload::is_android_ota_payload_file(&file) {
             println!("Android OTA payload file detected!");
             formats::android_ota_payload::extract_android_ota_payload(&file, &output_path)?;
         }
