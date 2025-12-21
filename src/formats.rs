@@ -13,6 +13,7 @@ pub mod rvp;
 pub mod funai_upg;
 pub mod pana_dvd;
 pub mod android_ota_payload;
+pub mod bdl;
 
 pub mod pup;
 
