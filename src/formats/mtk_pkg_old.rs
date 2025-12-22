@@ -98,7 +98,7 @@ pub fn extract_mtk_pkg_old(mut file: &File, output_folder: &str) -> Result<(), B
         //strip iMtK thing and get version
         let extra_header_len = if &out_data[0..4] == b"iMtK" {
             let imtk_len = u32::from_le_bytes(out_data[4..8].try_into().unwrap());
-            if &out_data[56..60] != b"iPAd" {
+            if &out_data[8..12] != b"iPAd" {
                 let version_len = u32::from_le_bytes(out_data[8..12].try_into().unwrap());
                 let version = common::string_from_bytes(&out_data[12..12 + version_len as usize]);
                 println!("- Version: {}", version);
