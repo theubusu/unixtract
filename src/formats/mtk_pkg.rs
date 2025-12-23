@@ -5,6 +5,7 @@ use binrw::{BinRead, BinReaderExt};
 
 use crate::utils::common;
 use crate::utils::aes::{decrypt_aes128_cbc_nopad};
+use crate::utils::lzhs::{decompress_lzhs_fs_file2file};
 use crate::keys;
 
 #[derive(BinRead)]
@@ -156,10 +157,18 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
             0
         };
         
-        let output_path = Path::new(&output_folder).join(part_entry.name() + ".bin");
+        //for compressed part create temp file
+        let output_path = Path::new(&output_folder).join(part_entry.name() + if part_entry.is_compressed() {".lzhs"} else {".bin"});
         fs::create_dir_all(&output_folder)?;
-        let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
+        let mut out_file = OpenOptions::new().write(true).read(true)/* for lzhs */.create(true).open(&output_path)?;
         out_file.write_all(&out_data[48 + extra_header_len as usize..])?;
+
+        if part_entry.is_compressed() {
+            let lzhs_out_path = Path::new(&output_folder).join(part_entry.name() + ".bin");
+            decompress_lzhs_fs_file2file(&out_file, lzhs_out_path)?;
+            //after decompression remove the temporary .lzhs file
+            fs::remove_file(&output_path)?;
+        }
 
         println!("-- Saved file!");
     }

@@ -7,3 +7,5 @@ pub mod sparse;
 pub mod compression;
 pub mod android_ota_update_metadata;
 pub mod mtk_crypto;
+pub mod lzhs;
+pub mod huffman_tables;
