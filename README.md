@@ -1,6 +1,21 @@
+# unixtract
+Extractor for various file formats.   
+This is a tool that is able to extract the contents of various firmware package formats.   
+Built in Rust, and made to not depend on any external dependancies, only Rust crates. This way it can work on Windows, Linux and MacOS without any issue.   
+Please note that this project is still mostly under development and errors may occur. Feel free to make an issue in that case.   
+
+# Usage
+`unixtract <INPUT_TARGET> [OUTPUT_FOLDER]`   
+`<INPUT_TARGET>` - The target to analyze/extract.  
+`[OUTPUT_FOLDER]` - Folder to save extracted files to.  
+If an output folder is not provided, extracted files will be saved in folder `_<INPUT_TARGET>`.   
+
+# Supported formats
+Please note that some formats depend on decryption keys, and matching ones may not be provided in the tool. If you want to add your own keys, use the `keys.rs` file.   
 | Format name					| Used by																			| Notes																					| Thanks to																						|
 | ----------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | Android OTA payload.bin		| Some Android MediaTek TVs															| Some compression methods are not supported											| https://android.googlesource.com/platform/system/update_engine/+/HEAD/update_metadata.proto	|
+| BDL							| HP Printers																		| All files should be supported.														| -										             											|
 | EPK v1						| LG TVs before ~2010																| All files should be supported.														| https://github.com/openlgtv/epk2extract             											|
 | EPK v2						| LG TVs since ~2010																| **Depends on keys** - see keys.rs														| https://github.com/openlgtv/epk2extract             											|
 | EPK v3						| LG webOS TVs																		| **Depends on keys** - see keys.rs														| https://github.com/openlgtv/epk2extract             											|
