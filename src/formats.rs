@@ -28,4 +28,5 @@ pub mod epk3;
 
 pub mod mtk_pkg;
 pub mod mtk_pkg_old;
+pub mod mtk_pkg_new;
 pub mod mtk_bdp;

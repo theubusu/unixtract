@@ -19,7 +19,7 @@ struct Header {
 	file_size: u32,
     _flags: u32,
     #[br(count = 32)] product_name_bytes: Vec<u8>,
-    #[br(count = 32)] _encrypted_digest: Vec<u8>,
+    #[br(count = 32)] _digest: Vec<u8>,
 }
 impl Header {
     fn vendor_magic(&self) -> String {

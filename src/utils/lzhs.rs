@@ -4,18 +4,19 @@ use binrw::{BinRead, BinReaderExt};
 use std::path::{PathBuf};
 
 use crate::utils::huffman_tables::{CHARLEN, POS};
+use crate::utils::compression::{decompress_lz4};
 
 #[derive(BinRead)]
 struct LzhsHeader {
     uncompressed_size: u32,
     compressed_size: u32,
     checksum_or_seg_idx: u16, //as checksum in normal lzhs header, as index in lzhs_fs header
-    #[br(count = 6)] _padding: Vec<u8>,
+    #[br(count = 6)] padding: Vec<u8>,
 }
 
 pub fn decompress_lzhs_fs_file2file(mut file: &File, output_file: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let file_size = file.metadata()?.len();
-    let mut out_file = OpenOptions::new().append(true).create(true).open(output_file)?;
+    let mut out_file = OpenOptions::new().append(true).create(true).open(&output_file)?;
     file.seek(SeekFrom::Start(0))?;
 
     let mut uncompressed_heading = vec![0u8; 0x100000]; //first 1mb is uncompressed
@@ -25,23 +26,50 @@ pub fn decompress_lzhs_fs_file2file(mut file: &File, output_file: PathBuf) -> Re
     while file.stream_position().unwrap() < file_size {
         let segment_header: LzhsHeader = file.read_le()?;
         let lzhs_header: LzhsHeader = file.read_le()?;
-        println!("[LZHS] Segment {} - Compressed size: {}, Decompressed size: {}, Expected Checksum: 0x{:02x?}",
-                segment_header.checksum_or_seg_idx, lzhs_header.compressed_size, lzhs_header.uncompressed_size, lzhs_header.checksum_or_seg_idx);
+
+        //lz4 type uses a 4 byte checksum instead of 1(2) byte , so the padding is not 0 anymore
+        //maybe this method will be changed
+        let is_lz4 = if lzhs_header.padding != b"\x00\x00\x00\x00\x00\x00" {true} else {false};
+
+        println!("[{}] Segment {} - Compressed size: {}, Decompressed size: {}, Expected Checksum: 0x{:02x?}",
+                if is_lz4 {"LZ4"} else {"LZHS"}, segment_header.checksum_or_seg_idx, lzhs_header.compressed_size, lzhs_header.uncompressed_size, lzhs_header.checksum_or_seg_idx);
 
         let mut compressed_data = vec![0u8; lzhs_header.compressed_size as usize];
         file.read_exact(&mut compressed_data)?;
+        let mut out_data;
+        if lzhs_header.compressed_size == 0 {
+            //odd variant no.1: if the compressed size is 0 , the output is just zeros with the uncompressed size.
+            out_data = vec![0; lzhs_header.uncompressed_size as usize];
 
-        println!("- Decompressing...");
-        let out_huff = unhuff(&compressed_data);
-        let mut out_data = unlzss(&out_huff, lzhs_header.uncompressed_size as usize);
-        arm_thumb_convert(&mut out_data, 0, false);
+        } else if (lzhs_header.uncompressed_size > segment_header.uncompressed_size) && 
+                  (lzhs_header.compressed_size == lzhs_header.uncompressed_size) &&
+                  lzhs_header.checksum_or_seg_idx == 0x00 
+        {
+            //odd variant no.2: the lzhs header compressed size is for some reason bigger by 8 bytes (and those 8 bytes are zeros), the data is stored UNCOMPRESSED in these
+            //the compressed and uncompressed size are the same and the checksum is 0.
+            out_data = compressed_data[..segment_header.uncompressed_size as usize].to_vec();
 
-        let checksum = calc_checksum(&out_data);
-        println!("-- Calculated checksum: 0x{:02x?}", checksum);
-        if u16::from(checksum) != lzhs_header.checksum_or_seg_idx {
-            println!("--- Checksum mismatch! Expected: 0x{:02x?}, Got: 0x{:02x?}!", lzhs_header.checksum_or_seg_idx, checksum);
         } else {
-            println!("--- Checksum OK!")
+            //normal variant
+            println!("- Decompressing...");
+            if is_lz4 {
+                out_data = decompress_lz4(&compressed_data, lzhs_header.uncompressed_size as i32)?;
+            } else {
+                //lzhs
+                let out_huff = unhuff(&compressed_data);
+                out_data = unlzss(&out_huff, lzhs_header.uncompressed_size as usize);
+                arm_thumb_convert(&mut out_data, 0, false);
+
+                let checksum = calc_checksum(&out_data);
+                println!("-- Calculated checksum: 0x{:02x?}", checksum);
+                if u16::from(checksum) != lzhs_header.checksum_or_seg_idx {
+                    println!("--- Checksum mismatch! Expected: 0x{:02x?}, Got: 0x{:02x?}!", lzhs_header.checksum_or_seg_idx, checksum);
+                    return Err("Checksum mismatch!".into());
+                } else {
+                    println!("--- Checksum OK!")
+                }
+            }
+            
         }
 
         out_file.write_all(&out_data)?;

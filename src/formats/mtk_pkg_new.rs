@@ -17,7 +17,7 @@ struct Header {
 	file_size: u32,
     _flags: u32,
     #[br(count = 32)] product_name_bytes: Vec<u8>,
-    #[br(count = 32)] _digest: Vec<u8>,
+    #[br(count = 256)] _digest: Vec<u8>,
 }
 impl Header {
     fn vendor_magic(&self) -> String {
@@ -53,35 +53,46 @@ impl PartEntry {
     }
 }
 
-static HEADER_KEY: [u8; 16] = [
-        0x09, 0x29, 0x10, 0x94, 0x09, 0x29, 0x10, 0x94,
-        0x09, 0x29, 0x10, 0x94, 0x09, 0x29, 0x10, 0x94,
-];
+pub fn is_mtk_pkg_new_file(file: &File) -> bool {
+    let encrypted_header = common::read_file(&file, 0, 112).expect("Failed to read from file.");
+    for (key_hex, iv_hex, _name) in keys::MTK_PKG_CUST {
+        let key_array: [u8; 16] = hex::decode(key_hex).expect("Error").as_slice().try_into().expect("Error");
+        let iv_array: [u8; 16] = hex::decode(iv_hex).expect("Error").as_slice().try_into().expect("Error");
+        let try_decrypt = decrypt_aes128_cbc_nopad(&encrypted_header, &key_array, &iv_array).expect("Failed to decrypt.");
 
-static HEADER_IV: [u8; 16] = [0x00; 16];
-
-pub fn is_mtk_pkg_file(file: &File) -> bool {
-    let mut encrypted_header = common::read_file(&file, 0, 144).expect("Failed to read from file.");
-    let mut header = decrypt_aes128_cbc_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV).expect("Decryption error!");
-    if &header[4..12] == b"#DH@FiRm" {
-        true
-    } else {
-        // try for philips which has additional 128 bytes at beginning
-        encrypted_header = common::read_file(&file, 128, 144).expect("Failed to read from file.");
-        header = decrypt_aes128_cbc_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV).expect("Decryption error!");
-        if &header[4..12] == b"#DH@FiRm" {
-            true
-        } else {
-            false
-
+        if &try_decrypt[4..12] == b"#DH@FiRm" {    
+            return true;
         }
     }
+
+    false
 }
 
-pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_mtk_pkg_new(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
     let file_size = file.metadata()?.len();
-    let encrypted_header = common::read_exact(&mut file, 144)?;
-    let header = decrypt_aes128_cbc_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV)?;
+    let encrypted_header = common::read_exact(&mut file, 368)?;
+
+    let mut header = Vec::new();
+    let mut matching_key: Option<[u8; 16]> = None;
+    let mut matching_iv: Option<[u8; 16]> = None;
+    //find key, the header and data key will be the same
+    for (key_hex, iv_hex, name) in keys::MTK_PKG_CUST {
+        let key_array = hex::decode(key_hex)?.as_slice().try_into()?;
+        let iv_array = hex::decode(iv_hex)?.as_slice().try_into()?;
+        header = decrypt_aes128_cbc_nopad(&encrypted_header, &key_array, &iv_array)?;
+
+        if &header[4..12] == b"#DH@FiRm" {
+            println!("Using key {}", name);
+            matching_key = Some(key_array);
+            matching_iv = Some(iv_array);
+            break
+        }
+    }
+    if matching_key.is_none() && matching_iv.is_none() {
+        println!("Failed to find key!");
+        return Ok(())
+    }
+
     let mut hdr_reader = Cursor::new(header); 
     let hdr: Header = hdr_reader.read_le()?;
 
@@ -106,41 +117,10 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
             continue
         }
 
-        let mut out_data = Vec::new(); 
+        let out_data;
         if part_entry.is_encrypted() {
-            let crypted_header = &data[..48];
-
-            // try decrypting with vendor magic repeated 4 times (works for most)
-            let mut key = [0u8; 16];
-            for i in 0..4 {
-                key[i * 4..(i + 1) * 4].copy_from_slice(&hdr.vendor_magic_bytes);
-            }
-            let try_decrypt = decrypt_aes128_cbc_nopad(&crypted_header, &key, &HEADER_IV)?;
-
-            if try_decrypt.starts_with(b"reserved mtk inc") {
-                println!("- Decrypting with 4xVendor magic...");
-                out_data = decrypt_aes128_cbc_nopad(&data[..data.len() & !15], &key, &HEADER_IV)?;
-            } else { 
-                //try decrypting with one of custom keys
-                let mut decrypted = false;
-                for (key_hex, iv_hex, name) in keys::MTK_PKG_CUST {
-                    let key_array: [u8; 16] = hex::decode(key_hex)?.as_slice().try_into()?;
-                    let iv_array: [u8; 16] = hex::decode(iv_hex)?.as_slice().try_into()?;
-                    let try_decrypt = decrypt_aes128_cbc_nopad(&crypted_header, &key_array, &iv_array)?;
-
-                    if try_decrypt.starts_with(b"reserved mtk inc") {    
-                        println!("- Decrypting with key {}...", name);
-                        out_data = decrypt_aes128_cbc_nopad(&data[..data.len() & !15], &key_array, &iv_array)?;
-                        decrypted = true;
-                        break
-                    }
-                }
-
-                if !decrypted {
-                    println!("- Failed to decrypt data!");
-                    continue
-                }
-            };  
+            println!("- Decrypting...");
+            out_data = decrypt_aes128_cbc_nopad(&data[..data.len() & !15], &matching_key.unwrap(), &matching_iv.unwrap())?;
         } else {
             out_data = data;
         }
@@ -168,7 +148,7 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
             let lzhs_out_path = Path::new(&output_folder).join(part_entry.name() + ".bin");
             match decompress_lzhs_fs_file2file(&out_file, lzhs_out_path) {
                 Ok(()) => {
-                    println!("- Decompressed Successfully!");
+                    println!("-- Decompressed Successfully!");
                     //after successfull decompression remove the temporary .lzhs file
                     fs::remove_file(&output_path)?;
                 },

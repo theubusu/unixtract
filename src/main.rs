@@ -144,6 +144,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("MTK PKG (Old) file detected!");
             formats::mtk_pkg_old::extract_mtk_pkg_old(&file, &output_path)?;
         }
+        else if formats::mtk_pkg_new::is_mtk_pkg_new_file(&file) {
+            println!("MTK PKG (New) file detected!");
+            formats::mtk_pkg_new::extract_mtk_pkg_new(&file, &output_path)?;
+        }
         else if formats::mtk_bdp::is_mtk_bdp_file(&file) {
             println!("MTK BDP file detected!");
             formats::mtk_bdp::extract_mtk_bdp(&file, &output_path)?;
