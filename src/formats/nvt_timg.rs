@@ -9,7 +9,7 @@ use crate::utils::compression::{decompress_gzip};
 
 #[derive(Debug, BinRead)]
 struct PIMG {
-    #[br(count = 4)] _magic_bytes: Vec<u8>,
+    #[br(count = 4)] magic_bytes: Vec<u8>,
     _unknown1: u32,
     size: u32,
     _unknown2: u32,
@@ -49,6 +49,12 @@ pub fn extract_nvt_timg(mut file: &File, output_folder: &str) -> Result<(), Box<
             Ok(val) => val,
             Err(_) => break, // EOF
         };
+        //there is an old format of TIMG, this is just temporary fix to prevent false extraction until i implement it.
+        if pimg.magic_bytes != b"PIMG" {
+            println!("Invalid PIMG magic!");
+            return Ok(());
+        }
+
         let data = common::read_exact(&mut file, pimg.size as usize)?;
 
         println!("\n#{} - {}, Size: {}, Dest: {}, Compression: {}", pimg_i, pimg.name(), pimg.size, pimg.dest_dev(), pimg.comp_type());
