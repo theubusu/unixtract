@@ -117,10 +117,17 @@ pub fn extract_mtk_pkg_new(mut file: &File, output_folder: &str) -> Result<(), B
             continue
         }
 
-        let out_data;
+        let mut out_data;
         if part_entry.is_encrypted() {
             println!("- Decrypting...");
-            out_data = decrypt_aes128_cbc_nopad(&data[..data.len() & !15], &matching_key.unwrap(), &matching_iv.unwrap())?;
+            let (key_array, iv_array) = (matching_key.unwrap(), matching_iv.unwrap());
+            //data aligned to 16 bytes is AES encrypted. the remaining unaligned data is XORed with the key
+            let align_len = data.len() & !15;
+            let (aes_enc, xor_tail) = data.split_at(align_len);
+            out_data = decrypt_aes128_cbc_nopad(aes_enc, &key_array, &iv_array)?;
+            for (i, &b) in xor_tail.iter().enumerate() {
+                out_data.push(b ^ key_array[i % key_array.len()]);
+            }
         } else {
             out_data = data;
         }

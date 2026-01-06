@@ -92,9 +92,7 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
     while file.stream_position()? < file_size as u64 {        
         part_n += 1;
         let part_entry: PartEntry = file.read_le()?;
-        if !part_entry.is_valid() {
-            break
-        }
+        if !part_entry.is_valid() {break};
 
         println!("\n#{} - {}, Size: {}{} {}", 
                 part_n, part_entry.name(), part_entry.size, if part_entry.is_compressed() {" [COMPRESSED]"} else {""}, if part_entry.is_encrypted() {"[ENCRYPTED]"} else {""} );
@@ -106,7 +104,8 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
             continue
         }
 
-        let mut out_data = Vec::new(); 
+        let mut matching_key: Option<[u8; 16]> = None;
+        let mut matching_iv: Option<[u8; 16]> = None;
         if part_entry.is_encrypted() {
             let crypted_header = &data[..48];
 
@@ -116,33 +115,42 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
                 key[i * 4..(i + 1) * 4].copy_from_slice(&hdr.vendor_magic_bytes);
             }
             let try_decrypt = decrypt_aes128_cbc_nopad(&crypted_header, &key, &HEADER_IV)?;
-
             if try_decrypt.starts_with(b"reserved mtk inc") {
                 println!("- Decrypting with 4xVendor magic...");
-                out_data = decrypt_aes128_cbc_nopad(&data[..data.len() & !15], &key, &HEADER_IV)?;
-            } else { 
+                matching_key = Some(key);
+                matching_iv = Some(HEADER_IV);
+
+            } else {
                 //try decrypting with one of custom keys
-                let mut decrypted = false;
                 for (key_hex, iv_hex, name) in keys::MTK_PKG_CUST {
                     let key_array: [u8; 16] = hex::decode(key_hex)?.as_slice().try_into()?;
                     let iv_array: [u8; 16] = hex::decode(iv_hex)?.as_slice().try_into()?;
                     let try_decrypt = decrypt_aes128_cbc_nopad(&crypted_header, &key_array, &iv_array)?;
 
-                    if try_decrypt.starts_with(b"reserved mtk inc") {    
+                    if try_decrypt.starts_with(b"reserved mtk inc") {
                         println!("- Decrypting with key {}...", name);
-                        out_data = decrypt_aes128_cbc_nopad(&data[..data.len() & !15], &key_array, &iv_array)?;
-                        decrypted = true;
+                        matching_key = Some(key_array);
+                        matching_iv = Some(iv_array);
                         break
                     }
                 }
+            }
+        }
 
-                if !decrypted {
-                    println!("- Failed to decrypt data!");
-                    continue
-                }
-            };  
+        let mut out_data;
+        if matching_key.is_some() && matching_iv.is_some() {
+            let (key_array, iv_array) = (matching_key.unwrap(), matching_iv.unwrap());
+            //data aligned to 16 bytes is AES encrypted. the remaining unaligned data is XORed with the key
+            let align_len = data.len() & !15;
+            let (aes_enc, xor_tail) = data.split_at(align_len);
+            out_data = decrypt_aes128_cbc_nopad(aes_enc, &key_array, &iv_array)?;
+            for (i, &b) in xor_tail.iter().enumerate() {
+                out_data.push(b ^ key_array[i % key_array.len()]);
+            }
+
         } else {
-            out_data = data;
+            println!("- Failed to decrypt data!");
+            continue
         }
 
         //strip iMtK thing and get version
