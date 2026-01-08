@@ -104,9 +104,11 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
             continue
         }
 
-        let mut matching_key: Option<[u8; 16]> = None;
-        let mut matching_iv: Option<[u8; 16]> = None;
+        let mut out_data;
         if part_entry.is_encrypted() {
+            let mut matching_key: Option<[u8; 16]> = None;
+            let mut matching_iv: Option<[u8; 16]> = None;
+
             let crypted_header = &data[..48];
 
             // try decrypting with vendor magic repeated 4 times (works for most)
@@ -135,22 +137,22 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
                     }
                 }
             }
-        }
 
-        let mut out_data;
-        if matching_key.is_some() && matching_iv.is_some() {
-            let (key_array, iv_array) = (matching_key.unwrap(), matching_iv.unwrap());
-            //data aligned to 16 bytes is AES encrypted. the remaining unaligned data is XORed with the key
-            let align_len = data.len() & !15;
-            let (aes_enc, xor_tail) = data.split_at(align_len);
-            out_data = decrypt_aes128_cbc_nopad(aes_enc, &key_array, &iv_array)?;
-            for (i, &b) in xor_tail.iter().enumerate() {
-                out_data.push(b ^ key_array[i % key_array.len()]);
+            if matching_key.is_some() && matching_iv.is_some() {
+                let (key_array, iv_array) = (matching_key.unwrap(), matching_iv.unwrap());
+                //data aligned to 16 bytes is AES encrypted. the remaining unaligned data is XORed with the key
+                let align_len = data.len() & !15;
+                let (aes_enc, xor_tail) = data.split_at(align_len);
+                out_data = decrypt_aes128_cbc_nopad(aes_enc, &key_array, &iv_array)?;
+                for (i, &b) in xor_tail.iter().enumerate() {
+                    out_data.push(b ^ key_array[i % key_array.len()]);
+                }
+            } else {
+                println!("- Failed to decrypt data!");
+                continue
             }
-
         } else {
-            println!("- Failed to decrypt data!");
-            continue
+            out_data = data;
         }
 
         //strip iMtK thing and get version
