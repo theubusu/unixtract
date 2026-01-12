@@ -5,6 +5,7 @@ use binrw::{BinRead, BinReaderExt};
 
 use crate::utils::common;
 use crate::utils::mtk_crypto::{decrypt};
+use crate::utils::lzhs::{decompress_lzhs_fs_file2file_old};
 
 static KEY: u32 = 0x94102909; //09 29 10 94
 // first 4 bytes of header and content are additionally XORed, they have different masks although only differ by half a byte
@@ -47,6 +48,9 @@ impl PartEntry {
     fn is_encrypted(&self) -> bool {
         (self.flags & 1 << 0) == 1 << 0
     }
+    fn is_compressed(&self) -> bool { //lzhs fs
+        (self.flags & 1 << 8) != 0
+    }
 }
 
 pub fn is_mtk_pkg_old_file(mut file: &File) -> bool {
@@ -82,7 +86,8 @@ pub fn extract_mtk_pkg_old(mut file: &File, output_folder: &str) -> Result<(), B
         part_n += 1;
         let part_entry: PartEntry = file.read_le()?;
 
-        println!("\n#{} - {}, Size: {} {}", part_n, part_entry.name(), part_entry.size, if part_entry.is_encrypted() {"[ENCRYPTED]"} else {""} );
+        println!("\n#{} - {}, Size: {}{} {}", 
+                part_n, part_entry.name(), part_entry.size, if part_entry.is_compressed() {" [COMPRESSED]"} else {""}, if part_entry.is_encrypted() {"[ENCRYPTED]"} else {""} );
 
         let data = common::read_exact(&mut file, part_entry.size as usize)?;
         let out_data; 
@@ -108,13 +113,26 @@ pub fn extract_mtk_pkg_old(mut file: &File, output_folder: &str) -> Result<(), B
             0
         };
 
-        let output_path = Path::new(&output_folder).join(part_entry.name() + ".bin");
+        //for compressed part create temp file
+        let output_path = Path::new(&output_folder).join(part_entry.name() + if part_entry.is_compressed() {".lzhs"} else {".bin"});
         fs::create_dir_all(&output_folder)?;
-        let mut out_file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(output_path)?;
+        let mut out_file = OpenOptions::new().write(true).read(true)/* for lzhs */.create(true).open(&output_path)?;
         out_file.write_all(&out_data[extra_header_len as usize..])?;
+
+        if part_entry.is_compressed() {
+            let lzhs_out_path = Path::new(&output_folder).join(part_entry.name() + ".bin");
+            match decompress_lzhs_fs_file2file_old(&out_file, lzhs_out_path) {
+                Ok(()) => {
+                    println!("- Decompressed Successfully!");
+                    //after successfull decompression remove the temporary .lzhs file
+                    fs::remove_file(&output_path)?;
+                },
+                Err(e) => {
+                    eprintln!("Failed to decompress partition!, Error: {}. Saving compressed data...", e);
+                    //if the decompression is not successfull leave out compressed data.
+                }
+            }   
+        }
 
         println!("-- Saved file!");
     }
