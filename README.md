@@ -30,7 +30,7 @@ If an output folder is not provided, extracted files will be saved in folder `_<
 
 ## EPK v2  
 **Used in:** LG TVs since ~2010  
-**Notes:** **Depends on keys** - see keys.rs  
+**Notes:** **Depends on keys** - see keys.rs (most common keys should be included)  
 **Thanks to:** https://github.com/openlgtv/epk2extract
 
 ## EPK v3  
@@ -53,7 +53,7 @@ If an output folder is not provided, extracted files will be saved in folder `_<
 
 ## MSD 1.1
 **Used in:** Samsung TVs 2016+  
-**Notes:** **Depends on keys** - see keys.rs  
+**Notes:** **Depends on keys** - see keys.rs (keys 2015-2018, 2020 included)  
 **Thanks to:** https://github.com/bugficks/msddecrypt  
 
 ## MStar upgrade bin
@@ -127,4 +127,7 @@ If an output folder is not provided, extracted files will be saved in folder `_<
 ## Sony BDP
 **Used in:** Sony Blu-Ray players  
 **Notes:** Only platforms up to MSB18 are supported.  
-**Thanks to:** http://malcolmstagg.com/bdp/s390-firmware.html
+**Thanks to:** http://malcolmstagg.com/bdp/s390-firmware.html  
+
+# License
+Licensed under GNU GPL v3.  

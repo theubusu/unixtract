@@ -12,8 +12,7 @@ use crate::keys;
 struct Header {
     #[br(count = 4)] vendor_magic_bytes: Vec<u8>,
     #[br(count = 8)] _mtk_magic: Vec<u8>, //#DH@FiRm
-	#[br(count = 56)] version_bytes: Vec<u8>,
-    _unk: u32,
+	#[br(count = 60)] version_bytes: Vec<u8>,
 	file_size: u32,
     _flags: u32,
     #[br(count = 32)] product_name_bytes: Vec<u8>,
