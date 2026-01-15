@@ -17,9 +17,11 @@ pub static SAMSUNG: &[(&str, &str)] = &[
 //github.com/bugficks/msddecrypt
 //fw prefix, type, key
 pub static MSD10: &[(&str, &str, &str)] = &[
-    ("T-ECP",   "old"  , "3ef6067262cf0c678598bff22169d1f1ea57c284"),
-    ("T-MST14", "old",   "d145f1d55aee3ef520d194e1275b429c580baacb"),
-    ("T-NT14M", "old",   "95d01e0bae861a05695bc8a6edb2ea835a09accd"),
+    ("T-ECP",   "old",   "3ef6067262cf0c678598bff22169d1f1ea57c284"), //for T-ECPDEUT
+    ("T-MST14", "old",   "d145f1d55aee3ef520d194e1275b429c580baacb"), //X14 - 2014 Mstar
+    ("T-MS14J", "old",   "d145f1d55aee3ef520d194e1275b429c580baacb"), //X14 - 2014 Mstar (For 2015 models)
+    ("T-NT14M", "old",   "95d01e0bae861a05695bc8a6edb2ea835a09accd"), //NT14M - 2014 Novatek (low-end)
+    ("T-N14MJ", "old",   "95d01e0bae861a05695bc8a6edb2ea835a09accd"), //NT14M - 2014 Novatek (low-end) (for 2015 models)
     ("T-HKM",   "tizen", "1ac8989ff57db5e75ea67b033050871c"),
     ("T-HKP",   "tizen", "cce8a3ef92f3e94895999e928f4dd6c3"),
 ];
