@@ -1,11 +1,12 @@
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path};
-use std::io::{Cursor, Write, Seek, SeekFrom};
+use std::io::{Write};
 use binrw::{BinRead, BinReaderExt};
 
 use crate::utils::common;
 use crate::keys;
 use crate::formats::msd::{decrypt_aes_salted_tizen, decrypt_aes_tizen};
+use crate::utils::msd_ouith_parser_tizen_1_9::{parse_blob_1_9};
 
 #[derive(BinRead)]
 struct FileHeader {
@@ -38,21 +39,6 @@ struct Section {
     index: u32,
     offset: u64,
     size: u64,
-}
-
-#[derive(BinRead)]
-struct TocEntry {
-    #[br(count = 74)] _unk1: Vec<u8>,
-    _name_length: u8,
-    #[br(count = _name_length)] name_bytes: Vec<u8>,
-    #[br(count = 39)] _unk2: Vec<u8>,
-    #[br(count = 8)] salt: Vec<u8>,
-    #[br(count = 267)] _unk3: Vec<u8>,
-}
-impl TocEntry {
-    fn name(&self) -> String {
-        common::string_from_bytes(&self.name_bytes)
-    }
 }
 
 pub fn is_msd11_file(file: &File) -> bool {
@@ -112,32 +98,37 @@ pub fn extract_msd11(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
     let toc_data = common::read_file(&file, toc_offset as u64, toc_size as usize)?;
 
     let toc = decrypt_aes_salted_tizen(&toc_data, &passphrase_bytes)?;
-    let mut toc_reader = Cursor::new(toc);
+    let (items, info) = parse_blob_1_9(&toc)?;
 
-    toc_reader.seek(SeekFrom::Current(262))?; // probably signature
-    toc_reader.seek(SeekFrom::Current(50))?; // Tizen Software Upgrade Tree Binary Format ver. 1.9
+    if let Some(info) = info {
+        println!("\nImage info:\n{} {}.{}",
+                info.name(), info.major_ver, info.minor_ver);
+    }
 
-    for i in 0..header.section_count {
-        let entry: TocEntry = toc_reader.read_le()?;
-        let offset = sections[i as usize].offset;
+    for (i, item) in items.iter().enumerate() {
         let size = sections[i as usize].size;
+        let offset = sections[i as usize].offset;
 
-        println!("\n({}/{}) - {}, Size: {}", sections[i as usize].index, sections.len(), entry.name(), size);
+        println!("\n({}/{}) - {}, Size: {}",
+                item.item_id, items.len(), item.name, size);
 
-        let encrypted_data = common::read_file(&file, offset as u64, size as usize)?;
+        assert!(sections[i as usize].index == item.item_id, "Item ID in TOC does not match ID from header!");
 
-        println!("- Decrypting...");
-        let decrypted_data = decrypt_aes_tizen(&encrypted_data, &passphrase_bytes, &entry.salt)?;
+        let stored_data = common::read_file(&file, offset as u64, size as usize)?;
 
-        let output_path = Path::new(&output_folder).join(entry.name());
+        let out_data;
+        if item.aes_encryption {
+            println!("- Decrypting...");
+            let salt = item.aes_salt.as_ref().ok_or("AES salt missing!")?;
+            out_data = decrypt_aes_tizen(&stored_data, &passphrase_bytes, salt)?;
+        } else {
+            out_data = stored_data;
+        }
 
+        let output_path = Path::new(&output_folder).join(item.name.clone());
         fs::create_dir_all(&output_folder)?;
-        let mut out_file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(output_path)?;
-            
-        out_file.write_all(&decrypted_data)?;
+        let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;   
+        out_file.write_all(&out_data)?;
 
         println!("-- Saved file!");
     }

@@ -25,21 +25,21 @@ pub static MSD10: &[(&str, &str, &str)] = &[
     ("T-N14MJ", "old",   "95d01e0bae861a05695bc8a6edb2ea835a09accd"), //NT14M_J - 2014 Novatek (low-end) (for 2015 models)
 
     //github.com/bugficks/msddecrypt
-    ("T-HKM",   "tizen", "1ac8989ff57db5e75ea67b033050871c"),
-    ("T-HKP",   "tizen", "cce8a3ef92f3e94895999e928f4dd6c3"),
+    ("T-HKM",   "tizen", "1ac8989ff57db5e75ea67b033050871c"), //HawkM - 2015 Samsung
+    ("T-HKP",   "tizen", "cce8a3ef92f3e94895999e928f4dd6c3"), //HawkP - 2015 Samsung
 ];
 
 //MSD11 keys
 //github.com/bugficks/msddecrypt
 pub static MSD11: &[(&str, &str)] = &[
-    ("T-JZM",   "9b1d077c0d137d406c79ddacb6b159fe"), //2016
-    ("T-HKM",   "c7097975e8ab994beb5eaae57e0ba77c"), //2016
-    ("T-KTM2L", "46b04f5e794ca4377a20951c9ea00427"), //2018
-    ("T-KTM2",  "29110e0ce940b3a9b67d3e158f3f1342"), //2018
-    ("T-KTM",   "d0d49d5f36f5c0da50062fbf32168f5b"), //2017
-    ("T-KTSU",  "19e1ba41163f03735e692d9daa2cbb47"), //2018
-    ("T-KTSD",  "39332605ff47a0aea999b10ce9087389"), //2018
-    ("T-NKL",   "5bab1098dab48792619ebd63650d929f"), //2020
+    ("T-HKM",   "c7097975e8ab994beb5eaae57e0ba77c"), //HawkM    - 2015 Samsung (for 2016 models)
+    ("T-JZM",   "9b1d077c0d137d406c79ddacb6b159fe"), //JazzM    - 2016 Samsung
+    ("T-KTM2L", "46b04f5e794ca4377a20951c9ea00427"), //KantM2L  - 2018 Samsung
+    ("T-KTM2",  "29110e0ce940b3a9b67d3e158f3f1342"), //KantM2   - 2018 Samsung
+    ("T-KTM",   "d0d49d5f36f5c0da50062fbf32168f5b"), //KantM    - 2017 Samsung
+    ("T-KTSU",  "19e1ba41163f03735e692d9daa2cbb47"), //KantSU   - 2018 Samsung
+    ("T-KTSD",  "39332605ff47a0aea999b10ce9087389"), //KantSD?  - ???? Samsung
+    ("T-NKL",   "5bab1098dab48792619ebd63650d929f"), //NikeL    - 2020 Samsung
 ];
 
 //RUF keys

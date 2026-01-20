@@ -10,3 +10,5 @@ pub mod mtk_crypto;
 pub mod lzhs;
 pub mod huffman_tables;
 pub mod msd_ouith_parser_old;
+pub mod msd_ouith_parser_tizen_1_8;
+pub mod msd_ouith_parser_tizen_1_9;
