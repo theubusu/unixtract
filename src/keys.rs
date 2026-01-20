@@ -16,11 +16,12 @@ pub static SAMSUNG: &[(&str, &str)] = &[
 //MSD10 keys
 //fw prefix, type, key
 pub static MSD10: &[(&str, &str, &str)] = &[
-    ("T-ECP",   "old",   "3ef6067262cf0c678598bff22169d1f1ea57c284"), //for T-ECPDEUT
-    ("T-MST12", "old",   "010287362008be691dc8c9f6d2c5ca5aa210ecb8"), //X12 - 2013 Mstar
-    ("T-MST14", "old",   "d145f1d55aee3ef520d194e1275b429c580baacb"), //X14H - 2014 Mstar
-    ("T-MS14J", "old",   "d145f1d55aee3ef520d194e1275b429c580baacb"), //X14J - 2014 Mstar (For 2015 models)
-    ("T-NT14M", "old",   "95d01e0bae861a05695bc8a6edb2ea835a09accd"), //NT14M - 2014 Novatek (low-end)
+    ("T-ECP",   "old",   "3ef6067262cf0c678598bff22169d1f1ea57c284"), //EchoP   - 2012 Samsung
+    ("T-MST12", "old",   "010287362008be691dc8c9f6d2c5ca5aa210ecb8"), //X12     - 2013 Mstar
+    ("T-MST14", "old",   "d145f1d55aee3ef520d194e1275b429c580baacb"), //X14     - 2014 Mstar
+    ("T-MS14J", "old",   "d145f1d55aee3ef520d194e1275b429c580baacb"), //X14J    - 2014 Mstar (For 2015 models)
+    ("T-M14HK", "old",   "d145f1d55aee3ef520d194e1275b429c580baacb"), //X14HK   - 2014 Mstar (For 2016 models)
+    ("T-NT14M", "old",   "95d01e0bae861a05695bc8a6edb2ea835a09accd"), //NT14M   - 2014 Novatek (low-end)
     ("T-N14MJ", "old",   "95d01e0bae861a05695bc8a6edb2ea835a09accd"), //NT14M_J - 2014 Novatek (low-end) (for 2015 models)
 
     //github.com/bugficks/msddecrypt

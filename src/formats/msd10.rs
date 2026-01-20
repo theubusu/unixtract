@@ -6,6 +6,7 @@ use binrw::{BinRead, BinReaderExt};
 use crate::utils::common;
 use crate::keys;
 use crate::formats::msd::{decrypt_aes_salted_old, decrypt_aes_salted_tizen, decrypt_aes_tizen};
+use crate::utils::msd_ouith_parser_old::{parse_ouith_blob};
 
 #[derive(BinRead)]
 struct FileHeader {
@@ -37,7 +38,6 @@ struct Section {
     index: u32,
     offset: u32,
     size: u32,
-    name: String,
 }
 
 #[derive(BinRead)]
@@ -50,21 +50,6 @@ struct TizenTocEntry {
     #[br(count = 13)] _unk3: Vec<u8>,
 }
 impl TizenTocEntry {
-    fn name(&self) -> String {
-        common::string_from_bytes(&self.name_bytes)
-    }
-}
-
-#[derive(BinRead)]
-struct OldTocEntry {
-    #[br(count = 4)] _magic: Vec<u8>,
-    segment_length: u32,
-    segment_size: u32,
-    #[br(count = 26)] _unk: Vec<u8>,
-    name_lenght: u8,
-    #[br(count = name_lenght)] name_bytes: Vec<u8>,
-}
-impl OldTocEntry {
     fn name(&self) -> String {
         common::string_from_bytes(&self.name_bytes)
     }
@@ -84,20 +69,17 @@ pub fn extract_msd10(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
     println!("\nNumber of sections: {}", header.section_count);
 
     let mut sections: Vec<Section> = Vec::new();
-
     for _i in 0..header.section_count {
         let section: SectionEntry = file.read_le()?;
         println!("Section {}: offset: {}, size: {}", section.index, section.offset, section.size);
-        sections.push(Section {index: section.index, offset: section.offset, size: section.size, name: "".to_owned()});
+        sections.push(Section {index: section.index, offset: section.offset, size: section.size});
     }
 
-    let _0 = common::read_exact(&mut file, 4)?; //0000
-    let header_count_bytes = common::read_exact(&mut file, 4)?;
-    let header_count = u32::from_le_bytes(header_count_bytes.try_into().unwrap());
+    let _zero_padding = common::read_exact(&mut file, 4)?;
+    let header_count: u32 = file.read_le()?;
     println!("\nNumber of headers: {}", header_count);
 
     let mut headers: Vec<HeaderEntry> = Vec::new();
-
     for i in 0..header_count {
         let header: HeaderEntry = file.read_le()?;
         println!("Header {}: {}, offset: {}, size: {}", i + 1, header.name(), header.offset, header.size);
@@ -168,33 +150,41 @@ pub fn extract_msd10(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
 
     } else if firmware_type == "old" {
         let toc = decrypt_aes_salted_old(&toc_data, &passphrase_bytes)?;
-        let mut toc_reader = Cursor::new(toc);
+        let (items, info) = parse_ouith_blob(&toc)?;
 
-        toc_reader.seek(SeekFrom::Current(124))?; //probably signature + first magic
+        if let Some(info) = info {
+            println!("\nImage info:\n{} {}.{} {}/{}/20{}",
+                    info.name(), info.major_ver, info.minor_ver, info.date_day, info.date_month, info.date_year);
+        }
 
-        for i in 0..header.section_count {            
-            let entry: OldTocEntry = toc_reader.read_be()?;
+        for (i, item) in items.iter().enumerate() {
+            let type_str = if item.item_type == 0x0A {"Partition"} else if item.item_type == 0x0B {"File"} else if item.item_type == 0x11 {"CMAC Data"} else {"Unknown"};
+            println!("\n({}/{}) - {}, Type: {}, Size: {}",
+                    item.item_id, items.len(), item.name, type_str, item.all_size);
 
-            toc_reader.seek(SeekFrom::Current((entry.segment_length - entry.name_lenght as u32 - 31).into()))?;
+            assert!(sections[i as usize].index == item.item_id, "Item ID in TOC does not match ID from header!");
 
-            assert!(entry.segment_size == sections[i as usize].size, "size in TOC does not match size from header!");
-            sections[i as usize].name = entry.name().clone();
-            let offset = sections[i as usize].offset;
-            let size = sections[i as usize].size;
-
-            println!("\n({}/{}) - {}, Size: {}", sections[i as usize].index, sections.len(), entry.name(), size);
-            
-            if i != 0 && entry.name() == sections[i as usize - 1].name { //second section with the same name is some sort of signature
-                println!("- Skipping signature file...");
-                continue;
+            if item.item_type == 0x11 { //Skip CMAC DATA
+                println!("- Skipping CMAC Data...");
+                continue
             }
             
-            let encrypted_data = common::read_file(&file, offset as u64 + 136, size as usize - 136)?;
+            let offset = sections[i as usize].offset;
+            file.seek(SeekFrom::Start(offset as u64))?;
 
-            println!("- Decrypting...");
-            let out_data = decrypt_aes_salted_old(&encrypted_data, &passphrase_bytes)?; 
+            //skip heading metadata thing
+            file.seek(SeekFrom::Current(item.heading_size as i64))?;
+    
+            let stored_data = common::read_exact(&mut file, item.data_size as usize)?;
+            let out_data;
+            if item.aes_encryption {
+                println!("- Decrypting...");
+                out_data = decrypt_aes_salted_old(&stored_data, &passphrase_bytes)?;
+            } else {
+                out_data = stored_data;
+            }
 
-            let output_path = Path::new(&output_folder).join(entry.name());
+            let output_path = Path::new(&output_folder).join(item.name.clone());
             fs::create_dir_all(&output_folder)?;
             let mut out_file = OpenOptions::new()
                 .write(true)

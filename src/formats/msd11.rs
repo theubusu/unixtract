@@ -69,19 +69,16 @@ pub fn extract_msd11(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
     println!("\nNumber of sections: {}", header.section_count);
 
     let mut sections: Vec<Section> = Vec::new();
-
     for _i in 0..header.section_count {
         let section: SectionEntry = file.read_le()?;
         println!("Section {}: offset: {}, size: {}", section.index, section.offset, section.size);
         sections.push(Section {index: section.index, offset: section.offset, size: section.size});
     }
 
-    let header_count_bytes = common::read_exact(&mut file, 4)?;
-    let header_count = u32::from_le_bytes(header_count_bytes.try_into().unwrap());
+    let header_count: u32 = file.read_le()?;
     println!("\nNumber of headers: {}", header_count);
 
     let mut headers: Vec<HeaderEntry> = Vec::new();
-
     for i in 0..header_count {
         let header: HeaderEntry = file.read_le()?;
         println!("Header {}: {}, offset: {}, size: {}", i + 1, header.name(), header.offset, header.size);

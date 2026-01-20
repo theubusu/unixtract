@@ -9,3 +9,4 @@ pub mod android_ota_update_metadata;
 pub mod mtk_crypto;
 pub mod lzhs;
 pub mod huffman_tables;
+pub mod msd_ouith_parser_old;
