@@ -116,7 +116,7 @@ pub fn extract_msd10(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
             let offset = sections[i as usize].offset;
 
             println!("\n({}/{}) - {}, Size: {}",
-                    item.item_id, items.len(), item.name, size);
+                    i + 1, items.len(), item.name, size);
 
             assert!(sections[i as usize].index == item.item_id, "Item ID in TOC does not match ID from header!");
 

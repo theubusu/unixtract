@@ -11,8 +11,9 @@ use crate::utils::msd_ouith_parser_tizen_1_9::{parse_blob_1_9};
 #[derive(BinRead)]
 struct FileHeader {
     #[br(count = 6)] _magic_bytes: Vec<u8>,
-    #[br(count = 12)] _unk: Vec<u8>,
-    section_count: u32
+    _header_checksum: u32, //CRC32 of data with the size of "_header_size"
+    _header_size: u64,
+    section_count: u32,
 }
 
 #[derive(BinRead)]
@@ -110,7 +111,7 @@ pub fn extract_msd11(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
         let offset = sections[i as usize].offset;
 
         println!("\n({}/{}) - {}, Size: {}",
-                item.item_id, items.len(), item.name, size);
+                i + 1, items.len(), item.name, size);
 
         assert!(sections[i as usize].index == item.item_id, "Item ID in TOC does not match ID from header!");
 

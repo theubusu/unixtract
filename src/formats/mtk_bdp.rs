@@ -8,39 +8,56 @@ use std::sync::OnceLock;
 use crate::utils::common;
 
 #[derive(BinRead)]
-struct TocEntry {
-	id: u32,
-    offset: u32,
-    size: u32,
-    _unk: u32,
-    part_type: u32,
+struct PITITPITEntry {
+	nand_size: u32,
+    pit_offset: u32,
+    pit_size: u32,
+    _private_data_2: u32,
 }
 
 #[derive(BinRead)]
-struct PartHeader {
-	#[br(count = 20)] _unk1: Vec<u8>,
-    part_count: u32,
-    #[br(count = 40)] _unk2: Vec<u8>,
+struct PITITBITEntry {
+	bit_offset: u32,
+    bit_size: u32,
+    _private_data_1: u32,
+    _private_data_2: u32,
 }
 
 #[derive(BinRead)]
-struct PartEntry {
-	#[br(count = 16)] name_bytes: Vec<u8>,
-    id: u32,
+struct PITHeader {
+    #[br(count = 8)] pit_magic: Vec<u8>,
     _unk: u32,
-    _part_type: u32,
-    size: u32,
-    #[br(count = 32)] _unknown: Vec<u8>,
+    first_entry_offset: u32,
+    entry_size: u32,
+    entry_count: u32,
 }
-impl PartEntry {
+
+#[derive(BinRead)]
+struct PITEntry {
+    #[br(count = 16)] name_bytes: Vec<u8>,
+    partition_id: u32,
+    _unknown: u32,
+    offset_on_nand: u32,
+    size_on_nand: u32,
+    #[br(count = 32)] _unused: Vec<u8>,
+}
+impl PITEntry {
     fn name(&self) -> String {
         common::string_from_bytes(&self.name_bytes)
     }
 }
 
-static ITIP_MAGIC: [u8; 8] = [0x69, 0x54, 0x49, 0x50, 0x69, 0x54, 0x49, 0x50];
+#[derive(BinRead)]
+struct BITEntry {
+    partition_id: u32,
+    offset: u32,
+    size: u32,
+    offset_in_target_part: u32,
+    _unknown: u32,
+}
 
-static ITIP_OFFSET: OnceLock<usize> = OnceLock::new();
+static PITIT_MAGIC: [u8; 8] = [0x69, 0x54, 0x49, 0x50, 0x69, 0x54, 0x49, 0x50];
+static PITIT_OFFSET: OnceLock<usize> = OnceLock::new();
 
 fn find_bytes(data: &[u8], pattern: &[u8]) -> Option<usize> {
     data.windows(pattern.len()).position(|window| window == pattern)
@@ -56,8 +73,8 @@ pub fn is_mtk_bdp_file(mut file: &File) -> bool {
 
     file.read_to_end(&mut data).expect("Failed to read from file.");
 
-    if let Some(pos) = find_bytes(&data, &ITIP_MAGIC) {
-        ITIP_OFFSET.set(start_offset as usize + pos).unwrap();
+    if let Some(pos) = find_bytes(&data, &PITIT_MAGIC) {
+        PITIT_OFFSET.set(start_offset as usize + pos).unwrap();
         true 
     } else {
         false
@@ -65,108 +82,96 @@ pub fn is_mtk_bdp_file(mut file: &File) -> bool {
 }
 
 pub fn extract_mtk_bdp(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
-    //check if its a philips file which has a 106 byte header that offsets everything
-    let base_offset;
-    let magic = common::read_file(&file, 0, 7)?;
-    if magic == b"PHILIPS" {
-        base_offset = 106;
-        println!("Philips variant detected!\n")
-    } else {
-        base_offset = 0;
-    }
-
-    let offset = ITIP_OFFSET.get().unwrap();
-    println!("Reading PIT at: {}", offset);
+    let offset = PITIT_OFFSET.get().unwrap();
+    println!("\nReading PITIT at: {}", offset);
 
     file.seek(SeekFrom::Start(*offset as u64 + 8))?;
 
-    let ittp_check = common::read_exact(&mut file, 8)?;
-    let mut toc_offset = 0;
-    if ittp_check == ITIP_MAGIC {
-        //old pit
-        for i in 0..10 {
-            let line = common::read_exact(&mut file, 16)?;
-            //line that ends the old PIT, TOC appears directly after
-            if line == b"\x50\x49\x54\x69\x50\x49\x54\x69\x50\x49\x54\x69\x50\x49\x54\x69" {
-                toc_offset = offset + (16* (i + 2));
-                break
-            }   
-        }
-        if toc_offset == 0 {
-            println!("Failed to find TOC!");
-            return Ok(());
-        }
-    } else {
-        //new pit
-        let _ = common::read_exact(&mut file, 16)?;
-        let toc_offset_bytes = common::read_exact(&mut file, 4)?;
-        toc_offset = u32::from_le_bytes(toc_offset_bytes.try_into().unwrap()) as usize;
-    }
+    let pitit_check = common::read_exact(&mut file, 8)?;
+    //{UPG_INFO}the upg bin is  %d version(old is 0,new is 1)!\n
+    let pitit_ver = if pitit_check == PITIT_MAGIC {0} else {1};
 
-    println!("\nReading TOC at: {}", toc_offset);
-    file.seek(SeekFrom::Start(base_offset + toc_offset as u64))?;
-
-    let toc_check = common::read_exact(&mut file, 20)?;
-    if toc_check != b"\xCD\xAB\x30\x85\xCD\xAB\x30\x85\xCD\xAB\x30\x85\xCD\xAB\x30\x85\xCD\xAB\x30\x85" {
-        println!("Invalid TOC!");
-        return Ok(())
-    }
-
-    let mut entries: Vec<TocEntry> = Vec::new();
-    let mut part_table_offset: Option<u64> = None;
-    let mut n = 1;
+    let mut pit_offset: u64 = 0;
+    let mut bit_offset: u64 = 0;
     loop {
-        let entry: TocEntry = file.read_le()?;
-        if entry.id == 0x8530efef {
-            break
+        let pitit_pit_entry: PITITPITEntry = file.read_le()?;
+        if pitit_pit_entry.nand_size == 0x69544950 {break}; //PITi - end marker of PITIT
+        if pitit_ver == 1 {
+            //old PITIT does not have BIT entry, because BIT appears directly after PITIT
+            let pitit_bit_entry: PITITBITEntry = file.read_le()?;
+            println!("PITIT Entry - NAND Size: {}, PIT Offset: {}, PIT Size: {}, BIT Offset: {}, BIT Size: {}",
+                    pitit_pit_entry.nand_size, pitit_pit_entry.pit_offset, pitit_pit_entry.pit_size, pitit_bit_entry.bit_offset, pitit_bit_entry.bit_size);
+            if bit_offset == 0 { bit_offset = pitit_bit_entry.bit_offset as u64 } //use the first entry in PITIT
+        } else {
+            println!("PITIT Entry - NAND Size: {}, PIT Offset: {}, PIT Size: {}",
+                    pitit_pit_entry.nand_size, pitit_pit_entry.pit_offset, pitit_pit_entry.pit_size);
         }
-        println!("Entry {}. ID: {:02x}, Offset: {}, Size: {}, Type: {:02x}", n, entry.id, entry.offset, entry.size, entry.part_type);
-
-        if entry.id == 0x02 && entry.part_type == 0x00 {
-            part_table_offset = Some(entry.offset as u64);
-        }
-
-        entries.push(entry);
-        n += 1;
+        if pit_offset == 0 { pit_offset = pitit_pit_entry.pit_offset as u64 } //use the first entry in PITIT
+    }
+    if pitit_ver == 0 && bit_offset == 0{
+        //in old upg bin, BIT appears directly after PITIT. so we can use the current file pos cuz we just ended reading PITIT
+        bit_offset = file.stream_position()?;
     }
 
-    if part_table_offset.is_none() {
-        println!("Failed to find partition table offset!");
+    println!("\nReading PIT at: {}", pit_offset); //PIT is the NAND partition table.
+    file.seek(SeekFrom::Start(pit_offset))?;
+    let mut pit_entries: Vec<PITEntry> = Vec::new();
+    let pit_header: PITHeader = file.read_le()?;
+    if pit_header.pit_magic != b"\xDC\xEA\x30\x85\xDC\xEA\x30\x85" {
+        println!("Invalid PIT Magic!");
+        return Ok(());
+    }
+    println!("PIT Info - First entry offs: {}, Entry size: {}, Entry count: {}", pit_header.first_entry_offset, pit_header.entry_size, pit_header.entry_count);
+    file.seek(SeekFrom::Start(pit_offset + pit_header.first_entry_offset as u64))?;
+
+    for i in 0..pit_header.entry_count {
+        let pit_entry: PITEntry = file.read_le()?;
+        println!("{}. ID: {:02x}, Name: {}, NAND Offset: {}, NAND Size: {}",
+                i + 1, pit_entry.partition_id, pit_entry.name(), pit_entry.offset_on_nand, pit_entry.size_on_nand);
+        pit_entries.push(pit_entry);
+    }
+
+    println!("\nReading BIT at: {}", bit_offset); //BIT is the table of objects present in the update file.
+    file.seek(SeekFrom::Start(bit_offset))?;
+    let mut bit_entries: Vec<BITEntry> = Vec::new();
+    let bit_magic = common::read_exact(&mut file, 20)?;
+    if bit_magic != b"\xCD\xAB\x30\x85\xCD\xAB\x30\x85\xCD\xAB\x30\x85\xCD\xAB\x30\x85\xCD\xAB\x30\x85" {
+        println!("Invalid BIT Magic!");
         return Ok(());
     }
 
-    println!("\nReading partition table at: {}", part_table_offset.unwrap());
+    let mut bit_i = 0;
+    loop {
+        let bit_entry: BITEntry = file.read_le()?;
+        if bit_entry.partition_id == 0x8530EFEF {break}; //EF EF 30 85 - end marker of BIT
+        println!("{}. ID: {:02x}, Offset: {}, Size: {}, Offset in part: {}",
+                bit_i + 1, bit_entry.partition_id, bit_entry.offset, bit_entry.size, bit_entry.offset_in_target_part);
+        bit_entries.push(bit_entry);
+        bit_i += 1;
+    }
 
-    file.seek(SeekFrom::Start(base_offset + part_table_offset.unwrap()))?;
-    let part_header: PartHeader = file.read_le()?;
-    println!("Part count: {}", part_header.part_count);
-
-    for i in 0..part_header.part_count {
-        let part_entry: PartEntry = file.read_le()?;
-        println!("\n({}/{}) - {}, ID: {:02x}, Size: {}", i + 1, part_header.part_count, part_entry.name(), part_entry.id, part_entry.size);
-
-        for entry in &entries{
-            if entry.id == part_entry.id && entry.size == part_entry.size {
-                //println!("- Saving {}.bin, Offset: {}, Size: {}", part_entry.name(), entry.offset, entry.size);
-                let current_pos = file.stream_position()?;
-                file.seek(SeekFrom::Start(base_offset + entry.offset as u64))?;
-                let data = common::read_exact(&mut file, entry.size as usize)?;
-
-                let output_path = Path::new(&output_folder).join(part_entry.name() + ".bin");
-
-                fs::create_dir_all(&output_folder)?;
-                let mut out_file = OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .open(output_path)?;
-            
-                out_file.write_all(&data)?;
-
-                println!("- Saved file!");
-                file.seek(SeekFrom::Start(current_pos))?;
-                break
+    //extraction logic
+    for (i, bit_entry) in bit_entries.iter().enumerate() {
+        //find the name of partition using PIT by partition_id. if not found use the ID as placeholder
+        let mut name = format!("unknown_{:02x}", bit_entry.partition_id);
+        for pit_entry in &pit_entries {
+            if pit_entry.partition_id == bit_entry.partition_id {
+                name = pit_entry.name();
             }
         }
+
+        println!("\n({}/{}) - {}, Offset: {}, Size: {}, Offset in partition: {}",
+                i + 1, bit_entries.len(), name, bit_entry.offset, bit_entry.size, bit_entry.offset_in_target_part);
+
+        let data = common::read_file(&file, bit_entry.offset as u64, bit_entry.size as usize)?;
+
+        let output_path = Path::new(&output_folder).join(format!("{}.bin", name));
+        fs::create_dir_all(&output_folder)?;
+        let mut out_file = OpenOptions::new().read(true).write(true).create(true).open(output_path)?;
+        out_file.seek(SeekFrom::Start(bit_entry.offset_in_target_part as u64))?;
+        out_file.write_all(&data)?;
+
+        println!("-- Saved file!");
     }
 
     println!("\nExtraction finished!");
