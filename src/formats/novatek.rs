@@ -10,14 +10,16 @@ use crate::utils::common;
 #[derive(BinRead)]
 struct Header {
     #[br(count = 4)] _magic_bytes: Vec<u8>,
-    #[br(count = 4)] _flags: Vec<u8>,
-    _header_size: u32,
+    version_major: u32,
+    version_minor: u32,
     _unused: u32,
     #[br(count = 16)] firmware_name_bytes: Vec<u8>,
-    #[br(count = 20)] _unknown1: Vec<u8>,
+    data_size: u32,
+    #[br(count = 16)] _md5_checksum: Vec<u8>, //data checksum
     part_count: u32,
-    _first_part_offset: u32,
-    #[br(count = 116)] _unknown2: Vec<u8>,
+    _data_start_offset: u32,
+    #[br(count = 128)] _signature: Vec<u8>,
+    _header_checksum: u32, //CRC32, calculated with the field set to 0
 }
 impl Header {
     fn firmware_name(&self) -> String {
@@ -27,10 +29,10 @@ impl Header {
 
 #[derive(BinRead)]
 struct PartEntry {
-    #[br(count = 16)] _unknown: Vec<u8>,
-    index: u32,
+    id: u32,
     size: u32,
     offset: u32,
+    #[br(count = 16)] _md5_checksum: Vec<u8>,
 }
 
 pub fn is_novatek_file(file: &File) -> bool {
@@ -45,9 +47,10 @@ pub fn is_novatek_file(file: &File) -> bool {
 pub fn extract_novatek(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
     let header: Header = file.read_le()?;
 
-    println!("File info:\nFirmware name: {}\nPart count: {}", header.firmware_name(), header.part_count);
-    let mut entries: Vec<PartEntry> = Vec::new();
+    println!("File info:\nFirmware name: {}\nVersion: {}.{}\nData size: {}\nPart count: {}",
+            header.firmware_name(), header.version_major, header.version_minor, header.data_size, header.part_count);
 
+    let mut entries: Vec<PartEntry> = Vec::new();
     for _i in 0..header.part_count {
         let part: PartEntry = file.read_le()?;
         entries.push(part);
@@ -56,11 +59,11 @@ pub fn extract_novatek(mut file: &File, output_folder: &str) -> Result<(), Box<d
     let mut e_i = 0;
     for entry in &entries {
         e_i += 1;
-        println!("\n({}/{}) - Index: {}, Offset: {}, Size: {}", e_i, entries.len(), entry.index, entry.offset, entry.size);
+        println!("\n({}/{}) - ID: {}, Offset: {}, Size: {}", e_i, entries.len(), entry.id, entry.offset, entry.size);
 
         let data = common::read_file(&file, entry.offset as u64, entry.size as usize)?;
 
-        let output_path = Path::new(&output_folder).join(format!("{}.bin", e_i));
+        let output_path = Path::new(&output_folder).join(format!("{}_{}.bin", e_i, entry.id));
 
         fs::create_dir_all(&output_folder)?;
         let mut out_file = OpenOptions::new()
