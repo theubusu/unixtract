@@ -34,7 +34,7 @@ struct FileHeader {
     #[br(count = 60)] file_name_bytes: Vec<u8>,
     real_size: u32,
 	stored_size: u32,
-	_header_size: u32,
+	header_size: u32,
     #[br(count = 4)] attributes: Vec<u8>,
 }
 impl FileHeader {
@@ -156,16 +156,26 @@ pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<d
 
         //its a folder not a file
         if (file_header.attributes[3] & (1 << 1)) != 0 {
-            println!("\nFolder: {}", file_header.file_name());
+            println!("\nFolder - {}", file_header.file_name());
             let output_path = Path::new(&output_folder).join(file_header.file_name().trim_start_matches('/'));
             fs::create_dir_all(output_path)?;
             continue
         }
 
-        println!("\nFile - {}, Size: {}", file_header.file_name(), file_header.real_size);
+        //extended name is used
+        let file_name = if (file_header.attributes[2] & (1 << 7)) != 0 {
+            let ex_name_size = file_header.header_size - 76; //76 is base file header size
+            //println!("extended name {}, org name: {}", ex_name_size, file_header.file_name());
+            let ex_name_bytes = common::read_exact(&mut data_reader, ex_name_size as usize)?;
+            common::string_from_bytes(&ex_name_bytes)
+        } else {
+            file_header.file_name()
+        };
+
+        println!("\nFile - {}, Size: {}", file_name, file_header.real_size);
         let data = common::read_exact(&mut data_reader, file_header.stored_size as usize)?;
 
-        let output_path = Path::new(&output_folder).join(file_header.file_name().trim_start_matches('/'));
+        let output_path = Path::new(&output_folder).join(file_name.trim_start_matches('/'));
         let output_path_parent = output_path.parent().expect("Failed to get parent of the output path!");
 
         //prevent collisions
@@ -185,6 +195,11 @@ pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<d
             .open(output_path)?;
 
         out_file.write_all(&data[..file_header.real_size as usize])?;
+
+        //if it contains a PFL upg in itself to extract
+        //if (file_header.attributes[3] & (1 << 2)) != 0 {
+        //   println!("Container file");
+        //}
 
         println!("- Saved file!");
     }
