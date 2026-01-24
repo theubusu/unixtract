@@ -14,16 +14,11 @@ struct CommonHeader {
 }
 
 #[derive(BinRead)]
-struct Pak {
-    offset : u32,
-    size : u32,
-}
-
-#[derive(BinRead)]
 struct PakHeader {
     #[br(count = 4)] pak_name_bytes: Vec<u8>,
-    stored_size: u32,
-	#[br(count = 15)] platform_id_bytes: Vec<u8>,
+    image_size: u32,
+	#[br(count = 64)] platform_id_bytes: Vec<u8>,
+    #[br(count = 56)] _reserved: Vec<u8>,
 }
 impl PakHeader {
     fn pak_name(&self) -> String {
@@ -34,9 +29,16 @@ impl PakHeader {
     }
 }
 
+#[derive(BinRead)]
+struct Pak {
+    offset : u32,
+    size : u32,
+}
+
 pub fn is_epk1_file(file: &File) -> bool {
-    let header = common::read_file(&file, 0, 4).expect("Failed to read from file.");
-    if header == b"epak" {
+    let epk2_magic = common::read_file(&file, 12, 4).expect("Failed to read from file."); //for epk2b
+    let epak_magic = common::read_file(&file, 0, 4).expect("Failed to read from file.");
+    if epak_magic == b"epak" && epk2_magic != b"EPK2" {
         true
     } else {
         false
@@ -52,13 +54,11 @@ pub fn extract_epk1(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
     if init_pak_count > 256 {
         println!("\nBig endian EPK1 detected.");
         epk1_type = "be";
-    } else if init_pak_count < 21 {
+    } else if init_pak_count < 33 {
         println!("\nLittle endian EPK1 detected.");
         epk1_type = "le";
     } else {
-        //println!("\nEPK1(new) detected.");
-        //epk1_type = "new";
-        println!("\nNot supported!");
+        println!("\nUnknown EPK1 variant!");
         return Ok(());
     }
 
@@ -71,66 +71,61 @@ pub fn extract_epk1(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
 
         for _i in 0..10 { //header can fit max 10 pak entries
             let pak: Pak = file.read_be()?;
-
             if pak.offset == 0 && pak.size == 0 {
                 continue;
             }
-
             paks.push(Pak { offset: pak.offset, size: pak.size });
         }
-
-        assert!(header.pak_count as usize == paks.len(), "Paks count in header does not match the amount of non empty pak entries!");
+        assert!(header.pak_count as usize == paks.len(), "Paks count in header({}) does not match the amount of non empty pak entries({})!", header.pak_count, paks.len());
 
         let version = common::read_exact(&mut file, 4)?;
 
-        println!("EPK info:\nFile size: {}\nPak count: {}\nVersion: {:02x?}.{:02x?}.{:02x?}",
+        println!("EPK info -\nData size: {}\nPak count: {}\nVersion: {:02x?}.{:02x?}.{:02x?}",
                 header.file_size, header.pak_count, version[1], version[2], version[3]);
 
     } else if epk1_type == "le" {
         let header: CommonHeader = file.read_le()?;
 
-        for _i in 0..20 { //header can fit max 20 pak entries
-            let pak: Pak = file.read_le()?;
+        //this is to make an odd variant with 32 max pak entries work
+        let header_size_bytes = common::read_file(&file, 12, 4)?; //offset of first entry, can be treated as header size
+        let header_size = u32::from_le_bytes(header_size_bytes.try_into().unwrap());
+        let max_pak_count = (header_size - 48) / 8; //header size minus common header + ota id (48) divide by size of pak entry (8). 
+        assert!(max_pak_count < 128, "Unreasonable calculated pak count {}!!", max_pak_count);
 
+        for _i in 0..max_pak_count {
+            let pak: Pak = file.read_le()?;
             if pak.offset == 0 && pak.size == 0 {
                 continue;
             }
-
             paks.push(Pak { offset: pak.offset, size: pak.size });
         }
-
-        assert!(header.pak_count as usize == paks.len(), "Paks count in header does not match the amount of non empty pak entries!");
+        assert!(header.pak_count as usize == paks.len(), "Paks count in header({}) does not match the amount of non empty pak entries({})!", header.pak_count, paks.len());
 
         let version = common::read_exact(&mut file, 4)?;
 
         let ota_id_bytes = common::read_exact(&mut file, 32)?;
         let ota_id = common::string_from_bytes(&ota_id_bytes);
 
-        println!("EPK info:\nFile size: {}\nPak count: {}\nOTA ID: {}\nVersion: {:02x?}.{:02x?}.{:02x?}", 
-                header.file_size, header.pak_count, ota_id, version[2], version[1], version[0]);
+        println!("EPK info -\nData size: {}\nHeader size: {}\nPak count: {}\nOTA ID: {}\nVersion: {:02x?}.{:02x?}.{:02x?}", 
+                header.file_size, header_size, header.pak_count, ota_id, version[2], version[1], version[0]);
     }
 
     for (i, pak) in paks.iter().enumerate() {
-            file.seek(SeekFrom::Start(pak.offset as u64))?;
-            let pak_header: PakHeader = if epk1_type == "be" {file.read_be()?} else {file.read_le()?};
+        file.seek(SeekFrom::Start(pak.offset as u64))?;
+        let pak_header: PakHeader = if epk1_type == "be" {file.read_be()?} else {file.read_le()?};
 
-            let data = common::read_file(&file, pak.offset as u64 + 128, pak.size as usize - 128)?;
+        println!("\n({}/{}) - {}, Offset: {}, Size: {}, Platform: {}", 
+                i + 1, paks.len(), pak_header.pak_name(), pak.offset, pak_header.image_size, pak_header.platform_id());
 
-            println!("\n({}/{}) - {}, Offset: {}, Size: {}, Platform: {}", 
-                    i + 1, paks.len(), pak_header.pak_name(), pak.offset, pak.size, pak_header.platform_id());
+        let data = common::read_exact(&mut file, pak_header.image_size as usize)?;
 
-            let output_path = Path::new(&output_folder).join(pak_header.pak_name() + ".bin");
+        let output_path = Path::new(&output_folder).join(pak_header.pak_name() + ".bin");
+        fs::create_dir_all(&output_folder)?;
+        let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;        
+        out_file.write_all(&data)?;
 
-            fs::create_dir_all(&output_folder)?;
-            let mut out_file = OpenOptions::new()
-                .write(true)
-                .create(true)
-                .open(output_path)?;
-            
-            out_file.write_all(&data[..pak_header.stored_size as usize])?;
-
-            println!("- Saved file!");
-        }
+        println!("- Saved file!");
+    }
     
     println!("\nExtraction finished!");
 

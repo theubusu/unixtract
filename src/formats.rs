@@ -24,6 +24,7 @@ pub mod msd11;
 pub mod epk;
 pub mod epk1;
 pub mod epk2;
+pub mod epk2b;
 pub mod epk3;
 
 pub mod mtk_pkg;

@@ -43,9 +43,12 @@ fn match_with_pattern(data: &[u8], pattern: &str) -> bool {
 }
 
 pub fn extract_epk(file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
-
     let versions = common::read_file(&file, 1712, 36)?;
     let epk_version = check_epk_version(&versions);
+
+    let platform_version = common::string_from_bytes(&versions[4..20]);
+    let sdk_version = common::string_from_bytes(&versions[20..36]);
+    println!("Platform version: {}\nSDK version: {}", platform_version, sdk_version);
     
     if epk_version == Some("epk2".to_string()) {
         println!("EPK2 detected!\n");

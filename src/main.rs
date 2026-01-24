@@ -90,15 +90,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("EPK1 file detected!");
             formats::epk1::extract_epk1(&file, &output_path)?;
         }
-        //epk2 with unencrypted header
-        else if formats::epk2::is_epk2_file(&file) {
-            println!("EPK2 file detected!");
-            formats::epk2::extract_epk2(&file, &output_path)?;
+        else if formats::epk2b::is_epk2b_file(&file) {
+            println!("EPK2B file detected!");
+            formats::epk2b::extract_epk2b(&file, &output_path)?;
         }
         //epk with encrypted header - it can be epk2 or epk3 so we need to check
         else if formats::epk::is_epk_file(&file) {
             println!("EPK file detected!");
             formats::epk::extract_epk(&file, &output_path)?;
+        }
+        //epk2 with unencrypted header
+        else if formats::epk2::is_epk2_file(&file) {
+            println!("EPK2 file detected!");
+            formats::epk2::extract_epk2(&file, &output_path)?;
         }
         else if formats::ruf::is_ruf_file(&file) {
             println!("RUF file detected!");

@@ -9,16 +9,36 @@ use crate::formats::epk::{decrypt_aes_ecb_auto, find_key};
 
 #[derive(BinRead)]
 struct Header {
-    #[br(count = 4)] _magic_bytes: Vec<u8>,
+    #[br(count = 4)] _magic_bytes: Vec<u8>, //EPK3
     #[br(count = 4)] version: Vec<u8>,
 	#[br(count = 32)] ota_id_bytes: Vec<u8>,
     package_info_size: u32,
+    _bchunked: u32,
 }
 impl Header {
     fn ota_id(&self) -> String {
         common::string_from_bytes(&self.ota_id_bytes)
     }
 }
+
+#[derive(BinRead)]
+struct HeaderNewEx {
+    #[br(count = 4)] _pak_info_magic: Vec<u8>,
+    #[br(count = 6)] encrypt_type_bytes: Vec<u8>,
+    #[br(count = 6)] update_type_bytes: Vec<u8>,
+    update_platform_version: f32,
+    compatible_minimum_version: f32,
+    need_to_check_compatible_version: i32,
+}
+impl HeaderNewEx {
+    fn encrypt_type(&self) -> String {
+        common::string_from_bytes(&self.encrypt_type_bytes)
+    }
+    fn update_type(&self) -> String {
+        common::string_from_bytes(&self.update_type_bytes)
+    }
+}
+
 
 #[derive(BinRead)]
 struct PkgInfoHeader {
@@ -62,13 +82,13 @@ pub fn extract_epk3(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
     println!("Finding key...");
 
     // find the key, knowing that the header should start with "EPK3"
-    if let Some((key_name, key_bytes)) = find_key(&keys::EPK3, &stored_header, b"EPK3")? {
+    if let Some((key_name, key_bytes)) = find_key(&keys::EPK, &stored_header, b"EPK3")? {
         println!("Found valid key: {}", key_name);
         matching_key = Some(key_bytes);
         header = decrypt_aes_ecb_auto(matching_key.as_ref().unwrap(), &stored_header)?;
 
     //try for new format epk3 where theres an additional 128byte signature at the beginning
-    } else if let Some((key_name, key_bytes)) = find_key(&keys::EPK3, &stored_header[128..], b"EPK3")? {
+    } else if let Some((key_name, key_bytes)) = find_key(&keys::EPK, &stored_header[128..], b"EPK3")? {
         println!("Found valid key: {}", key_name);
         matching_key = Some(key_bytes);
         header = decrypt_aes_ecb_auto(matching_key.as_ref().unwrap(), &stored_header)?;
@@ -89,10 +109,18 @@ pub fn extract_epk3(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
     if new_type {let _signature = common::read_exact(&mut hdr_reader, 128)?;};
     let hdr: Header = hdr_reader.read_le()?;
 
-    println!("\nEPK info:\nOTA ID: {}\nVersion: {:02x?}.{:02x?}.{:02x?}\nPackage Info size: {}\n", 
-                hdr.ota_id(), hdr.version[3], hdr.version[2], hdr.version[1], hdr.package_info_size);
-    //
-    let _versions = common::read_exact(&mut file, 36)?;
+    println!("\nEPK info -\nEPK3 type: {}\nOTA ID: {}\nVersion: {:02x?}.{:02x?}.{:02x?}.{:02x?}\nPackage Info size: {}", 
+                if new_type {"New"} else {"Old"}, hdr.ota_id(), hdr.version[3], hdr.version[2], hdr.version[1], hdr.version[0], hdr.package_info_size);
+
+    if new_type {
+        let ex_hdr: HeaderNewEx = hdr_reader.read_le()?;
+        println!("Encrypt type: {}\nUpdate type: {}\nUpdate platform version: {:.6}\nCompatible minimum version: {:.6}\nNeed to check compatible version: {}",
+                ex_hdr.encrypt_type(), ex_hdr.update_type(), ex_hdr.update_platform_version, ex_hdr.compatible_minimum_version, ex_hdr.need_to_check_compatible_version);
+    }
+
+    println!();
+    
+    let _platform_versions = common::read_exact(&mut file, 36)?;
     let _signature = common::read_exact(&mut file, signature_size)?;
 
     //PKG INFO
@@ -125,14 +153,9 @@ pub fn extract_epk3(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
             let encrypted_data = common::read_exact(&mut file, entry.segment_size as usize + extra_segment_size)?;
             let out_data = decrypt_aes_ecb_auto(matching_key_bytes, &encrypted_data)?;
 
-            let output_path = Path::new(&output_folder).join(entry.package_name().clone() + ".bin");
-
+            let output_path = Path::new(&output_folder).join(format!("{}.bin", entry.package_name()));
             fs::create_dir_all(&output_folder)?;
-            let mut out_file = OpenOptions::new()
-                .append(true)
-                .create(true)
-                .open(output_path)?;
-
+            let mut out_file = OpenOptions::new().append(true).create(true).open(output_path)?;
             out_file.write_all(&out_data[extra_segment_size..])?;
 
             println!("-- Saved to file!");
