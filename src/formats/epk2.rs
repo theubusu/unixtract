@@ -75,7 +75,7 @@ pub fn is_epk2_file(file: &File) -> bool {
 }
 
 pub fn extract_epk2(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
-    file.seek(SeekFrom::Start(128))?; //inital signature
+    let _header_signature = common::read_exact(&mut file, SIGNATURE_SIZE as usize)?;
 
     let stored_header = common::read_exact(&mut file, 1584)?; //max header size
     let header;
@@ -122,7 +122,7 @@ pub fn extract_epk2(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
         let actual_offset = pak.offset + (SIGNATURE_SIZE * signature_count);
         file.seek(SeekFrom::Start(actual_offset as u64))?;
 
-        let _signature = common::read_exact(&mut file, SIGNATURE_SIZE as usize)?;
+        let mut _segment_signature = common::read_exact(&mut file, SIGNATURE_SIZE as usize)?;
         signature_count += 1;
 
         let encrypted_header = common::read_exact(&mut file, 128)?;
@@ -150,7 +150,7 @@ pub fn extract_epk2(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
         for i in 0..pak_header.segment_count {
             // for first segment we already read the header so skip doing that for it
             if i > 0 {
-                let _signature = common::read_exact(&mut file, 128)?;
+                _segment_signature = common::read_exact(&mut file, 128)?;
                 signature_count += 1;
 
                 let encrypted_header = common::read_exact(&mut file, 128)?;

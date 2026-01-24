@@ -71,27 +71,28 @@ impl PkgInfoEntry {
 }
 
 pub fn extract_epk3(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
-    file.seek(SeekFrom::Start(128))?; //inital signature
-
-    let stored_header = common::read_exact(&mut file, 1584)?; //max header size
+    file.seek(SeekFrom::Start(0))?;
+    let stored_header = common::read_exact(&mut file, 1712)?;
     let header: Vec<u8>;
+    let _header_signature;
 
     let mut new_type = false;
-
     let matching_key: Option<Vec<u8>>;
     println!("Finding key...");
 
-    // find the key, knowing that the header should start with "EPK3"
-    if let Some((key_name, key_bytes)) = find_key(&keys::EPK, &stored_header, b"EPK3")? {
+    // find the key, knowing that the header should start with "EPK3" (old type 128 byte signature)
+    if let Some((key_name, key_bytes)) = find_key(&keys::EPK, &stored_header[128..], b"EPK3")? {
         println!("Found valid key: {}", key_name);
         matching_key = Some(key_bytes);
-        header = decrypt_aes_ecb_auto(matching_key.as_ref().unwrap(), &stored_header)?;
+        _header_signature = &stored_header[..128];
+        header = decrypt_aes_ecb_auto(matching_key.as_ref().unwrap(), &stored_header[128..])?;
 
-    //try for new format epk3 where theres an additional 128byte signature at the beginning
-    } else if let Some((key_name, key_bytes)) = find_key(&keys::EPK, &stored_header[128..], b"EPK3")? {
+    //try for new format epk3 (new type 256 byte signature)
+    } else if let Some((key_name, key_bytes)) = find_key(&keys::EPK, &stored_header[256..], b"EPK3")? {
         println!("Found valid key: {}", key_name);
         matching_key = Some(key_bytes);
-        header = decrypt_aes_ecb_auto(matching_key.as_ref().unwrap(), &stored_header)?;
+        _header_signature = &stored_header[..256];
+        header = decrypt_aes_ecb_auto(matching_key.as_ref().unwrap(), &stored_header[256..])?;
         new_type = true;
 
     } else {
@@ -106,7 +107,6 @@ pub fn extract_epk3(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
 
     //parse header
     let mut hdr_reader = Cursor::new(header);
-    if new_type {let _signature = common::read_exact(&mut hdr_reader, 128)?;};
     let hdr: Header = hdr_reader.read_le()?;
 
     println!("\nEPK info -\nEPK3 type: {}\nOTA ID: {}\nVersion: {:02x?}.{:02x?}.{:02x?}.{:02x?}\nPackage Info size: {}", 
@@ -121,7 +121,7 @@ pub fn extract_epk3(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
     println!();
     
     let _platform_versions = common::read_exact(&mut file, 36)?;
-    let _signature = common::read_exact(&mut file, signature_size)?;
+    let _pkg_info_signature = common::read_exact(&mut file, signature_size)?;
 
     //PKG INFO
     let pkg_info_encrypted = common::read_exact(&mut file, hdr.package_info_size as usize)?;
@@ -148,7 +148,7 @@ pub fn extract_epk3(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
             
             println!("- Segment {}/{}, Size: {}", entry.segment_index + 1, entry.segment_count, entry.segment_size);
 
-            let _signature = common::read_exact(&mut file, signature_size)?;
+            let _segment_signature = common::read_exact(&mut file, signature_size)?;
 
             let encrypted_data = common::read_exact(&mut file, entry.segment_size as usize + extra_segment_size)?;
             let out_data = decrypt_aes_ecb_auto(matching_key_bytes, &encrypted_data)?;
