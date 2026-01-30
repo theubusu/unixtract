@@ -63,9 +63,9 @@ pub static PANA_DVD_KEYONLY: &[&str] = &[
     ("08E03D859AF9F3EE"), //B3A25A0B9D864F08 # 87 firmwares, ..-~2011
 ];
 
-//pana dvd keys (PANAEUSB pair (AES + cust))
-pub static PANA_DVD_AESPAIR: &[(&str, &str)] = &[
-    ("62A39E1C5594AE09244EB326EF7938FA", "06C943F3B997F7E0"), //# 9 firmwares, ~2018
+//pana dvd keys (PANAEUSB pair - AES key, AES IV, cust)
+pub static PANA_DVD_AESPAIR: &[(&str, &str, &str)] = &[
+    ("62A39E1C5594AE09244EB326EF7938FA", "46D03C52B1A398FA03276FDE7CC4EA26", "06C943F3B997F7E0"), //# 9 firmwares, ~2018
 ];
 
 //mtk pkg custom keys

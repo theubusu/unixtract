@@ -1,8 +1,7 @@
 use std::fs::File;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::fs::{self, OpenOptions};
 use std::io::{Write, Read, Cursor, Seek, SeekFrom};
-use simd_adler32::adler32;
 use binrw::{BinRead, BinReaderExt};
 
 use crate::keys;
@@ -11,6 +10,19 @@ use crate::utils::pana_dvd_crypto::{decrypt_data};
 use crate::utils::aes::{decrypt_aes128_cbc_nopad};
 use crate::utils::compression::{decompress_gzip};
 use crate::utils::lzss::{decompress_lzss};
+
+#[derive(BinRead)]
+struct AesHeaderFileEntry {
+    offset: u32,
+    size: u32,
+}
+
+struct FileEntry {
+    offset: u32,
+    base_offset: u32,
+}
+
+//checksums are mostly Adler32, but some very old files use Checksum32 instead.
 
 #[derive(BinRead)]
 struct ModuleEntry {
@@ -22,9 +34,9 @@ struct ModuleEntry {
     _unk1: u16,
     #[br(count = 6)] id_bytes: Vec<u8>,
     size: u32,
-    data_checksum: u32,
+    data_checksum: u32, //checksum of the entrys' DATA
     _unk2: u32,
-    _entry_checksum: u32,
+    _entry_checksum: u32, //checksum of THIS header entry (all previous 44 bytes)
 }
 impl ModuleEntry {
     fn name(&self) -> String {
@@ -46,10 +58,11 @@ impl ModuleEntry {
 
 #[derive(BinRead)]
 struct MainListHeader {
-    _checksum: u32,
-    _unk: u32,
+    _checksum: u32, //checksum of the MAIN LIST
+    _unk: u32, //seems to be always 1?
     list_size: u32,
-    _unk2: u64,
+    decompressed_part_size: u32,
+    _unk2: u32,
 }
 impl MainListHeader {
     fn entry_count(&self) -> u32 {
@@ -60,12 +73,12 @@ impl MainListHeader {
 #[derive(BinRead)]
 struct MainListEntry {
     size: u32,
-    checksum: u32,
+    checksum: u32, //checksum of this MAIN entrys' data
 }
 
 #[derive(BinRead)]
 struct MainEntryHeader {
-    #[br(count = 14)] _header_string: Vec<u8>, //EXTRHEADDRV
+    #[br(count = 14)] _header_string: Vec<u8>, //EXTRHEADDRV \x01\x00
     compression_type_byte: u16,
     decompressed_size: u32,
     _destination_address: u32,
@@ -73,7 +86,7 @@ struct MainEntryHeader {
     _unk: u32,
     _footer_offset: u32,
     _base_address: u32,
-    _checksum: u32,
+    _checksum: u32, //unknown type of checksum
     _checksum_flag: u8,
     #[br(count = 19)] _unused: Vec<u8>,
 }
@@ -91,43 +104,41 @@ impl MainEntryHeader {
     }
 }
 
-pub fn find_key<'a>(key_array: &'a [&'a str], data: &[u8], expected_magic: &[u8]) -> Result<Option<[u8; 8]>, Box<dyn std::error::Error>> {
+pub fn find_key<'a>(key_array: &'a [&'a str], data: &[u8], expected_magic: &[u8], magic_offset: usize) -> Result<Option<[u8; 8]>, Box<dyn std::error::Error>> {
     for key_hex in key_array {
         let key_bytes = hex::decode(key_hex)?;
         let key_array: [u8; 8] = key_bytes.as_slice().try_into()?;
         let decrypted = decrypt_data(data, &key_array);
      
-        if decrypted.starts_with(expected_magic) {
+        if decrypted[magic_offset..].starts_with(expected_magic) {
             return Ok(Some(key_array));
         }
     }
     Ok(None)
 }
 
-pub fn find_aes_key_pair<'a>(key_array: &'a [(&'a str, &'a str)], data: &[u8], expected_magic: &[u8], magic_offset: usize) -> Result<Option<([u8; 16], [u8; 8])>, Box<dyn std::error::Error>> {
-    for (aes_key_hex, cust_key_hex) in key_array {
-        let aes_key_bytes = hex::decode(aes_key_hex)?;
-        let aes_key_array: [u8; 16] = aes_key_bytes.as_slice().try_into()?;
-        let iv: [u8; 16] = [0x00; 16];
-        let aes_decrypted = decrypt_aes128_cbc_nopad(data, &aes_key_array, &iv)?;
+pub fn find_aes_key_pair<'a>(key_array: &'a [(&'a str, &'a str, &'a str)], data: &[u8], expected_magic: &[u8], magic_offset: usize) -> Result<Option<([u8; 16], [u8; 16], [u8; 8])>, Box<dyn std::error::Error>> {
+    for (aes_key_hex, aes_iv_hex, cust_key_hex) in key_array {
+        let aes_key: [u8; 16] = hex::decode(aes_key_hex)?.as_slice().try_into()?;
+        let aes_iv: [u8; 16] = hex::decode(aes_iv_hex)?.as_slice().try_into()?;
+        let aes_decrypted = decrypt_aes128_cbc_nopad(data, &aes_key, &aes_iv)?;
 
         let key_bytes = hex::decode(cust_key_hex)?;
         let key_array: [u8; 8] = key_bytes.as_slice().try_into()?;
         let decrypted = decrypt_data(&aes_decrypted, &key_array);
      
         if decrypted[magic_offset..].starts_with(expected_magic) {
-            return Ok(Some((aes_key_array, key_array)));
+            return Ok(Some((aes_key, aes_iv, key_array)));
         }
     }
     Ok(None)
 }
 
-pub fn is_pana_dvd_file(mut file: &File) -> bool {
+pub fn is_pana_dvd_file(file: &File) -> bool {
     let header = common::read_file(&file, 0, 64).expect("Failed to read from file.");
     if header.starts_with(b"PANASONIC\x00\x00\x00") {
-        file.seek(std::io::SeekFrom::Start(48)).expect("Failed to seek"); //skip rest of header
         true
-    } else if find_key(&keys::PANA_DVD_KEYONLY, &header, b"PROG").expect("Failed to decrypt header.").is_some() {
+    } else if find_key(&keys::PANA_DVD_KEYONLY, &header, b"PROG", 0).expect("Failed to decrypt header.").is_some() {
         true
     } else if find_aes_key_pair(&keys::PANA_DVD_AESPAIR, &header, b"PANASONIC", 32).expect("Failed to decrypt header.").is_some() {
         true
@@ -137,45 +148,74 @@ pub fn is_pana_dvd_file(mut file: &File) -> bool {
 }
 
 pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let init_pos = file.stream_position()?;
-    file.seek(SeekFrom::Start(0))?;
-
-    let mut data = Vec::new();  // we need to load the entire file into a cursor so we can swap it with AES decrypted data if its AES encrypted because im not making temp files
+    let mut data = Vec::new();  // we need to load the entire file into memory so we can swap it with AES decrypted data if its AES encrypted
     file.read_to_end(&mut data)?;
-
     let mut file_reader = Cursor::new(data);
-    file_reader.seek(SeekFrom::Start(init_pos))?;
-
-    let enc_header = common::read_exact(&mut file_reader, 8192)?;
+    let enc_header_s = common::read_exact(&mut file_reader, 64)?;
     let matching_key;
-    let header;
-    // find the key, knowing that the first entry is always "PROG"
-    if let Some(key_array) = find_key(&keys::PANA_DVD_KEYONLY, &enc_header, b"PROG")? {
+    let mut file_entries: Vec<FileEntry> = Vec::new();
+
+    // (custom enc) find the key, knowing that the first entry is always "PROG" (offset 0)
+    if let Some(key_array) = find_key(&keys::PANA_DVD_KEYONLY, &enc_header_s, b"PROG", 0)? {
         println!("Found valid key: {}\n", hex::encode_upper(key_array));
         matching_key = Some(key_array);
-        header = decrypt_data(&enc_header, &key_array);
+        file_entries.push(FileEntry { offset: 0, base_offset: 0 })
 
-    } else if let Some((aes_key_array, key_array)) = find_aes_key_pair(&keys::PANA_DVD_AESPAIR, &enc_header, b"PROG", 96)? {
-        println!("Found AES key pair: aes={} cust={}", hex::encode_upper(aes_key_array), hex::encode_upper(key_array));
+    // (custom enc) find the key, knowing that the first entry is always "PROG" (offset 48)
+    } else if let Some(key_array) = find_key(&keys::PANA_DVD_KEYONLY, &enc_header_s, b"PROG", 48)? {
+        println!("Found valid key: {}\n", hex::encode_upper(key_array));
         matching_key = Some(key_array);
-        let iv: [u8; 16] = [0x00; 16];
+        file_entries.push(FileEntry { offset: 0, base_offset: 48 })
+
+    // (aes) find the key using PANASONIC magic
+    } else if let Some((aes_key, aes_iv, key_array)) = find_aes_key_pair(&keys::PANA_DVD_AESPAIR, &enc_header_s, b"PANASONIC", 32)? {
+        println!("Found AES key pair: aes={} iv={} cust={}", hex::encode_upper(aes_key), hex::encode_upper(aes_iv), hex::encode_upper(key_array));
+        matching_key = Some(key_array);
 
         println!("Decrypting AES...\n");
-        let aes_decrypted = decrypt_aes128_cbc_nopad(&file_reader.get_ref()[48..], &aes_key_array, &iv)?;
+        let aes_decrypted = decrypt_aes128_cbc_nopad(&file_reader.get_ref(), &aes_key, &aes_iv)?;
         file_reader = Cursor::new(aes_decrypted); //set the file reader to use AES decrypted stream
 
-        file_reader.seek(SeekFrom::Start(48))?;
-        let enc_header = common::read_exact(&mut file_reader, 8192)?;
-        header = decrypt_data(&enc_header, &key_array);
+        //read file entries in extra header
+        let file_table = common::read_exact(&mut file_reader, 48)?;
+        let mut file_table_reader = Cursor::new(decrypt_data(&file_table, &key_array));
+        for _i in 0..4 {
+            let file_entry: AesHeaderFileEntry = file_table_reader.read_le()?;
+            if file_entry.size == 0 && file_entry.offset == 0 {
+                break
+            }
+            file_entries.push(FileEntry { offset: file_entry.offset, base_offset: 48 });
+        }
 
     } else {
-        println!("No valid key found!\n");
+        println!("\nNo valid key found!");
         return Ok(());
     }
 
-    let matching_key_array = matching_key.as_ref().unwrap();
+    let matching_key_array = matching_key.unwrap();
 
-    let mut hdr_reader = Cursor::new(header);
+    if file_entries.len() == 1 {
+        //only one file, standard extraction
+        println!("File contains no extra sub-files...");
+        extract_file(&mut file_reader, file_entries[0].offset as u64, file_entries[0].base_offset as u64, matching_key_array, output_folder)?;
+    } else {
+        println!("File contains {} sub-files...", file_entries.len());
+        for (i, file_entry ) in file_entries.iter().enumerate() {
+            println!("\nExtracting file {}/{} - Offset: {}, base: {}", i + 1, file_entries.len(), file_entry.offset, file_entry.base_offset);
+            extract_file(&mut file_reader, file_entry.offset as u64, file_entry.base_offset as u64, matching_key_array, &format!("{}/file_{}", output_folder, i + 1))?;
+        }
+    }
+
+    println!("\nExtraction finished!");
+
+    Ok(())
+}
+
+fn extract_file(file_reader: &mut Cursor<Vec<u8>>, offset: u64, base_offset: u64, key: [u8; 8], output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+    file_reader.seek(SeekFrom::Start(offset + base_offset))?;
+ 
+    let enc_header = common::read_exact(file_reader, 8192)?;
+    let mut hdr_reader = Cursor::new(decrypt_data(&enc_header, &key));
     let mut modules: Vec<ModuleEntry> = Vec::new();
 
     for i in 0..100 {
@@ -191,31 +231,26 @@ pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<
     }
 
     let mut mod_i = 0;
-    let mut main_offset: Option<u32> = None;
     for module in &modules {
         mod_i += 1;
-        println!("\n({}/{}) - {}, Offset: {}, Size: {}, Expected checksum: {:#010x}",
+        println!("\n({}/{}) - {}, Offset: {}, Size: {}, Checksum: {:#010x}",
                 mod_i, modules.len(), module.name(), module.offset, module.size, module.data_checksum);
-
-        file_reader.seek(SeekFrom::Start(module.offset as u64))?;
-        let data = common::read_exact(&mut file_reader, module.size as usize)?;
-        let checksum = adler32(&data.as_slice());
-
-        if module.name() == "MAIN" {
-            if checksum == module.data_checksum {
-                main_offset = Some(module.offset);
-                println!("- Valid MAIN data found - will extract later...");
-                continue
-            } else {
-                println!("- WARNING: Invalid/unsupported MAIN data!")
-            } 
-        }
-
-        println!("- Decrypting...");
-        let dec_data = decrypt_data(&data, &matching_key_array);
 
         let output_path = Path::new(&output_folder).join(format!("{}.bin", module.name()));
 
+        let rel_offset: u64 = offset + module.offset as u64;
+        file_reader.seek(SeekFrom::Start(rel_offset))?;
+
+        if module.name() == "MAIN" {
+            println!("Extracting MAIN...");
+            extract_main(file_reader, key, output_path)?;
+            continue
+        }
+
+        let data = common::read_exact(file_reader, module.size as usize)?;
+        println!("- Decrypting...");
+        let dec_data = decrypt_data(&data, &key);
+        
         fs::create_dir_all(&output_folder)?;
         let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
         out_file.write_all(&dec_data)?;
@@ -223,17 +258,13 @@ pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<
         println!("-- Saved file!");
     }
 
-    if !main_offset.is_some() {
-        println!("\nExtraction finished!");
-        return Ok(())
-    }
-    println!("\nExtracting MAIN section...");
+    Ok(())
+}
 
-    let main_offset_unwrap = main_offset.unwrap();
-    file_reader.seek(SeekFrom::Start(main_offset_unwrap as u64))?;
-
+fn extract_main(file_reader: &mut Cursor<Vec<u8>>, key: [u8; 8], output_path: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let main_list_hdr: MainListHeader = file_reader.read_le()?;
-    println!("MAIN entry count: {}", main_list_hdr.entry_count());
+    println!("MAIN - Entry count: {}, Decompressed part size: {}", main_list_hdr.entry_count(), main_list_hdr.decompressed_part_size);
+    assert!(main_list_hdr.entry_count() < 200, "Unreasonable MAIN entry count!");
 
     let mut main_entries: Vec<MainListEntry> = Vec::new();
     for i in 0..main_list_hdr.entry_count() {
@@ -246,21 +277,21 @@ pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<
     let mut maine_i = 0;
     for entry in &main_entries {
         maine_i += 1;
-        let mut data = common::read_exact(&mut file_reader, entry.size as usize)?;
-        if entry.size > 5120 {
+        let mut data = common::read_exact(file_reader, entry.size as usize)?;
+        let decrypt_size: usize = if main_list_hdr.decompressed_part_size == 0x2000000 {10240} /* old type */ else {5120};
+        if entry.size > decrypt_size as u32 {
             //decrypt first and last 5kb
-            let first_decrypted = decrypt_data(&data[..5120], &matching_key_array);
-            data[..5120].copy_from_slice(&first_decrypted);
+            let first_decrypted = decrypt_data(&data[..decrypt_size], &key);
+            data[..decrypt_size].copy_from_slice(&first_decrypted);
 
-            let last_decrypted = decrypt_data(&data[entry.size as usize - 5120..], &matching_key_array);
-            data[entry.size as usize - 5120..].copy_from_slice(&last_decrypted);
+            let last_decrypted = decrypt_data(&data[entry.size as usize - decrypt_size..], &key);
+            data[entry.size as usize - decrypt_size..].copy_from_slice(&last_decrypted);
             //
         } else {
-            let decrypted = decrypt_data(&data, &matching_key_array);
+            let decrypted = decrypt_data(&data, &key);
             data.copy_from_slice(&decrypted);
         }
         
-
         let mut data_reader = Cursor::new(data);
         let header: MainEntryHeader = data_reader.read_le()?;
         println!("\nMAIN ({}/{}) - Compressed size: {}, Decompressed size: {}, Compression type: {}({})", 
@@ -278,26 +309,25 @@ pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<
             let compressed_lzss = common::read_exact(&mut decompressed_gzip_reader, header.compressed_size as usize)?;
             decompressed_data = decompress_lzss(&compressed_lzss);
             assert!(decompressed_data.len() == header.decompressed_size as usize, "Decompressed size does not match size in header, decompression failed!");
+
         } else if header.compression_type_byte == 2 { //only lzss
             println!("- Decompressing LZSS...");
             decompressed_data = decompress_lzss(&compressed_data);
             assert!(decompressed_data.len() == header.decompressed_size as usize, "Decompressed size does not match size in header, decompression failed!");
+
         } else if header.compression_type_byte == 0 { //no compression. havent encountered one yet
             decompressed_data = compressed_data;
+            
         } else {
             println!("- Unknown compression method!");
             decompressed_data = compressed_data;
         }
 
-        let output_path = Path::new(&output_folder).join("MAIN.bin");
-
-        fs::create_dir_all(&output_folder)?;
-        let mut out_file = OpenOptions::new().append(true).create(true).open(output_path)?;
+        let mut out_file = OpenOptions::new().append(true).create(true).open(&output_path)?;
         out_file.write_all(&decompressed_data)?;
         
-        println!("- Saved to MAIN!");
+        println!("-- Saved to MAIN!");
     }
 
-    println!("\nExtraction finished!");
     Ok(())
 }
