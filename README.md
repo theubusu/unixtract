@@ -14,6 +14,11 @@ Build from source, by downloading the code or cloning the respository and runnin
 If an output folder is not provided, extracted files will be saved in folder `_<INPUT_TARGET>`.   
 
 # Supported formats
+## Amlogic burning image  
+**Used in:** Android TVs and Boxes   
+**Notes:** V1 format is not supported because of the lack of sample file.  
+**Thanks to:** https://github.com/7Ji/ampack
+
 ## Android OTA payload.bin  
 **Used in:** Android devices, smartphones, TVs   
 **Notes:** Some compression methods may not be supported.  

@@ -41,6 +41,16 @@ pub fn unsparse_to_file(data: &[u8], file_path: PathBuf) -> Result<(), Box<dyn s
 
         if chunk_header.chunk_type == 0xCAC1 { //"raw" type chunk (actual data)
             out_file.write_all(&chunk_data)?; 
+
+        } else if chunk_header.chunk_type == 0xCAC2 { // "fill" type chunk (fill size with a value)
+            if chunk_data.len() != 4 {
+                return Err("Inavlid lenght of FILL chunk!".into());
+            }
+            let fill_size = (chunk_header.chunk_size * file_header.block_size) / 4;
+            let fill_data = chunk_data.repeat(fill_size as usize);
+
+            out_file.write_all(&fill_data)?; 
+
         } else if chunk_header.chunk_type == 0xCAC3 { // "dont care" type chunk (skip over)
             let skip_size = file_header.block_size as u64 * chunk_header.chunk_size as u64;
             let current_pos = out_file.stream_position()?;
