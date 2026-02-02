@@ -111,10 +111,10 @@ pub fn extract_sony_bdp(mut file: &File, output_folder: &str) -> Result<(), Box<
     if last_file_path.is_some() {
         println!("\nChecking if it's also MTK BDP...");
         let last_file = File::open(last_file_path.unwrap())?;
-        if formats::mtk_bdp::is_mtk_bdp_file(&last_file) {
+        if let Some(result) = formats::mtk_bdp::is_mtk_bdp_file(&last_file)? {
             println!("- MTK BDP file detected!\n");
             let mtk_extraction_path = format!("{}/{}", &output_folder, i - 1);
-            formats::mtk_bdp::extract_mtk_bdp(&last_file, &mtk_extraction_path)?;
+            formats::mtk_bdp::extract_mtk_bdp(&last_file, &mtk_extraction_path, result)?;
         } else {
             println!("- Not an MTK BDP file.");    
         }

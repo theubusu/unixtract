@@ -12,6 +12,8 @@ static KEY: u32 = 0x94102909; //09 29 10 94
 static HEADER_XOR_MASK: u32 = 0x04BE7C75; //75 7C BE 04
 static CONTENT_XOR_MASK: u32 = 0x04BE7C72; //72 7C BE 04
 
+use crate::formats::mtk_pkg::{MTK_HEADER_MAGIC, MTK_META_MAGIC, MTK_META_PAD_MAGIC};
+
 #[derive(BinRead)]
 struct Header {
     #[br(count = 4)] vendor_magic_bytes: Vec<u8>,
@@ -53,16 +55,18 @@ impl PartEntry {
     }
 }
 
+static HEADER_SIZE: usize = 0x98;
+
 pub fn is_mtk_pkg_old_file(mut file: &File) -> bool {
-    let encrypted_header = common::read_file(&file, 0, 152).expect("Failed to read from file.");
+    let encrypted_header = common::read_file(&file, 0, HEADER_SIZE).expect("Failed to read from file.");
     let header = decrypt(&encrypted_header, KEY, Some(HEADER_XOR_MASK));
-    if &header[4..12] == b"#DH@FiRm" {
+    if &header[4..12] == MTK_HEADER_MAGIC {
         true
-    } else if &header[68..76] == b"#DH@FiRm" {
+    } else if &header[68..76] == MTK_HEADER_MAGIC {
         //check for 64 byte additional header used in some Sony and Philips firmwares and skip it
         file.seek(std::io::SeekFrom::Start(64)).expect("Failed to seek");
         true
-    } else if &header[132..140] == b"#DH@FiRm" {
+    } else if &header[132..140] == MTK_HEADER_MAGIC {
         //check for 128 byte additional header used in some Philips firmwares and skip it
         file.seek(std::io::SeekFrom::Start(128)).expect("Failed to seek");
         true
@@ -73,7 +77,7 @@ pub fn is_mtk_pkg_old_file(mut file: &File) -> bool {
 
 pub fn extract_mtk_pkg_old(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
     let file_size = file.metadata()?.len();
-    let encrypted_header = common::read_exact(&mut file, 152)?;
+    let encrypted_header = common::read_exact(&mut file, HEADER_SIZE)?;
     let header = decrypt(&encrypted_header, KEY, Some(HEADER_XOR_MASK));
     let mut hdr_reader = Cursor::new(header); 
     let hdr: Header = hdr_reader.read_le()?;
@@ -101,9 +105,9 @@ pub fn extract_mtk_pkg_old(mut file: &File, output_folder: &str) -> Result<(), B
         }
 
         //strip iMtK thing and get version
-        let extra_header_len = if &out_data[0..4] == b"iMtK" {
+        let extra_header_len = if &out_data[0..4] == MTK_META_MAGIC {
             let imtk_len = u32::from_le_bytes(out_data[4..8].try_into().unwrap());
-            if &out_data[8..12] != b"iPAd" {
+            if &out_data[8..12] != MTK_META_PAD_MAGIC {
                 let version_len = u32::from_le_bytes(out_data[8..12].try_into().unwrap());
                 let version = common::string_from_bytes(&out_data[12..12 + version_len as usize]);
                 println!("- Version: {}", version);

@@ -3,9 +3,14 @@ use std::path::{Path};
 use std::fs::{self, OpenOptions};
 use std::io::{Seek, SeekFrom, Read, Write};
 use binrw::{BinRead, BinReaderExt};
-use std::sync::OnceLock;
 
 use crate::utils::common;
+pub struct MtkBdpContext {
+    pitit_offset: u64,
+}
+
+static PITIT_MAGIC: [u8; 8] = [0x69, 0x54, 0x49, 0x50, 0x69, 0x54, 0x49, 0x50];
+static PITIT_END_MARKER: u32 = 0x69_54_49_50; //PITi - end marker of PITIT
 
 #[derive(BinRead)]
 struct PITITPITEntry {
@@ -32,6 +37,8 @@ struct PITHeader {
     entry_count: u32,
 }
 
+static PIT_MAGIC: [u8; 8] = [0xDC, 0xEA, 0x30, 0x85, 0xDC, 0xEA, 0x30, 0x85];
+
 #[derive(BinRead)]
 struct PITEntry {
     #[br(count = 16)] name_bytes: Vec<u8>,
@@ -56,36 +63,35 @@ struct BITEntry {
     _unknown: u32,
 }
 
-static PITIT_MAGIC: [u8; 8] = [0x69, 0x54, 0x49, 0x50, 0x69, 0x54, 0x49, 0x50];
-static PITIT_OFFSET: OnceLock<usize> = OnceLock::new();
+static BIT_MAGIC: [u8; 20] = [0xCD, 0xAB, 0x30, 0x85, 0xCD, 0xAB, 0x30, 0x85, 0xCD, 0xAB, 0x30, 0x85, 0xCD, 0xAB, 0x30, 0x85, 0xCD, 0xAB, 0x30, 0x85];
+static BIT_END_MARKER: u32 = 0x85_30_EF_EF; //EF EF 30 85 - end marker of BIT
 
 fn find_bytes(data: &[u8], pattern: &[u8]) -> Option<usize> {
     data.windows(pattern.len()).position(|window| window == pattern)
 }
 
-pub fn is_mtk_bdp_file(mut file: &File) -> bool {
-    let file_size = file.metadata().expect("REASON").len();
+pub fn is_mtk_bdp_file(mut file: &File) -> Result<Option<MtkBdpContext>, Box<dyn std::error::Error>> {
+    let file_size = file.metadata()?.len();
     let mut data = Vec::new();
 
     // I wish there was a better way
     let start_offset = file_size.saturating_sub(file_size / 20);
     let _ = file.seek(SeekFrom::Start(start_offset));
 
-    file.read_to_end(&mut data).expect("Failed to read from file.");
+    file.read_to_end(&mut data)?;
 
     if let Some(pos) = find_bytes(&data, &PITIT_MAGIC) {
-        PITIT_OFFSET.set(start_offset as usize + pos).unwrap();
-        true 
+        Ok(Some(MtkBdpContext {pitit_offset: start_offset + pos as u64}))
     } else {
-        false
+        Ok(None)
     }
 }
 
-pub fn extract_mtk_bdp(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let offset = PITIT_OFFSET.get().unwrap();
+pub fn extract_mtk_bdp(mut file: &File, output_folder: &str, context: MtkBdpContext) -> Result<(), Box<dyn std::error::Error>> {
+    let offset = context.pitit_offset;
     println!("\nReading PITIT at: {}", offset);
 
-    file.seek(SeekFrom::Start(*offset as u64 + 8))?;
+    file.seek(SeekFrom::Start(offset + 8))?;
 
     let pitit_check = common::read_exact(&mut file, 8)?;
     //{UPG_INFO}the upg bin is  %d version(old is 0,new is 1)!\n
@@ -95,7 +101,7 @@ pub fn extract_mtk_bdp(mut file: &File, output_folder: &str) -> Result<(), Box<d
     let mut bit_offset: u64 = 0;
     loop {
         let pitit_pit_entry: PITITPITEntry = file.read_le()?;
-        if pitit_pit_entry.nand_size == 0x69544950 {break}; //PITi - end marker of PITIT
+        if pitit_pit_entry.nand_size == PITIT_END_MARKER {break}; 
         if pitit_ver == 1 {
             //old PITIT does not have BIT entry, because BIT appears directly after PITIT
             let pitit_bit_entry: PITITBITEntry = file.read_le()?;
@@ -117,7 +123,7 @@ pub fn extract_mtk_bdp(mut file: &File, output_folder: &str) -> Result<(), Box<d
     file.seek(SeekFrom::Start(pit_offset))?;
     let mut pit_entries: Vec<PITEntry> = Vec::new();
     let pit_header: PITHeader = file.read_le()?;
-    if pit_header.pit_magic != b"\xDC\xEA\x30\x85\xDC\xEA\x30\x85" {
+    if pit_header.pit_magic != PIT_MAGIC {
         println!("Invalid PIT Magic!");
         return Ok(());
     }
@@ -135,7 +141,7 @@ pub fn extract_mtk_bdp(mut file: &File, output_folder: &str) -> Result<(), Box<d
     file.seek(SeekFrom::Start(bit_offset))?;
     let mut bit_entries: Vec<BITEntry> = Vec::new();
     let bit_magic = common::read_exact(&mut file, 20)?;
-    if bit_magic != b"\xCD\xAB\x30\x85\xCD\xAB\x30\x85\xCD\xAB\x30\x85\xCD\xAB\x30\x85\xCD\xAB\x30\x85" {
+    if bit_magic != BIT_MAGIC {
         println!("Invalid BIT Magic!");
         return Ok(());
     }
@@ -143,7 +149,7 @@ pub fn extract_mtk_bdp(mut file: &File, output_folder: &str) -> Result<(), Box<d
     let mut bit_i = 0;
     loop {
         let bit_entry: BITEntry = file.read_le()?;
-        if bit_entry.partition_id == 0x8530EFEF {break}; //EF EF 30 85 - end marker of BIT
+        if bit_entry.partition_id == BIT_END_MARKER {break};
         println!("{}. ID: {:02x}, Offset: {}, Size: {}, Offset in part: {}",
                 bit_i + 1, bit_entry.partition_id, bit_entry.offset, bit_entry.size, bit_entry.offset_in_target_part);
         bit_entries.push(bit_entry);

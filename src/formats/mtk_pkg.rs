@@ -1,12 +1,17 @@
 use std::path::Path;
 use std::fs::{self, File, OpenOptions};
-use std::io::{Write, Cursor, Seek};
+use std::io::{Write, Cursor, Seek, SeekFrom};
 use binrw::{BinRead, BinReaderExt};
 
 use crate::utils::common;
 use crate::utils::aes::{decrypt_aes128_cbc_nopad};
 use crate::utils::lzhs::{decompress_lzhs_fs_file2file};
 use crate::keys;
+
+pub struct MtkPkgContext {
+    is_philips_variant: bool,
+    decrypted_header: Vec<u8>,
+}
 
 #[derive(BinRead)]
 struct Header {
@@ -52,6 +57,17 @@ impl PartEntry {
     }
 }
 
+pub static MTK_HEADER_MAGIC: &[u8; 8] = b"#DH@FiRm";
+pub static MTK_RESERVED_MAGIC: &[u8; 16] = b"reserved mtk inc";
+pub static MTK_META_MAGIC: &[u8; 4] = b"iMtK";
+pub static MTK_META_PAD_MAGIC: &[u8; 4] = b"iPAd";
+pub static CRYPTED_HEADER_SIZE: usize = 0x30;
+
+static HEADER_SIZE: usize = 0x90;
+
+static PHILIPS_EXTRA_HEADER_SIZE: usize = 0x80;
+static _PHILIPS_FOOTER_SIGNATURE_SIZE: usize = 0x100;
+
 static HEADER_KEY: [u8; 16] = [
         0x09, 0x29, 0x10, 0x94, 0x09, 0x29, 0x10, 0x94,
         0x09, 0x29, 0x10, 0x94, 0x09, 0x29, 0x10, 0x94,
@@ -59,33 +75,38 @@ static HEADER_KEY: [u8; 16] = [
 
 static HEADER_IV: [u8; 16] = [0x00; 16];
 
-pub fn is_mtk_pkg_file(file: &File) -> bool {
-    let mut encrypted_header = common::read_file(&file, 0, 144).expect("Failed to read from file.");
-    let mut header = decrypt_aes128_cbc_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV).expect("Decryption error!");
-    if &header[4..12] == b"#DH@FiRm" {
-        true
+pub fn is_mtk_pkg_file(file: &File) -> Result<Option<MtkPkgContext>, Box<dyn std::error::Error>> {
+    let mut encrypted_header = common::read_file(&file, 0, HEADER_SIZE)?;
+    let mut header = decrypt_aes128_cbc_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV)?;
+    if &header[4..12] == MTK_HEADER_MAGIC {
+        Ok(Some(MtkPkgContext { is_philips_variant: false, decrypted_header: header}))
     } else {
         // try for philips which has additional 128 bytes at beginning
-        encrypted_header = common::read_file(&file, 128, 144).expect("Failed to read from file.");
-        header = decrypt_aes128_cbc_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV).expect("Decryption error!");
-        if &header[4..12] == b"#DH@FiRm" {
-            true
+        encrypted_header = common::read_file(&file, PHILIPS_EXTRA_HEADER_SIZE as u64, HEADER_SIZE)?;
+        header = decrypt_aes128_cbc_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV)?;
+        if &header[4..12] == MTK_HEADER_MAGIC {
+            Ok(Some(MtkPkgContext { is_philips_variant: true, decrypted_header: header }))
         } else {
-            false
+            Ok(None)
 
         }
     }
 }
 
-pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_mtk_pkg(mut file: &File, output_folder: &str, context: MtkPkgContext) -> Result<(), Box<dyn std::error::Error>> {
     let file_size = file.metadata()?.len();
-    let encrypted_header = common::read_exact(&mut file, 144)?;
-    let header = decrypt_aes128_cbc_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV)?;
+    let header = context.decrypted_header;
     let mut hdr_reader = Cursor::new(header); 
     let hdr: Header = hdr_reader.read_le()?;
 
     println!("File info:\nFile size: {}\nVendor magic: {}\nVersion info: {}\nProduct name: {}" , 
             hdr.file_size, hdr.vendor_magic(), hdr.version(), hdr.product_name());
+
+    if context.is_philips_variant {
+        file.seek(SeekFrom::Start(HEADER_SIZE as u64 + PHILIPS_EXTRA_HEADER_SIZE as u64))?;
+    } else {
+        file.seek(SeekFrom::Start(HEADER_SIZE as u64))?;
+    }
 
     let mut part_n = 0;
     while file.stream_position()? < file_size as u64 {        
@@ -96,7 +117,7 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
         println!("\n#{} - {}, Size: {}{} {}", 
                 part_n, part_entry.name(), part_entry.size, if part_entry.is_compressed() {" [COMPRESSED]"} else {""}, if part_entry.is_encrypted() {"[ENCRYPTED]"} else {""} );
 
-        let data = common::read_exact(&mut file, part_entry.size as usize + 48)?;
+        let data = common::read_exact(&mut file, part_entry.size as usize + CRYPTED_HEADER_SIZE)?;
         
         if part_entry.size == 0 {
             println!("- Empty entry, skipping!");
@@ -108,7 +129,7 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
             let mut matching_key: Option<[u8; 16]> = None;
             let mut matching_iv: Option<[u8; 16]> = None;
 
-            let crypted_header = &data[..48];
+            let crypted_header = &data[..CRYPTED_HEADER_SIZE];
 
             // try decrypting with vendor magic repeated 4 times (works for most)
             let mut key = [0u8; 16];
@@ -116,7 +137,7 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
                 key[i * 4..(i + 1) * 4].copy_from_slice(&hdr.vendor_magic_bytes);
             }
             let try_decrypt = decrypt_aes128_cbc_nopad(&crypted_header, &key, &HEADER_IV)?;
-            if try_decrypt.starts_with(b"reserved mtk inc") {
+            if try_decrypt.starts_with(MTK_RESERVED_MAGIC) {
                 println!("- Decrypting with 4xVendor magic...");
                 matching_key = Some(key);
                 matching_iv = Some(HEADER_IV);
@@ -128,7 +149,7 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
                     let iv_array: [u8; 16] = hex::decode(iv_hex)?.as_slice().try_into()?;
                     let try_decrypt = decrypt_aes128_cbc_nopad(&crypted_header, &key_array, &iv_array)?;
 
-                    if try_decrypt.starts_with(b"reserved mtk inc") {
+                    if try_decrypt.starts_with(MTK_RESERVED_MAGIC) {
                         println!("- Decrypting with key {}...", name);
                         matching_key = Some(key_array);
                         matching_iv = Some(iv_array);
@@ -155,9 +176,9 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
         }
 
         //strip iMtK thing and get version
-        let extra_header_len = if &out_data[48..52] == b"iMtK" {
+        let extra_header_len = if &out_data[48..52] == MTK_META_MAGIC {
             let imtk_len = u32::from_le_bytes(out_data[52..56].try_into().unwrap());
-            if &out_data[56..60] != b"iPAd" {
+            if &out_data[56..60] != MTK_META_PAD_MAGIC {
                 let version_len = u32::from_le_bytes(out_data[56..60].try_into().unwrap());
                 let version = common::string_from_bytes(&out_data[60..60 + version_len as usize]);
                 println!("- Version: {}", version);
@@ -171,7 +192,7 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str) -> Result<(), Box<d
         let output_path = Path::new(&output_folder).join(part_entry.name() + if part_entry.is_compressed() {".lzhs"} else {".bin"});
         fs::create_dir_all(&output_folder)?;
         let mut out_file = OpenOptions::new().write(true).read(true)/* for lzhs */.create(true).open(&output_path)?;
-        out_file.write_all(&out_data[48 + extra_header_len as usize..])?;
+        out_file.write_all(&out_data[CRYPTED_HEADER_SIZE + extra_header_len as usize..])?;
 
         if part_entry.is_compressed() {
             let lzhs_out_path = Path::new(&output_folder).join(part_entry.name() + ".bin");

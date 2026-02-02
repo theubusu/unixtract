@@ -11,6 +11,14 @@ use crate::utils::aes::{decrypt_aes128_cbc_nopad};
 use crate::utils::compression::{decompress_gzip};
 use crate::utils::lzss::{decompress_lzss};
 
+pub struct PanaDvdContext {
+    matching_key: [u8; 8],
+    base_hdr_size: u32,
+    is_aes: bool,
+    aes_key: Option<[u8; 16]>,
+    aes_iv: Option<[u8; 16]>
+}
+
 #[derive(BinRead)]
 struct AesHeaderFileEntry {
     offset: u32,
@@ -104,6 +112,8 @@ impl MainEntryHeader {
     }
 }
 
+static MAX_HEADER_SIZE: usize = 0x2000;
+
 pub fn find_key<'a>(key_array: &'a [&'a str], data: &[u8], expected_magic: &[u8], magic_offset: usize) -> Result<Option<[u8; 8]>, Box<dyn std::error::Error>> {
     for key_hex in key_array {
         let key_bytes = hex::decode(key_hex)?;
@@ -134,75 +144,77 @@ pub fn find_aes_key_pair<'a>(key_array: &'a [(&'a str, &'a str, &'a str)], data:
     Ok(None)
 }
 
-pub fn is_pana_dvd_file(file: &File) -> bool {
-    let header = common::read_file(&file, 0, 64).expect("Failed to read from file.");
-    if header.starts_with(b"PANASONIC\x00\x00\x00") {
-        true
-    } else if find_key(&keys::PANA_DVD_KEYONLY, &header, b"PROG", 0).expect("Failed to decrypt header.").is_some() {
-        true
-    } else if find_aes_key_pair(&keys::PANA_DVD_AESPAIR, &header, b"PANASONIC", 32).expect("Failed to decrypt header.").is_some() {
-        true
+pub fn is_pana_dvd_file(file: &File) -> Result<Option<PanaDvdContext>, Box<dyn std::error::Error>> {
+    let header = common::read_file(&file, 0, 64)?;
+    if let Some(matching_key) = find_key(&keys::PANA_DVD_KEYONLY, &header, b"PROG", 0)? {
+        Ok(Some(PanaDvdContext {
+            matching_key: matching_key,
+            base_hdr_size: 0,
+            is_aes: false,
+            aes_key: None, 
+            aes_iv: None,
+        }))
+    } else if header.starts_with(b"PANASONIC\x00\x00\x00") && let Some(matching_key) = find_key(&keys::PANA_DVD_KEYONLY, &header, b"PROG", 48)? {
+        Ok(Some(PanaDvdContext {
+            matching_key: matching_key,
+            base_hdr_size: 48,
+            is_aes: false,
+            aes_key: None, 
+            aes_iv: None,
+        }))
+    } else if let Some((aes_key, aes_iv, matching_key)) = find_aes_key_pair(&keys::PANA_DVD_AESPAIR, &header, b"PANASONIC", 32)? {
+        Ok(Some(PanaDvdContext {
+            matching_key: matching_key,
+            base_hdr_size: 48,
+            is_aes: true,
+            aes_key: Some(aes_key), 
+            aes_iv: Some(aes_iv),
+        }))
     } else {
-        false
+        Ok(None)
     }
 }
 
-pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_pana_dvd(mut file: &File, output_folder: &str, context: PanaDvdContext) -> Result<(), Box<dyn std::error::Error>> {
     let mut data = Vec::new();  // we need to load the entire file into memory so we can swap it with AES decrypted data if its AES encrypted
     file.read_to_end(&mut data)?;
     let mut file_reader = Cursor::new(data);
-    let enc_header_s = common::read_exact(&mut file_reader, 64)?;
-    let matching_key;
+
+    let matching_key = context.matching_key;
     let mut file_entries: Vec<FileEntry> = Vec::new();
 
-    // (custom enc) find the key, knowing that the first entry is always "PROG" (offset 0)
-    if let Some(key_array) = find_key(&keys::PANA_DVD_KEYONLY, &enc_header_s, b"PROG", 0)? {
-        println!("Found valid key: {}\n", hex::encode_upper(key_array));
-        matching_key = Some(key_array);
-        file_entries.push(FileEntry { offset: 0, base_offset: 0 })
-
-    // (custom enc) find the key, knowing that the first entry is always "PROG" (offset 48)
-    } else if let Some(key_array) = find_key(&keys::PANA_DVD_KEYONLY, &enc_header_s, b"PROG", 48)? {
-        println!("Found valid key: {}\n", hex::encode_upper(key_array));
-        matching_key = Some(key_array);
-        file_entries.push(FileEntry { offset: 0, base_offset: 48 })
-
-    // (aes) find the key using PANASONIC magic
-    } else if let Some((aes_key, aes_iv, key_array)) = find_aes_key_pair(&keys::PANA_DVD_AESPAIR, &enc_header_s, b"PANASONIC", 32)? {
-        println!("Found AES key pair: aes={} iv={} cust={}", hex::encode_upper(aes_key), hex::encode_upper(aes_iv), hex::encode_upper(key_array));
-        matching_key = Some(key_array);
-
+    if context.is_aes {
+        let (aes_key, aes_iv) = (context.aes_key.unwrap(), context.aes_iv.unwrap());
+        println!("Using key: {} + AES key: {}, IV: {}", hex::encode_upper(matching_key), hex::encode_upper(aes_key), hex::encode_upper(aes_iv));
         println!("Decrypting AES...\n");
         let aes_decrypted = decrypt_aes128_cbc_nopad(&file_reader.get_ref(), &aes_key, &aes_iv)?;
         file_reader = Cursor::new(aes_decrypted); //set the file reader to use AES decrypted stream
 
         //read file entries in extra header
         let file_table = common::read_exact(&mut file_reader, 48)?;
-        let mut file_table_reader = Cursor::new(decrypt_data(&file_table, &key_array));
+        let mut file_table_reader = Cursor::new(decrypt_data(&file_table, &matching_key));
         for _i in 0..4 {
             let file_entry: AesHeaderFileEntry = file_table_reader.read_le()?;
             if file_entry.size == 0 && file_entry.offset == 0 {
                 break
             }
-            file_entries.push(FileEntry { offset: file_entry.offset, base_offset: 48 });
+            file_entries.push(FileEntry { offset: file_entry.offset, base_offset: context.base_hdr_size });
         }
 
     } else {
-        println!("\nNo valid key found!");
-        return Ok(());
+        println!("Using key: {}", hex::encode_upper(matching_key));
+        file_entries.push(FileEntry { offset: 0, base_offset: context.base_hdr_size });
     }
-
-    let matching_key_array = matching_key.unwrap();
 
     if file_entries.len() == 1 {
         //only one file, standard extraction
-        println!("File contains no extra sub-files...");
-        extract_file(&mut file_reader, file_entries[0].offset as u64, file_entries[0].base_offset as u64, matching_key_array, output_folder)?;
+        println!("File contains no extra sub-files...\n");
+        extract_file(&mut file_reader, file_entries[0].offset as u64, file_entries[0].base_offset as u64, matching_key, output_folder)?;
     } else {
         println!("File contains {} sub-files...", file_entries.len());
         for (i, file_entry ) in file_entries.iter().enumerate() {
             println!("\nExtracting file {}/{} - Offset: {}, base: {}", i + 1, file_entries.len(), file_entry.offset, file_entry.base_offset);
-            extract_file(&mut file_reader, file_entry.offset as u64, file_entry.base_offset as u64, matching_key_array, &format!("{}/file_{}", output_folder, i + 1))?;
+            extract_file(&mut file_reader, file_entry.offset as u64, file_entry.base_offset as u64, matching_key, &format!("{}/file_{}", output_folder, i + 1))?;
         }
     }
 
@@ -214,7 +226,7 @@ pub fn extract_pana_dvd(mut file: &File, output_folder: &str) -> Result<(), Box<
 fn extract_file(file_reader: &mut Cursor<Vec<u8>>, offset: u64, base_offset: u64, key: [u8; 8], output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
     file_reader.seek(SeekFrom::Start(offset + base_offset))?;
  
-    let enc_header = common::read_exact(file_reader, 8192)?;
+    let enc_header = common::read_exact(file_reader, MAX_HEADER_SIZE)?;
     let mut hdr_reader = Cursor::new(decrypt_data(&enc_header, &key));
     let mut modules: Vec<ModuleEntry> = Vec::new();
 

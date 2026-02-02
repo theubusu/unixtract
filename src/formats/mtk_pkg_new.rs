@@ -1,12 +1,21 @@
 use std::path::Path;
 use std::fs::{self, File, OpenOptions};
-use std::io::{Write, Cursor, Seek};
+use std::io::{Write, Cursor, Seek, SeekFrom};
 use binrw::{BinRead, BinReaderExt};
 
 use crate::utils::common;
 use crate::utils::aes::{decrypt_aes128_cbc_nopad};
 use crate::utils::lzhs::{decompress_lzhs_fs_file2file};
 use crate::keys;
+
+use crate::formats::mtk_pkg::{MTK_HEADER_MAGIC, MTK_META_MAGIC, MTK_META_PAD_MAGIC};
+
+pub struct MtkPkgNewContext {
+    matching_key_name: String,
+    matching_key_key: [u8; 16],
+    matching_key_iv: [u8; 16],
+    decrypted_header: Vec<u8>,
+}
 
 #[derive(BinRead)]
 struct Header {
@@ -53,51 +62,44 @@ impl PartEntry {
     }
 }
 
-pub fn is_mtk_pkg_new_file(file: &File) -> bool {
-    let encrypted_header = common::read_file(&file, 0, 112).expect("Failed to read from file.");
-    for (key_hex, iv_hex, _name) in keys::MTK_PKG_CUST {
-        let key_array: [u8; 16] = hex::decode(key_hex).expect("Error").as_slice().try_into().expect("Error");
-        let iv_array: [u8; 16] = hex::decode(iv_hex).expect("Error").as_slice().try_into().expect("Error");
-        let try_decrypt = decrypt_aes128_cbc_nopad(&encrypted_header, &key_array, &iv_array).expect("Failed to decrypt.");
+static HEADER_SIZE: usize = 0x170;
 
-        if &try_decrypt[4..12] == b"#DH@FiRm" {    
-            return true;
+pub fn is_mtk_pkg_new_file(file: &File) -> Result<Option<MtkPkgNewContext>, Box<dyn std::error::Error>> {
+    let encrypted_header = common::read_file(&file, 0, HEADER_SIZE)?;
+    for (key_hex, iv_hex, name) in keys::MTK_PKG_CUST {
+        let key_array: [u8; 16] = hex::decode(key_hex)?.as_slice().try_into()?;
+        let iv_array: [u8; 16] = hex::decode(iv_hex)?.as_slice().try_into()?;
+        let try_decrypt = decrypt_aes128_cbc_nopad(&encrypted_header, &key_array, &iv_array)?;
+
+        if &try_decrypt[4..12] == MTK_HEADER_MAGIC {    
+            return Ok(Some(MtkPkgNewContext {
+                matching_key_name: name.to_string(),
+                matching_key_key: key_array,
+                matching_key_iv: iv_array,
+                decrypted_header: try_decrypt
+            }));
         }
     }
 
-    false
+    Ok(None)
 }
 
-pub fn extract_mtk_pkg_new(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_mtk_pkg_new(mut file: &File, output_folder: &str, context: MtkPkgNewContext) -> Result<(), Box<dyn std::error::Error>> {
     let file_size = file.metadata()?.len();
-    let encrypted_header = common::read_exact(&mut file, 368)?;
 
-    let mut header = Vec::new();
-    let mut matching_key: Option<[u8; 16]> = None;
-    let mut matching_iv: Option<[u8; 16]> = None;
-    //find key, the header and data key will be the same
-    for (key_hex, iv_hex, name) in keys::MTK_PKG_CUST {
-        let key_array = hex::decode(key_hex)?.as_slice().try_into()?;
-        let iv_array = hex::decode(iv_hex)?.as_slice().try_into()?;
-        header = decrypt_aes128_cbc_nopad(&encrypted_header, &key_array, &iv_array)?;
-
-        if &header[4..12] == b"#DH@FiRm" {
-            println!("Using key {}", name);
-            matching_key = Some(key_array);
-            matching_iv = Some(iv_array);
-            break
-        }
-    }
-    if matching_key.is_none() && matching_iv.is_none() {
-        println!("Failed to find key!");
-        return Ok(())
-    }
+    //the key was founf, and header was decrypted at detection stage so we can reuse
+    println!("Using key {}", context.matching_key_name);
+    let key_array = context.matching_key_key;
+    let iv_array = context.matching_key_iv;
+    let header = context.decrypted_header;
 
     let mut hdr_reader = Cursor::new(header); 
     let hdr: Header = hdr_reader.read_le()?;
 
     println!("File info:\nFile size: {}\nVendor magic: {}\nVersion info: {}\nProduct name: {}" , 
             hdr.file_size, hdr.vendor_magic(), hdr.version(), hdr.product_name());
+
+    file.seek(SeekFrom::Start(HEADER_SIZE as u64))?;
 
     let mut part_n = 0;
     while file.stream_position()? < file_size as u64 {        
@@ -120,7 +122,6 @@ pub fn extract_mtk_pkg_new(mut file: &File, output_folder: &str) -> Result<(), B
         let mut out_data;
         if part_entry.is_encrypted() {
             println!("- Decrypting...");
-            let (key_array, iv_array) = (matching_key.unwrap(), matching_iv.unwrap());
             //data aligned to 16 bytes is AES encrypted. the remaining unaligned data is XORed with the key
             let align_len = data.len() & !15;
             let (aes_enc, xor_tail) = data.split_at(align_len);
@@ -133,9 +134,9 @@ pub fn extract_mtk_pkg_new(mut file: &File, output_folder: &str) -> Result<(), B
         }
 
         //strip iMtK thing and get version
-        let extra_header_len = if &out_data[48..52] == b"iMtK" {
+        let extra_header_len = if &out_data[48..52] == MTK_META_MAGIC {
             let imtk_len = u32::from_le_bytes(out_data[52..56].try_into().unwrap());
-            if &out_data[56..60] != b"iPAd" {
+            if &out_data[56..60] != MTK_META_PAD_MAGIC {
                 let version_len = u32::from_le_bytes(out_data[56..60].try_into().unwrap());
                 let version = common::string_from_bytes(&out_data[60..60 + version_len as usize]);
                 println!("- Version: {}", version);

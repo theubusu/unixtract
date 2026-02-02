@@ -21,7 +21,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Input target: {}", target_path);
     let path = PathBuf::from(target_path);
 
-
     let output_path = if args.output_folder.is_some() {
         args.output_folder.unwrap()
     } else {
@@ -120,9 +119,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Amlogic image file detected!");
             formats::amlogic::extract_amlogic(&file, &output_path)?;
         }
-        else if formats::pana_dvd::is_pana_dvd_file(&file) {
+        else if let Some(result) = formats::pana_dvd::is_pana_dvd_file(&file)? {
             println!("PANA_DVD file detected!");
-            formats::pana_dvd::extract_pana_dvd(&file, &output_path)?;
+            formats::pana_dvd::extract_pana_dvd(&file, &output_path, result)?;
         }
         else if formats::pup::is_pup_file(&file) {
             println!("PUP file detected!");
@@ -144,21 +143,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Roku file detected!");
             formats::roku::extract_roku(&file, &output_path)?;
         }
-        else if formats::mtk_pkg::is_mtk_pkg_file(&file) {
+        else if let Some(result) = formats::mtk_pkg::is_mtk_pkg_file(&file)? {
             println!("MTK PKG file detected!");
-            formats::mtk_pkg::extract_mtk_pkg(&file, &output_path)?;
+            formats::mtk_pkg::extract_mtk_pkg(&file, &output_path, result)?;
         } 
         else if formats::mtk_pkg_old::is_mtk_pkg_old_file(&file) {
             println!("MTK PKG (Old) file detected!");
             formats::mtk_pkg_old::extract_mtk_pkg_old(&file, &output_path)?;
         }
-        else if formats::mtk_pkg_new::is_mtk_pkg_new_file(&file) {
+        else if let Some(result) = formats::mtk_pkg_new::is_mtk_pkg_new_file(&file)? {
             println!("MTK PKG (New) file detected!");
-            formats::mtk_pkg_new::extract_mtk_pkg_new(&file, &output_path)?;
+            formats::mtk_pkg_new::extract_mtk_pkg_new(&file, &output_path, result)?;
         }
-        else if formats::mtk_bdp::is_mtk_bdp_file(&file) {
+        else if let Some(result) = formats::mtk_bdp::is_mtk_bdp_file(&file)? {
             println!("MTK BDP file detected!");
-            formats::mtk_bdp::extract_mtk_bdp(&file, &output_path)?;
+            formats::mtk_bdp::extract_mtk_bdp(&file, &output_path, result)?;
         }
         else {
             println!("Input format not recognized!");
