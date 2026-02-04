@@ -17,7 +17,7 @@ struct PITITPITEntry {
 	nand_size: u32,
     pit_offset: u32,
     pit_size: u32,
-    _private_data_2: u32,
+    _table_id: u32,
 }
 
 #[derive(BinRead)]
@@ -31,10 +31,10 @@ struct PITITBITEntry {
 #[derive(BinRead)]
 struct PITHeader {
     #[br(count = 8)] pit_magic: Vec<u8>,
-    _unk: u32,
-    first_entry_offset: u32,
-    entry_size: u32,
-    entry_count: u32,
+    _version: u32,
+    first_entry_offset: u32, //"header len"
+    entry_size: u32, //"item lenght"
+    entry_count: u32, //"item num"
 }
 
 static PIT_MAGIC: [u8; 8] = [0xDC, 0xEA, 0x30, 0x85, 0xDC, 0xEA, 0x30, 0x85];
@@ -43,10 +43,12 @@ static PIT_MAGIC: [u8; 8] = [0xDC, 0xEA, 0x30, 0x85, 0xDC, 0xEA, 0x30, 0x85];
 struct PITEntry {
     #[br(count = 16)] name_bytes: Vec<u8>,
     partition_id: u32,
-    _unknown: u32,
+    _part_info: u32,
     offset_on_nand: u32,
     size_on_nand: u32,
-    #[br(count = 32)] _unused: Vec<u8>,
+    _enc_size: u32,
+    _no_enc_size: u32,
+    #[br(count = 24)] _reserve: Vec<u8>,
 }
 impl PITEntry {
     fn name(&self) -> String {
@@ -60,7 +62,7 @@ struct BITEntry {
     offset: u32,
     size: u32,
     offset_in_target_part: u32,
-    _unknown: u32,
+    _bin_info: u32,  //"Bin info"
 }
 
 static BIT_MAGIC: [u8; 20] = [0xCD, 0xAB, 0x30, 0x85, 0xCD, 0xAB, 0x30, 0x85, 0xCD, 0xAB, 0x30, 0x85, 0xCD, 0xAB, 0x30, 0x85, 0xCD, 0xAB, 0x30, 0x85];
