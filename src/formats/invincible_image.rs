@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "invincible_image", detect_func: is_invincible_image_file, run_func: extract_invincible_image }
+    Format { name: "invincible_image", detector_func: is_invincible_image_file, extractor_func: extract_invincible_image }
 }
 
 use std::path::{Path};
@@ -62,7 +62,7 @@ impl Entry {
     }
 }
 
-pub fn is_invincible_image_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_invincible_image_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let header = common::read_file(app_ctx.file, 0, 16)?;
     if header == b"INVINCIBLE_IMAGE" {
         Ok(Some(Box::new(())))
@@ -71,7 +71,7 @@ pub fn is_invincible_image_file(app_ctx: &ProgramContext) -> Result<Option<Box<d
     }
 }
 
-pub fn extract_invincible_image(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_invincible_image(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     let header: Header = file.read_le()?;
 

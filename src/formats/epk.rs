@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "epk", detect_func: is_epk_file, run_func: extract_epk }
+    Format { name: "epk", detector_func: is_epk_file, extractor_func: extract_epk }
 }
 
 use crate::utils::common;
@@ -11,7 +11,7 @@ pub struct EpkContext {
     epk_version: u8,
 }
 
-pub fn is_epk_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_epk_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let versions = common::read_file(app_ctx.file, 1712, 36)?;
 
     if let Some(epk_version) = check_epk_version(&versions) {
@@ -50,7 +50,7 @@ fn match_with_pattern(data: &[u8], pattern: &str) -> bool {
     true
 }
 
-pub fn extract_epk(app_ctx: &ProgramContext, ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_epk(app_ctx: &AppContext, ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let ctx = ctx.and_then(|c| c.downcast::<EpkContext>().ok()).ok_or("Context is invalid or missing!")?;
 
     let versions = common::read_file(app_ctx.file, 1712, 36)?;

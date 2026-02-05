@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "mtk_bdp", detect_func: is_mtk_bdp_file, run_func: extract_mtk_bdp }
+    Format { name: "mtk_bdp", detector_func: is_mtk_bdp_file, extractor_func: extract_mtk_bdp }
 }
 
 use std::path::{Path};
@@ -77,7 +77,7 @@ fn find_bytes(data: &[u8], pattern: &[u8]) -> Option<usize> {
     data.windows(pattern.len()).position(|window| window == pattern)
 }
 
-pub fn is_mtk_bdp_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_mtk_bdp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     let file_size = file.metadata()?.len();
     let mut data = Vec::new();
@@ -95,7 +95,7 @@ pub fn is_mtk_bdp_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>,
     }
 }
 
-pub fn extract_mtk_bdp(app_ctx: &ProgramContext, ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_mtk_bdp(app_ctx: &AppContext, ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     let ctx = ctx.and_then(|c: Box<dyn Any>| c.downcast::<MtkBdpContext>().ok()).ok_or("Context is invalid or missing!")?;
     let offset = ctx.pitit_offset;

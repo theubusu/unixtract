@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "rvp", detect_func: is_rvp_file, run_func: extract_rvp }
+    Format { name: "rvp", detector_func: is_rvp_file, extractor_func: extract_rvp }
 }
 
 use std::path::Path;
@@ -18,7 +18,7 @@ fn decrypt_xor(data: &[u8]) -> Vec<u8> {
         .collect()
 }
 
-pub fn is_rvp_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_rvp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     //MVP
     let header = common::read_file(file, 0, 4)?;
@@ -39,7 +39,7 @@ pub fn is_rvp_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box
     Ok(Some(Box::new(())))
 }
 
-pub fn extract_rvp(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_rvp(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     let mut obf_data = Vec::new();  //we sadly cannot deXOR on the fly because of its 32 byte pattern
     file.read_to_end(&mut obf_data)?;

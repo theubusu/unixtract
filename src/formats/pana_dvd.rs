@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "pana_dvd", detect_func: is_pana_dvd_file, run_func: extract_pana_dvd }
+    Format { name: "pana_dvd", detector_func: is_pana_dvd_file, extractor_func: extract_pana_dvd }
 }
 
 use std::path::{Path, PathBuf};
@@ -149,7 +149,7 @@ pub fn find_aes_key_pair<'a>(key_array: &'a [(&'a str, &'a str, &'a str)], data:
     Ok(None)
 }
 
-pub fn is_pana_dvd_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_pana_dvd_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let header = common::read_file(app_ctx.file, 0, 64)?;
     if let Some(matching_key) = find_key(&keys::PANA_DVD_KEYONLY, &header, b"PROG", 0)? {
         Ok(Some(Box::new(PanaDvdContext {
@@ -180,7 +180,7 @@ pub fn is_pana_dvd_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>
     }
 }
 
-pub fn extract_pana_dvd(app_ctx: &ProgramContext, ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_pana_dvd(app_ctx: &AppContext, ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     let context = ctx.and_then(|c: Box<dyn Any>| c.downcast::<PanaDvdContext>().ok()).ok_or("Context is invalid or missing!")?;
 

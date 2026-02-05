@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "android_ota_payload", detect_func: is_android_ota_payload_file, run_func: extract_android_ota_payload }
+    Format { name: "android_ota_payload", detector_func: is_android_ota_payload_file, extractor_func: extract_android_ota_payload }
 }
 
 use std::fs::{self, OpenOptions};
@@ -22,7 +22,7 @@ struct Header {
     metadata_signature_size: u32,
 }
 
-pub fn is_android_ota_payload_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_android_ota_payload_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let header = common::read_file(app_ctx.file, 0, 4)?;
     if header == b"CrAU" {
         Ok(Some(Box::new(())))
@@ -31,7 +31,7 @@ pub fn is_android_ota_payload_file(app_ctx: &ProgramContext) -> Result<Option<Bo
     }
 }
 
-pub fn extract_android_ota_payload(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_android_ota_payload(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     let header: Header = file.read_be()?;
     println!("File info:\nFormat version: {}\nManifest size: {}", header.file_format_version, header.manifest_size);

@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "mtk_pkg_new", detect_func: is_mtk_pkg_new_file, run_func: extract_mtk_pkg_new }
+    Format { name: "mtk_pkg_new", detector_func: is_mtk_pkg_new_file, extractor_func: extract_mtk_pkg_new }
 }
 
 use std::path::Path;
@@ -70,7 +70,7 @@ impl PartEntry {
 
 static HEADER_SIZE: usize = 0x170;
 
-pub fn is_mtk_pkg_new_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_mtk_pkg_new_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let encrypted_header = common::read_file(app_ctx.file, 0, HEADER_SIZE)?;
     for (key_hex, iv_hex, name) in keys::MTK_PKG_CUST {
         let key_array: [u8; 16] = hex::decode(key_hex)?.as_slice().try_into()?;
@@ -90,7 +90,7 @@ pub fn is_mtk_pkg_new_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn An
     Ok(None)
 }
 
-pub fn extract_mtk_pkg_new(app_ctx: &ProgramContext, ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_mtk_pkg_new(app_ctx: &AppContext, ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     let ctx = ctx.and_then(|c: Box<dyn Any>| c.downcast::<MtkPkgNewContext>().ok()).ok_or("Context is invalid or missing!")?;
     let file_size = file.metadata()?.len();

@@ -14,7 +14,7 @@ struct Args {
     output_folder: Option<String>,
 }
 
-pub struct ProgramContext<'a> {
+pub struct AppContext<'a> {
     pub file: &'a std::fs::File,
     pub output_dir: &'a str,
 }
@@ -47,13 +47,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let file = File::open(path)?;
-    let program_context: ProgramContext = ProgramContext { file: &file, output_dir: &output_path };  
+    let app_ctx: AppContext = AppContext { file: &file, output_dir: &output_path };  
     let formats: Vec<Format> = get_registry();
 
     for format in formats {
-        if let Some(ctx) = (format.detect_func)(&program_context)? {
+        if let Some(ctx) = (format.detector_func)(&app_ctx)? {
             println!("{} detected!", format.name);
-            (format.run_func)(&program_context, Some(ctx))?;
+            (format.extractor_func)(&app_ctx, Some(ctx))?;
             return Ok(());
         }
     }

@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "pfl_upg", detect_func: is_pfl_upg_file, run_func: extract_pfl_upg }
+    Format { name: "pfl_upg", detector_func: is_pfl_upg_file, extractor_func: extract_pfl_upg }
 }
 
 use rsa::{RsaPublicKey, BigUint};
@@ -48,7 +48,7 @@ impl FileHeader {
     }
 }
 
-pub fn is_pfl_upg_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_pfl_upg_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let header = common::read_file(app_ctx.file, 0, 8)?;
     if header == b"2SWU3TXV" {
         Ok(Some(Box::new(())))
@@ -89,7 +89,7 @@ fn decrypt_aes256_ecb(key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, Box<dyn 
     Ok(buffer)
 }
 
-pub fn extract_pfl_upg(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     let header: Header = file.read_le()?; 
     let signature = common::read_exact(&mut file, 128)?;

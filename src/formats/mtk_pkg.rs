@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "mtk_pkg", detect_func: is_mtk_pkg_file, run_func: extract_mtk_pkg }
+    Format { name: "mtk_pkg", detector_func: is_mtk_pkg_file, extractor_func: extract_mtk_pkg }
 }
 
 use std::path::Path;
@@ -81,7 +81,7 @@ static HEADER_KEY: [u8; 16] = [
 
 static HEADER_IV: [u8; 16] = [0x00; 16];
 
-pub fn is_mtk_pkg_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_mtk_pkg_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let mut encrypted_header = common::read_file(app_ctx.file, 0, HEADER_SIZE)?;
     let mut header = decrypt_aes128_cbc_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV)?;
     if &header[4..12] == MTK_HEADER_MAGIC {
@@ -99,7 +99,7 @@ pub fn is_mtk_pkg_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>,
     }
 }
 
-pub fn extract_mtk_pkg(app_ctx: &ProgramContext, ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_mtk_pkg(app_ctx: &AppContext, ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     let ctx = ctx.and_then(|c: Box<dyn Any>| c.downcast::<MtkPkgContext>().ok()).ok_or("Context is invalid or missing!")?;
 

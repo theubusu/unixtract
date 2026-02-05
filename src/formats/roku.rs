@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "roku", detect_func: is_roku_file, run_func: extract_roku }
+    Format { name: "roku", detector_func: is_roku_file, extractor_func: extract_roku }
 }
 
 use std::fs::{self, OpenOptions};
@@ -61,7 +61,7 @@ impl ImageHeader {
     }
 }
 
-pub fn is_roku_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_roku_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let header = common::read_file(app_ctx.file, 0, 32)?;
     let try_decrypt_header = decrypt_aes128_cbc_nopad(&header, &FILE_KEY, &FILE_IV)?;
 
@@ -72,7 +72,7 @@ pub fn is_roku_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Bo
     }
 }
 
-pub fn extract_roku(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_roku(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     let mut encrypted_data = Vec::new();
     file.read_to_end(&mut encrypted_data)?;

@@ -1,8 +1,8 @@
 //sddl_dec 5.0
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "sddl_sec", detect_func: is_sddl_sec_file, run_func: extract_sddl_sec }
+    Format { name: "sddl_sec", detector_func: is_sddl_sec_file, extractor_func: extract_sddl_sec }
 }
 
 use std::path::{Path, PathBuf};
@@ -103,7 +103,7 @@ static DEC_IV: [u8; 16] = [
     0xCD, 0x88, 0x38, 0xC4, 0xB9, 0x0C, 0x76, 0x66,
 ];
 
-pub fn is_sddl_sec_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_sddl_sec_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let header = common::read_file(app_ctx.file, 0, 32)?;
     let deciph_header = decipher(&header);
     if deciph_header.starts_with(b"\x11\x22\x33\x44") {
@@ -155,7 +155,7 @@ fn decipher(s: &[u8]) -> Vec<u8> {
     out
 }
 
-pub fn extract_sddl_sec(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     let mut hdr_reader = Cursor::new(decipher(&common::read_exact(&mut file, 32)?));
     let hdr: SddlSecHeader = hdr_reader.read_be()?;

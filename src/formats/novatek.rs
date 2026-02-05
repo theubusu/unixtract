@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "novatek", detect_func: is_novatek_file, run_func: extract_novatek }
+    Format { name: "novatek", detector_func: is_novatek_file, extractor_func: extract_novatek }
 }
 
 use std::path::Path;
@@ -40,7 +40,7 @@ struct PartEntry {
     #[br(count = 16)] _md5_checksum: Vec<u8>,
 }
 
-pub fn is_novatek_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_novatek_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let header = common::read_file(app_ctx.file, 0, 4)?;
     if header == b"NFWB" {
         Ok(Some(Box::new(())))
@@ -49,7 +49,7 @@ pub fn is_novatek_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>,
     }
 }
 
-pub fn extract_novatek(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_novatek(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     let header: Header = file.read_le()?;
 

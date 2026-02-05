@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "sony_bdp", detect_func: is_sony_bdp_file, run_func: extract_sony_bdp }
+    Format { name: "sony_bdp", detector_func: is_sony_bdp_file, extractor_func: extract_sony_bdp }
 }
 
 use std::fs::File;
@@ -63,7 +63,7 @@ struct Entry {
     size: u32,
 }
 
-pub fn is_sony_bdp_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_sony_bdp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let header = common::read_file(app_ctx.file, 0, 4)?;
     if header == b"\x01\x73\xEC\xC9" || header == b"\x01\x73\xEC\x1F" || header == b"\xEC\x7D\xB0\xB0" { //MSB1x, MSB0x, BDPPxx
         Ok(Some(Box::new(())))
@@ -72,7 +72,7 @@ pub fn is_sony_bdp_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>
     }
 }
 
-pub fn extract_sony_bdp(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_sony_bdp(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     let obf_header = common::read_exact(&mut file, 300)?;
     let header = hex_substitute(&obf_header);
@@ -120,7 +120,7 @@ pub fn extract_sony_bdp(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) ->
 
         let last_file = File::open(last_file_path.unwrap())?;
         let mtk_extraction_path = format!("{}/{}", app_ctx.output_dir, i - 1);
-        let ctx: ProgramContext = ProgramContext { file: &last_file, output_dir: &mtk_extraction_path };
+        let ctx: AppContext = AppContext { file: &last_file, output_dir: &mtk_extraction_path };
 
         if let Some(result) = formats::mtk_bdp::is_mtk_bdp_file(&ctx)? {
             println!("- MTK BDP file detected!\n");

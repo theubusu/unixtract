@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "ruf", detect_func: is_ruf_file, run_func: extract_ruf }
+    Format { name: "ruf", detector_func: is_ruf_file, extractor_func: extract_ruf }
 }
 
 use std::path::{Path};
@@ -75,7 +75,7 @@ impl RufEntry {
     }
 }
 
-pub fn is_ruf_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_ruf_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let header = common::read_file(app_ctx.file, 0, 6)?;
     if header == b"RUF\x00\x00\x00" {
         Ok(Some(Box::new(())))
@@ -84,7 +84,7 @@ pub fn is_ruf_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box
     }
 }
 
-pub fn extract_ruf(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_ruf(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     let header: RufHeader = file.read_be()?;
     if header.is_dual_ruf() {

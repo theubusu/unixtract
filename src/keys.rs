@@ -2,16 +2,16 @@
 
 //samsung old keys
 //github.com/george-hopkins/samygo-patcher
-pub static SAMSUNG: &[(&str, &str)] = &[
-    ("T-GA", 	"SHWJUH:85a045ae-2296-484c-b457-ede832fcfbe1-646390a3-105e-40aa-85f6-da3086c70111"),
-    ("T-MST5",	"SHWJUH:eceb2c14-db11-425e-9ebf-5f9607f0eb4b-3c38193e-751e-4719-8884-9e76322c0cec"),
-    ("T-MST10P","b4c136-fbc93576-b3e8-4035-bf4e-ba4cb4ada1ac-f0d81cc4-8301-4832-bd60-f331295743ba"),
-    ("T-VAL", 	"A435HX:d3e90afc-0f09-4054-9bac-350cc8dfc901-7cee72ea-15ae-45ce-b0f5-00001abc2010"),
-    ("T-TDT", 	"A435HX:d3e90afc-0f09-4054-9bac-350cc8dfc901-7cee72ea-15ae-45ce-b0f5-00002abc2010"),
-    ("T-MSX", 	"A435HX:d3e90afc-0f09-4054-9bac-350cc8dfc901-7cee72ea-15ae-45ce-b0f5-00004abc2010"),
-    ("T-CH", 	"A435HX:d3e90afc-0f09-4054-9bac-350cc8dfc901-7cee72ea-15ae-45ce-b0f5-611c4f8d4a71"),
-    ("T-ECP",   "3EF6067262CF0C678598BFF22169D1F1EA57C284"),
-];
+//pub static SAMSUNG: &[(&str, &str)] = &[
+//    ("T-GA", 	"SHWJUH:85a045ae-2296-484c-b457-ede832fcfbe1-646390a3-105e-40aa-85f6-da3086c70111"),
+//    ("T-MST5",	"SHWJUH:eceb2c14-db11-425e-9ebf-5f9607f0eb4b-3c38193e-751e-4719-8884-9e76322c0cec"),
+//    ("T-MST10P","b4c136-fbc93576-b3e8-4035-bf4e-ba4cb4ada1ac-f0d81cc4-8301-4832-bd60-f331295743ba"),
+//    ("T-VAL", 	"A435HX:d3e90afc-0f09-4054-9bac-350cc8dfc901-7cee72ea-15ae-45ce-b0f5-00001abc2010"),
+//    ("T-TDT", 	"A435HX:d3e90afc-0f09-4054-9bac-350cc8dfc901-7cee72ea-15ae-45ce-b0f5-00002abc2010"),
+//    ("T-MSX", 	"A435HX:d3e90afc-0f09-4054-9bac-350cc8dfc901-7cee72ea-15ae-45ce-b0f5-00004abc2010"),
+//    ("T-CH", 	"A435HX:d3e90afc-0f09-4054-9bac-350cc8dfc901-7cee72ea-15ae-45ce-b0f5-611c4f8d4a71"),
+//    ("T-ECP",   "3EF6067262CF0C678598BFF22169D1F1EA57C284"),
+//];
 
 //MSD10 keys
 //fw prefix, type, key

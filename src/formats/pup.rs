@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "pup", detect_func: is_pup_file, run_func: extract_pup }
+    Format { name: "pup", detector_func: is_pup_file, extractor_func: extract_pup }
 }
 
 use std::path::{Path};
@@ -56,7 +56,7 @@ struct BlockEntry {
     size: u32,
 }
 
-pub fn is_pup_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_pup_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let header = common::read_file(app_ctx.file, 0, 4)?;
     if header == b"\x4F\x15\x3D\x1D" || header == b"\x54\x14\xF5\xEE" { //ps4, ps5
         Ok(Some(Box::new(())))
@@ -65,7 +65,7 @@ pub fn is_pup_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box
     }
 }
 
-pub fn extract_pup(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_pup(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     let header: Header = file.read_le()?;
 

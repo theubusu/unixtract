@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "mtk_pkg_old", detect_func: is_mtk_pkg_old_file, run_func: extract_mtk_pkg_old }
+    Format { name: "mtk_pkg_old", detector_func: is_mtk_pkg_old_file, extractor_func: extract_mtk_pkg_old }
 }
 
 use std::path::Path;
@@ -63,7 +63,7 @@ impl PartEntry {
 
 static HEADER_SIZE: usize = 0x98;
 
-pub fn is_mtk_pkg_old_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_mtk_pkg_old_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     let encrypted_header = common::read_file(&file, 0, HEADER_SIZE)?;
     let header = decrypt(&encrypted_header, KEY, Some(HEADER_XOR_MASK));
@@ -82,7 +82,7 @@ pub fn is_mtk_pkg_old_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn An
     }
 }
 
-pub fn extract_mtk_pkg_old(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_mtk_pkg_old(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     let file_size = file.metadata()?.len();
     let encrypted_header = common::read_exact(&mut file, HEADER_SIZE)?;

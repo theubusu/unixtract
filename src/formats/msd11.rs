@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "msd11", detect_func: is_msd11_file, run_func: extract_msd11 }
+    Format { name: "msd11", detector_func: is_msd11_file, extractor_func: extract_msd11 }
 }
 
 use std::fs::{self, OpenOptions};
@@ -48,7 +48,7 @@ struct Section {
     size: u64,
 }
 
-pub fn is_msd11_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_msd11_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let header = common::read_file(app_ctx.file, 0, 6)?;
     if header == b"MSDU11" {
         Ok(Some(Box::new(())))
@@ -57,7 +57,7 @@ pub fn is_msd11_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, B
     }
 }
 
-pub fn extract_msd11(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_msd11(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     let header: FileHeader = file.read_le()?;
     println!("\nNumber of sections: {}", header.section_count);

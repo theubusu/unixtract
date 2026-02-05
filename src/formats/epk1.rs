@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "epk1", detect_func: is_epk1_file, run_func: extract_epk1 }
+    Format { name: "epk1", detector_func: is_epk1_file, extractor_func: extract_epk1 }
 }
 
 use std::path::{Path};
@@ -40,7 +40,7 @@ struct Pak {
     size : u32,
 }
 
-pub fn is_epk1_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_epk1_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let epk2_magic = common::read_file(app_ctx.file, 12, 4)?; //for epk2b
     let epak_magic = common::read_file(app_ctx.file, 0, 4)?;
     if epak_magic == b"epak" && epk2_magic != b"EPK2" {
@@ -50,7 +50,7 @@ pub fn is_epk1_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Bo
     }
 }
 
-pub fn extract_epk1(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_epk1(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     //check type of epk1
     let epk1_type;

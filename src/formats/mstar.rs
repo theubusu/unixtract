@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "mstar", detect_func: is_mstar_file, run_func: extract_mstar }
+    Format { name: "mstar", detector_func: is_mstar_file, extractor_func: extract_mstar }
 }
 
 use std::fs::{self, OpenOptions};
@@ -13,7 +13,7 @@ use crate::utils::compression::{decompress_lzma, decompress_lz4};
 use crate::utils::lzop::{unlzop_to_file};
 use crate::utils::sparse::{unsparse_to_file};
 
-pub fn is_mstar_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_mstar_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let header = common::read_file(app_ctx.file, 0, 32768)?;
     let header_string = String::from_utf8_lossy(&header);
 
@@ -32,7 +32,7 @@ fn parse_number(s: &str) -> Option<u64> {
     }
 }
 
-pub fn extract_mstar(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_mstar(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let file = app_ctx.file;
 
     let mut script = common::read_file(&file, 0, 32768)?;

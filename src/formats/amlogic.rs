@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "amlogic", detect_func: is_amlogic_file, run_func: extract_amlogic }
+    Format { name: "amlogic", detector_func: is_amlogic_file, extractor_func: extract_amlogic }
 }
 
 use std::path::{Path};
@@ -49,7 +49,7 @@ impl ItemEntry {
     }
 }
 
-pub fn is_amlogic_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_amlogic_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let header = common::read_file(app_ctx.file, 8, 4)?;
     if header == b"\x56\x19\xB5\x27" {
         Ok(Some(Box::new(())))
@@ -58,7 +58,7 @@ pub fn is_amlogic_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>,
     }
 }
 
-pub fn extract_amlogic(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_amlogic(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     file.seek(SeekFrom::Start(0))?;
     let header: ImageHeader = file.read_le()?;

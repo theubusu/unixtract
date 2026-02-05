@@ -1,5 +1,8 @@
 use std::any::Any;
-use crate::{ProgramContext};
+use crate::{AppContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "epk3", detector_func: is_epk3_file, extractor_func: extract_epk3 }
+}
 
 use std::fs::{self, OpenOptions};
 use std::path::{Path};
@@ -73,7 +76,11 @@ impl PkgInfoEntry {
     }
 }
 
-pub fn extract_epk3(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn is_epk3_file(_app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    Ok(None)
+}
+
+pub fn extract_epk3(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     file.seek(SeekFrom::Start(0))?;
     let stored_header = common::read_exact(&mut file, 1712)?;

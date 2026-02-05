@@ -1,7 +1,7 @@
 use std::any::Any;
-use crate::{ProgramContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
-    Format { name: "epk2", detect_func: is_epk2_file, run_func: extract_epk2 }
+    Format { name: "epk2", detector_func: is_epk2_file, extractor_func: extract_epk2 }
 }
 
 use std::fs::{self, OpenOptions};
@@ -71,7 +71,7 @@ struct Pak {
     name: String,
 }
 
-pub fn is_epk2_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+pub fn is_epk2_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let header = common::read_file(app_ctx.file, 128, 4)?;
     if header == b"epak" {
         Ok(Some(Box::new(())))
@@ -80,7 +80,7 @@ pub fn is_epk2_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Bo
     }
 }
 
-pub fn extract_epk2(app_ctx: &ProgramContext, _: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_epk2(app_ctx: &AppContext, _: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file;
     let _header_signature = common::read_exact(&mut file, SIGNATURE_SIZE as usize)?;
 
