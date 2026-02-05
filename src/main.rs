@@ -11,7 +11,7 @@ use crate::formats::{Format, get_registry};
 #[derive(Parser, Debug)]
 struct Args {
     input_target: String,
-    output_folder: Option<String>,
+    output_directory: Option<String>,
 }
 
 pub struct AppContext<'a> {
@@ -23,21 +23,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("unixtract Firmware extractor");
     let args = Args::parse();
 
-    let target_path = args.input_target;
-    println!("Input target: {}", target_path);
-    let path = PathBuf::from(target_path);
-
-    let output_path = if args.output_folder.is_some() {
-        args.output_folder.unwrap()
+    let target_path_str = args.input_target;
+    println!("Input target: {}", target_path_str);
+    let target_path = PathBuf::from(&target_path_str);
+    
+    let output_path_str = if args.output_directory.is_some() {
+        args.output_directory.unwrap()
     } else {
-        format!("_{}", path.file_name().and_then(|s| s.to_str()).unwrap())
+        format!("_{}", target_path.file_name().and_then(|s| s.to_str()).unwrap())
     };
-    println!("Output folder: {}\n", output_path);
+    println!("Output directory: {}\n", output_path_str);
+    let output_directory_path = PathBuf::from(&output_path_str);
 
-    let output_folder_path = PathBuf::from(&output_path);
-    if output_folder_path.exists() {
-        if output_folder_path.is_dir() {
-            let is_empty = fs::read_dir(&output_folder_path)?.next().is_none();
+    if output_directory_path.exists() {
+        if output_directory_path.is_dir() {
+            let is_empty = fs::read_dir(&output_directory_path)?.next().is_none();
             if !is_empty {
                 println!("Warning: Output folder already exists and is NOT empty! Files may be overwritten!");
                 println!("Press Enter if you want to continue...");
@@ -46,10 +46,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let file = File::open(path)?;
-    let app_ctx: AppContext = AppContext { file: &file, output_dir: &output_path };  
-    let formats: Vec<Format> = get_registry();
+    let file = File::open(target_path)?;
+    let app_ctx: AppContext = AppContext { file: &file, output_dir: &output_path_str };
 
+    let formats: Vec<Format> = get_registry();
     for format in formats {
         if let Some(ctx) = (format.detector_func)(&app_ctx)? {
             println!("{} detected!", format.name);
