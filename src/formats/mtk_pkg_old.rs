@@ -1,5 +1,11 @@
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "mtk_pkg_old", detect_func: is_mtk_pkg_old_file, run_func: extract_mtk_pkg_old }
+}
+
 use std::path::Path;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, OpenOptions};
 use std::io::{Write, Cursor, Seek};
 use binrw::{BinRead, BinReaderExt};
 
@@ -57,25 +63,27 @@ impl PartEntry {
 
 static HEADER_SIZE: usize = 0x98;
 
-pub fn is_mtk_pkg_old_file(mut file: &File) -> bool {
-    let encrypted_header = common::read_file(&file, 0, HEADER_SIZE).expect("Failed to read from file.");
+pub fn is_mtk_pkg_old_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
+    let encrypted_header = common::read_file(&file, 0, HEADER_SIZE)?;
     let header = decrypt(&encrypted_header, KEY, Some(HEADER_XOR_MASK));
     if &header[4..12] == MTK_HEADER_MAGIC {
-        true
+        Ok(Some(Box::new(())))
     } else if &header[68..76] == MTK_HEADER_MAGIC {
         //check for 64 byte additional header used in some Sony and Philips firmwares and skip it
-        file.seek(std::io::SeekFrom::Start(64)).expect("Failed to seek");
-        true
+        file.seek(std::io::SeekFrom::Start(64))?;
+        Ok(Some(Box::new(())))
     } else if &header[132..140] == MTK_HEADER_MAGIC {
         //check for 128 byte additional header used in some Philips firmwares and skip it
-        file.seek(std::io::SeekFrom::Start(128)).expect("Failed to seek");
-        true
+        file.seek(std::io::SeekFrom::Start(128))?;
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
-pub fn extract_mtk_pkg_old(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_mtk_pkg_old(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     let file_size = file.metadata()?.len();
     let encrypted_header = common::read_exact(&mut file, HEADER_SIZE)?;
     let header = decrypt(&encrypted_header, KEY, Some(HEADER_XOR_MASK));
@@ -118,13 +126,13 @@ pub fn extract_mtk_pkg_old(mut file: &File, output_folder: &str) -> Result<(), B
         };
 
         //for compressed part create temp file
-        let output_path = Path::new(&output_folder).join(part_entry.name() + if part_entry.is_compressed() {".lzhs"} else {".bin"});
-        fs::create_dir_all(&output_folder)?;
+        let output_path = Path::new(app_ctx.output_dir).join(part_entry.name() + if part_entry.is_compressed() {".lzhs"} else {".bin"});
+        fs::create_dir_all(app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new().write(true).read(true)/* for lzhs */.create(true).open(&output_path)?;
         out_file.write_all(&out_data[extra_header_len as usize..])?;
 
         if part_entry.is_compressed() {
-            let lzhs_out_path = Path::new(&output_folder).join(part_entry.name() + ".bin");
+            let lzhs_out_path = Path::new(app_ctx.output_dir).join(part_entry.name() + ".bin");
             match decompress_lzhs_fs_file2file_old(&out_file, lzhs_out_path) {
                 Ok(()) => {
                     println!("- Decompressed Successfully!");

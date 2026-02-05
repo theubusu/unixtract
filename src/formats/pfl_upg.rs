@@ -1,4 +1,9 @@
-use std::fs::{File};
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "pfl_upg", detect_func: is_pfl_upg_file, run_func: extract_pfl_upg }
+}
+
 use rsa::{RsaPublicKey, BigUint};
 use hex::decode;
 use std::path::Path;
@@ -43,12 +48,12 @@ impl FileHeader {
     }
 }
 
-pub fn is_pfl_upg_file(file: &File) -> bool {
-    let header = common::read_file(&file, 0, 8).expect("Failed to read from file.");
+pub fn is_pfl_upg_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let header = common::read_file(app_ctx.file, 0, 8)?;
     if header == b"2SWU3TXV" {
-        true
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
@@ -84,7 +89,8 @@ fn decrypt_aes256_ecb(key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, Box<dyn 
     Ok(buffer)
 }
 
-pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_pfl_upg(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     let header: Header = file.read_le()?; 
     let signature = common::read_exact(&mut file, 128)?;
     let _ = common::read_exact(&mut file, 32)?; //unknown
@@ -157,7 +163,7 @@ pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<d
         //its a folder not a file
         if (file_header.attributes[3] & (1 << 1)) != 0 {
             println!("\nFolder - {}", file_header.file_name());
-            let output_path = Path::new(&output_folder).join(file_header.file_name().trim_start_matches('/'));
+            let output_path = Path::new(app_ctx.output_dir).join(file_header.file_name().trim_start_matches('/'));
             fs::create_dir_all(output_path)?;
             continue
         }
@@ -175,7 +181,7 @@ pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<d
         println!("\nFile - {}, Size: {}", file_name, file_header.real_size);
         let data = common::read_exact(&mut data_reader, file_header.stored_size as usize)?;
 
-        let output_path = Path::new(&output_folder).join(file_name.trim_start_matches('/'));
+        let output_path = Path::new(app_ctx.output_dir).join(file_name.trim_start_matches('/'));
         let output_path_parent = output_path.parent().expect("Failed to get parent of the output path!");
 
         //prevent collisions
@@ -188,7 +194,7 @@ pub fn extract_pfl_upg(mut file: &File, output_folder: &str) -> Result<(), Box<d
             fs::create_dir_all(parent)?;
         }
 
-        fs::create_dir_all(&output_folder)?;
+        fs::create_dir_all(app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new()
             .write(true)
             .create(true)

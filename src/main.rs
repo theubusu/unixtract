@@ -6,11 +6,17 @@ use clap::Parser;
 use std::path::{PathBuf};
 use std::io::{self};
 use std::fs::{self, File};
+use crate::formats::{Format, get_registry};
 
 #[derive(Parser, Debug)]
 struct Args {
     input_target: String,
     output_folder: Option<String>,
+}
+
+pub struct ProgramContext<'a> {
+    pub file: &'a std::fs::File,
+    pub output_dir: &'a str,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -39,130 +45,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
- 
-    if path.is_dir() {
-        if formats::samsung_old::is_samsung_old_dir(&path) {
-            println!("Samsung old firmware dir detected!\n");
-            formats::samsung_old::extract_samsung_old(&path, &output_path)?
-        } else {
-            println!("Input format not recognized!");
-        }
-    } else {
-        let file = File::open(path)?;
-        if formats::sddl_sec::is_sddl_sec_file(&file) {
-            println!("SDDL.SEC file detected!");
-            formats::sddl_sec::extract_sddl_sec(&file, &output_path)?;
-        } 
-        else if formats::invincible_image::is_invincible_image_file(&file) {
-            println!("INVINCIBLE_IMAGE file detected!");
-            formats::invincible_image::extract_invincible_image(&file, &output_path)?;
-        } 
-        else if formats::msd10::is_msd10_file(&file) {
-            println!("MSD10 file detected!");
-            formats::msd10::extract_msd10(&file, &output_path)?;
-        } 
-        else if formats::msd11::is_msd11_file(&file) {
-            println!("MSD11 file detected!");
-            formats::msd11::extract_msd11(&file, &output_path)?;
-        } 
-        else if formats::nvt_timg::is_nvt_timg_file(&file) {
-            println!("Novatek TIMG file detected!");
-            formats::nvt_timg::extract_nvt_timg(&file, &output_path)?;
-        }
-        else if formats::bdl::is_bdl_file(&file) {
-            println!("BDL file detected!");
-            formats::bdl::extract_bdl(&file, &output_path)?;
-        }
-        else if formats::android_ota_payload::is_android_ota_payload_file(&file) {
-            println!("Android OTA payload file detected!");
-            formats::android_ota_payload::extract_android_ota_payload(&file, &output_path)?;
-        }
-        else if formats::novatek::is_novatek_file(&file) {
-            println!("Novatek file detected!");
-            formats::novatek::extract_novatek(&file, &output_path)?;
-        } 
-        else if formats::slp::is_slp_file(&file) {
-            println!("SLP file detected!");
-            formats::slp::extract_slp(&file, &output_path)?;
-        } 
-        else if formats::epk1::is_epk1_file(&file) {
-            println!("EPK1 file detected!");
-            formats::epk1::extract_epk1(&file, &output_path)?;
-        }
-        else if formats::epk2b::is_epk2b_file(&file) {
-            println!("EPK2B file detected!");
-            formats::epk2b::extract_epk2b(&file, &output_path)?;
-        }
-        //epk with encrypted header - it can be epk2 or epk3 so we need to check
-        else if formats::epk::is_epk_file(&file) {
-            println!("EPK file detected!");
-            formats::epk::extract_epk(&file, &output_path)?;
-        }
-        //epk2 with unencrypted header
-        else if formats::epk2::is_epk2_file(&file) {
-            println!("EPK2 file detected!");
-            formats::epk2::extract_epk2(&file, &output_path)?;
-        }
-        else if formats::ruf::is_ruf_file(&file) {
-            println!("RUF file detected!");
-            formats::ruf::extract_ruf(&file, &output_path)?;
-        }
-        else if formats::funai_upg::is_funai_upg_file(&file) {
-            println!("Funai UPG file detected!");
-            formats::funai_upg::extract_funai_upg(&file, &output_path)?;
-        }
-        else if formats::pfl_upg::is_pfl_upg_file(&file) {
-            println!("PFL UPG file detected!");
-            formats::pfl_upg::extract_pfl_upg(&file, &output_path)?;
-        }
-        else if formats::amlogic::is_amlogic_file(&file) {
-            println!("Amlogic image file detected!");
-            formats::amlogic::extract_amlogic(&file, &output_path)?;
-        }
-        else if let Some(result) = formats::pana_dvd::is_pana_dvd_file(&file)? {
-            println!("PANA_DVD file detected!");
-            formats::pana_dvd::extract_pana_dvd(&file, &output_path, result)?;
-        }
-        else if formats::pup::is_pup_file(&file) {
-            println!("PUP file detected!");
-            formats::pup::extract_pup(&file, &output_path)?;
-        }
-        else if formats::sony_bdp::is_sony_bdp_file(&file) {
-            println!("Sony BDP file detected!");
-            formats::sony_bdp::extract_sony_bdp(&file, &output_path)?;
-        }
-        else if formats::rvp::is_rvp_file(&file) {
-            println!("RVP/MVP file detected!");
-            formats::rvp::extract_rvp(&file, &output_path)?;
-        }
-        else if formats::mstar::is_mstar_file(&file) {
-            println!("Mstar upgrade file detected!");
-            formats::mstar::extract_mstar(&file, &output_path)?;
-        }  
-        else if formats::roku::is_roku_file(&file) {
-            println!("Roku file detected!");
-            formats::roku::extract_roku(&file, &output_path)?;
-        }
-        else if let Some(result) = formats::mtk_pkg::is_mtk_pkg_file(&file)? {
-            println!("MTK PKG file detected!");
-            formats::mtk_pkg::extract_mtk_pkg(&file, &output_path, result)?;
-        } 
-        else if formats::mtk_pkg_old::is_mtk_pkg_old_file(&file) {
-            println!("MTK PKG (Old) file detected!");
-            formats::mtk_pkg_old::extract_mtk_pkg_old(&file, &output_path)?;
-        }
-        else if let Some(result) = formats::mtk_pkg_new::is_mtk_pkg_new_file(&file)? {
-            println!("MTK PKG (New) file detected!");
-            formats::mtk_pkg_new::extract_mtk_pkg_new(&file, &output_path, result)?;
-        }
-        else if let Some(result) = formats::mtk_bdp::is_mtk_bdp_file(&file)? {
-            println!("MTK BDP file detected!");
-            formats::mtk_bdp::extract_mtk_bdp(&file, &output_path, result)?;
-        }
-        else {
-            println!("Input format not recognized!");
+
+    let file = File::open(path)?;
+    let program_context: ProgramContext = ProgramContext { file: &file, output_dir: &output_path };  
+    let formats: Vec<Format> = get_registry();
+
+    for format in formats {
+        if let Some(ctx) = (format.detect_func)(&program_context)? {
+            println!("{} detected!", format.name);
+            (format.run_func)(&program_context, Some(ctx))?;
+            return Ok(());
         }
     }
 
+    println!("\nInput format not recognized!");
     Ok(())
 }

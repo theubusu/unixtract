@@ -1,3 +1,9 @@
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "ruf", detect_func: is_ruf_file, run_func: extract_ruf }
+}
+
 use std::path::{Path};
 use std::fs::{self, File, OpenOptions};
 use binrw::{BinRead, BinReaderExt};
@@ -69,24 +75,25 @@ impl RufEntry {
     }
 }
 
-pub fn is_ruf_file(file: &File) -> bool {
-    let header = common::read_file(&file, 0, 3).expect("Failed to read from file.");
-    if header == b"RUF" {
-        true
+pub fn is_ruf_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let header = common::read_file(app_ctx.file, 0, 6)?;
+    if header == b"RUF\x00\x00\x00" {
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
-pub fn extract_ruf(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_ruf(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     let header: RufHeader = file.read_be()?;
     if header.is_dual_ruf() {
         println!("\nDual RUF detected! Extracting 1st RUF...\n");
-        actually_extract_ruf(&file, &format!("{}/RUF_1", output_folder), 0)?;
+        actually_extract_ruf(file, &format!("{}/RUF_1", app_ctx.output_dir), 0)?;
         println!("\nExtracting 2nd RUF...\n");
-        actually_extract_ruf(&file, &format!("{}/RUF_2", output_folder), 41943088)?;
+        actually_extract_ruf(file, &format!("{}/RUF_2", app_ctx.output_dir), 41943088)?;
     } else {
-        actually_extract_ruf(&file, &output_folder, 0)?;
+        actually_extract_ruf(file, app_ctx.output_dir, 0)?;
     }
 
     println!("\nExtraction finished!");

@@ -1,4 +1,10 @@
-use std::fs::{self, File, OpenOptions};
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "android_ota_payload", detect_func: is_android_ota_payload_file, run_func: extract_android_ota_payload }
+}
+
+use std::fs::{self, OpenOptions};
 use std::path::{Path};
 use std::io::{Write};
 use binrw::{BinRead, BinReaderExt};
@@ -16,16 +22,17 @@ struct Header {
     metadata_signature_size: u32,
 }
 
-pub fn is_android_ota_payload_file(file: &File) -> bool {
-    let header = common::read_file(&file, 0, 4).expect("Failed to read from file.");
+pub fn is_android_ota_payload_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let header = common::read_file(app_ctx.file, 0, 4)?;
     if header == b"CrAU" {
-        true
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
-pub fn extract_android_ota_payload(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_android_ota_payload(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     let header: Header = file.read_be()?;
     println!("File info:\nFormat version: {}\nManifest size: {}", header.file_format_version, header.manifest_size);
 
@@ -75,8 +82,8 @@ pub fn extract_android_ota_payload(mut file: &File, output_folder: &str) -> Resu
                 break
             }
 
-            fs::create_dir_all(&output_folder)?;
-            let output_path = Path::new(&output_folder).join(format!("{}.bin", partition.partition_name));
+            fs::create_dir_all(app_ctx.output_dir)?;
+            let output_path = Path::new(app_ctx.output_dir).join(format!("{}.bin", partition.partition_name));
             let mut out_file = OpenOptions::new().append(true).create(true).open(output_path)?;
             out_file.write_all(&out_data)?;
         }

@@ -1,4 +1,9 @@
-use std::fs::File;
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "rvp", detect_func: is_rvp_file, run_func: extract_rvp }
+}
+
 use std::path::Path;
 use std::fs::{self, OpenOptions};
 use std::io::{Write, Read, Cursor, Seek};
@@ -13,26 +18,29 @@ fn decrypt_xor(data: &[u8]) -> Vec<u8> {
         .collect()
 }
 
-pub fn is_rvp_file(mut file: &File) -> bool {
+pub fn is_rvp_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     //MVP
-    let header = common::read_file(&file, 0, 4).expect("Failed to read from file.");
+    let header = common::read_file(file, 0, 4)?;
     if header == b"UPDT" {
-        file.seek(std::io::SeekFrom::Start(36)).expect("Failed to seek"); //skip rest of header
-        return true;
+        file.seek(std::io::SeekFrom::Start(36))?; //skip rest of header // NOT GOOD PRACTICE SHOULD BE REMOVED
+        return Ok(Some(Box::new(())))
     }
 
     //RVP
-    let bytes = common::read_file(&file, 16, 18).expect("Failed to read from file.");
+    let bytes = common::read_file(file, 16, 18)?;
     for (_i, &b) in bytes.iter().enumerate().step_by(2) {
         if b != 0xA3 {
-            return false;
+            return Ok(None);
         }
     }
-    file.seek(std::io::SeekFrom::Start(64)).expect("Failed to seek"); //skip rest of header
-    true
+    
+    file.seek(std::io::SeekFrom::Start(64))?; //skip rest of header // NOT GOOD PRACTICE SHOULD BE REMOVED
+    Ok(Some(Box::new(())))
 }
 
-pub fn extract_rvp(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_rvp(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     let mut obf_data = Vec::new();  //we sadly cannot deXOR on the fly because of its 32 byte pattern
     file.read_to_end(&mut obf_data)?;
     println!("DeXORing data..");
@@ -114,9 +122,9 @@ pub fn extract_rvp(mut file: &File, output_folder: &str) -> Result<(), Box<dyn s
 
         println!("Size: {}", size);
         let data = common::read_exact(&mut data_reader, size as usize)?;
-        let output_path = Path::new(&output_folder).join(if name=="" {format!("{}.bin", i)} else {format!("{}_{}.bin", i, name)});
+        let output_path = Path::new(app_ctx.output_dir).join(if name=="" {format!("{}.bin", i)} else {format!("{}_{}.bin", i, name)});
 
-        fs::create_dir_all(&output_folder)?;
+        fs::create_dir_all(app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;      
         out_file.write_all(&data)?;
 

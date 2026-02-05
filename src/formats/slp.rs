@@ -1,5 +1,11 @@
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "slp", detect_func: is_slp_file, run_func: extract_slp }
+}
+
 use std::path::{Path};
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, OpenOptions};
 use std::io::{Write, Seek, SeekFrom};
 use binrw::{BinRead, BinReaderExt};
 
@@ -46,16 +52,17 @@ struct EntryNew {
     #[br(count = 12)] _unk2: Vec<u8>,
 }
 
-pub fn is_slp_file(file: &File) -> bool {
-    let header = common::read_file(&file, 0, 4).expect("Failed to read from file.");
+pub fn is_slp_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let header = common::read_file(app_ctx.file, 0, 4)?;
     if header == b"SLP\x00" {
-        true
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
-pub fn extract_slp(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_slp(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     let header: Header = file.read_le()?;
 
     println!("File info:\nModel: {}\nVersion: {}\nFirmware: {}\nNew type: {}\n",
@@ -92,9 +99,9 @@ pub fn extract_slp(mut file: &File, output_folder: &str) -> Result<(), Box<dyn s
         file.seek(SeekFrom::Start(entry.offset.into()))?;
         let data = common::read_exact(&mut file, entry.size as usize)?;
 
-        let output_path = Path::new(&output_folder).join(format!("{}.bin", i));
+        let output_path = Path::new(app_ctx.output_dir).join(format!("{}.bin", i));
 
-        fs::create_dir_all(&output_folder)?;
+        fs::create_dir_all(app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new()
             .write(true)
             .create(true)

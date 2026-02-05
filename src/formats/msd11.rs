@@ -1,4 +1,10 @@
-use std::fs::{self, File, OpenOptions};
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "msd11", detect_func: is_msd11_file, run_func: extract_msd11 }
+}
+
+use std::fs::{self, OpenOptions};
 use std::path::{Path};
 use std::io::{Write};
 use binrw::{BinRead, BinReaderExt};
@@ -42,16 +48,17 @@ struct Section {
     size: u64,
 }
 
-pub fn is_msd11_file(file: &File) -> bool {
-    let header = common::read_file(&file, 0, 6).expect("Failed to read from file.");
+pub fn is_msd11_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let header = common::read_file(app_ctx.file, 0, 6)?;
     if header == b"MSDU11" {
-        true
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
-pub fn extract_msd11(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_msd11(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     let header: FileHeader = file.read_le()?;
     println!("\nNumber of sections: {}", header.section_count);
 
@@ -126,8 +133,8 @@ pub fn extract_msd11(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
             out_data = stored_data;
         }
 
-        let output_path = Path::new(&output_folder).join(item.name.clone());
-        fs::create_dir_all(&output_folder)?;
+        let output_path = Path::new(app_ctx.output_dir).join(item.name.clone());
+        fs::create_dir_all(app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;   
         out_file.write_all(&out_data)?;
 

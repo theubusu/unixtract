@@ -1,5 +1,11 @@
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "pup", detect_func: is_pup_file, run_func: extract_pup }
+}
+
 use std::path::{Path};
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, OpenOptions};
 use binrw::{BinRead, BinReaderExt};
 use std::io::{Write, Seek, SeekFrom};
 
@@ -50,16 +56,17 @@ struct BlockEntry {
     size: u32,
 }
 
-pub fn is_pup_file(file: &File) -> bool {
-    let header = common::read_file(&file, 0, 4).expect("Failed to read from file.");
+pub fn is_pup_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let header = common::read_file(app_ctx.file, 0, 4)?;
     if header == b"\x4F\x15\x3D\x1D" || header == b"\x54\x14\xF5\xEE" { //ps4, ps5
-        true
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
-pub fn extract_pup(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_pup(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     let header: Header = file.read_le()?;
 
     println!("File info:\nFile size: {}\nEntry count: {}",
@@ -132,9 +139,9 @@ pub fn extract_pup(mut file: &File, output_folder: &str) -> Result<(), Box<dyn s
                     out_data = data;
                 }
 
-                let output_path = Path::new(&output_folder).join(format!("{}.bin", entry.id()));
+                let output_path = Path::new(app_ctx.output_dir).join(format!("{}.bin", entry.id()));
             
-                fs::create_dir_all(&output_folder)?;
+                fs::create_dir_all(app_ctx.output_dir)?;
                 let mut out_file = OpenOptions::new()
                     .append(true)
                     .create(true)
@@ -158,9 +165,9 @@ pub fn extract_pup(mut file: &File, output_folder: &str) -> Result<(), Box<dyn s
                 out_data = data;
             }
 
-            let output_path = Path::new(&output_folder).join(format!("{}.bin", entry.id()));
+            let output_path = Path::new(app_ctx.output_dir).join(format!("{}.bin", entry.id()));
             
-            fs::create_dir_all(&output_folder)?;
+            fs::create_dir_all(app_ctx.output_dir)?;
             let mut out_file = OpenOptions::new()
                 .write(true)
                 .create(true)

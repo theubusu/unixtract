@@ -1,5 +1,11 @@
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "mtk_pkg_new", detect_func: is_mtk_pkg_new_file, run_func: extract_mtk_pkg_new }
+}
+
 use std::path::Path;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, OpenOptions};
 use std::io::{Write, Cursor, Seek, SeekFrom};
 use binrw::{BinRead, BinReaderExt};
 
@@ -64,34 +70,36 @@ impl PartEntry {
 
 static HEADER_SIZE: usize = 0x170;
 
-pub fn is_mtk_pkg_new_file(file: &File) -> Result<Option<MtkPkgNewContext>, Box<dyn std::error::Error>> {
-    let encrypted_header = common::read_file(&file, 0, HEADER_SIZE)?;
+pub fn is_mtk_pkg_new_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let encrypted_header = common::read_file(app_ctx.file, 0, HEADER_SIZE)?;
     for (key_hex, iv_hex, name) in keys::MTK_PKG_CUST {
         let key_array: [u8; 16] = hex::decode(key_hex)?.as_slice().try_into()?;
         let iv_array: [u8; 16] = hex::decode(iv_hex)?.as_slice().try_into()?;
         let try_decrypt = decrypt_aes128_cbc_nopad(&encrypted_header, &key_array, &iv_array)?;
 
         if &try_decrypt[4..12] == MTK_HEADER_MAGIC {    
-            return Ok(Some(MtkPkgNewContext {
+            return Ok(Some(Box::new(MtkPkgNewContext {
                 matching_key_name: name.to_string(),
                 matching_key_key: key_array,
                 matching_key_iv: iv_array,
                 decrypted_header: try_decrypt
-            }));
+            })));
         }
     }
 
     Ok(None)
 }
 
-pub fn extract_mtk_pkg_new(mut file: &File, output_folder: &str, context: MtkPkgNewContext) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_mtk_pkg_new(app_ctx: &ProgramContext, ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
+    let ctx = ctx.and_then(|c: Box<dyn Any>| c.downcast::<MtkPkgNewContext>().ok()).ok_or("Context is invalid or missing!")?;
     let file_size = file.metadata()?.len();
 
     //the key was founf, and header was decrypted at detection stage so we can reuse
-    println!("Using key {}", context.matching_key_name);
-    let key_array = context.matching_key_key;
-    let iv_array = context.matching_key_iv;
-    let header = context.decrypted_header;
+    println!("Using key {}", ctx.matching_key_name);
+    let key_array = ctx.matching_key_key;
+    let iv_array = ctx.matching_key_iv;
+    let header = ctx.decrypted_header;
 
     let mut hdr_reader = Cursor::new(header); 
     let hdr: Header = hdr_reader.read_le()?;
@@ -147,13 +155,13 @@ pub fn extract_mtk_pkg_new(mut file: &File, output_folder: &str, context: MtkPkg
         };
         
         //for compressed part create temp file
-        let output_path = Path::new(&output_folder).join(part_entry.name() + if part_entry.is_compressed() {".lzhs"} else {".bin"});
-        fs::create_dir_all(&output_folder)?;
+        let output_path = Path::new(app_ctx.output_dir).join(part_entry.name() + if part_entry.is_compressed() {".lzhs"} else {".bin"});
+        fs::create_dir_all(app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new().write(true).read(true)/* for lzhs */.create(true).open(&output_path)?;
         out_file.write_all(&out_data[48 + extra_header_len as usize..])?;
 
         if part_entry.is_compressed() {
-            let lzhs_out_path = Path::new(&output_folder).join(part_entry.name() + ".bin");
+            let lzhs_out_path = Path::new(app_ctx.output_dir).join(part_entry.name() + ".bin");
             match decompress_lzhs_fs_file2file(&out_file, lzhs_out_path) {
                 Ok(()) => {
                     println!("-- Decompressed Successfully!");

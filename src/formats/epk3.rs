@@ -1,4 +1,7 @@
-use std::fs::{self, File, OpenOptions};
+use std::any::Any;
+use crate::{ProgramContext};
+
+use std::fs::{self, OpenOptions};
 use std::path::{Path};
 use std::io::{Write, Seek, SeekFrom, Cursor};
 use binrw::{BinRead, BinReaderExt};
@@ -70,7 +73,8 @@ impl PkgInfoEntry {
     }
 }
 
-pub fn extract_epk3(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_epk3(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     file.seek(SeekFrom::Start(0))?;
     let stored_header = common::read_exact(&mut file, 1712)?;
     let header: Vec<u8>;
@@ -153,8 +157,8 @@ pub fn extract_epk3(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
             let encrypted_data = common::read_exact(&mut file, entry.segment_size as usize + extra_segment_size)?;
             let out_data = decrypt_aes_ecb_auto(matching_key_bytes, &encrypted_data)?;
 
-            let output_path = Path::new(&output_folder).join(format!("{}.bin", entry.package_name()));
-            fs::create_dir_all(&output_folder)?;
+            let output_path = Path::new(app_ctx.output_dir).join(format!("{}.bin", entry.package_name()));
+            fs::create_dir_all(app_ctx.output_dir)?;
             let mut out_file = OpenOptions::new().append(true).create(true).open(output_path)?;
             out_file.write_all(&out_data[extra_segment_size..])?;
 

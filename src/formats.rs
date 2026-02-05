@@ -1,5 +1,14 @@
+use std::any::Any;
+use crate::ProgramContext;
+
+pub struct Format {
+    pub name: &'static str,
+    pub detect_func: fn(&ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>>,
+    pub run_func: fn(&ProgramContext, Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>>,
+}
+
 pub mod mstar;
-pub mod samsung_old;
+//pub mod samsung_old; not sure what to do with this
 pub mod nvt_timg;
 pub mod pfl_upg;
 pub mod sddl_sec;
@@ -32,3 +41,35 @@ pub mod mtk_pkg;
 pub mod mtk_pkg_old;
 pub mod mtk_pkg_new;
 pub mod mtk_bdp;
+
+pub fn get_registry() -> Vec<Format> {
+    return vec![
+        crate::formats::amlogic::format(),
+        crate::formats::epk1::format(),
+        crate::formats::android_ota_payload::format(),
+        crate::formats::bdl::format(),
+        crate::formats::epk2::format(),
+        crate::formats::epk::format(),
+        crate::formats::epk2b::format(),
+        crate::formats::funai_upg::format(),
+        crate::formats::invincible_image::format(),
+        crate::formats::msd10::format(),
+        crate::formats::msd11::format(),
+        crate::formats::mstar::format(),
+        crate::formats::novatek::format(),
+        crate::formats::nvt_timg::format(),
+        crate::formats::pfl_upg::format(),
+        crate::formats::pup::format(),
+        crate::formats::roku::format(),
+        crate::formats::ruf::format(),
+        crate::formats::rvp::format(),
+        crate::formats::sddl_sec::format(),
+        crate::formats::slp::format(),
+        crate::formats::mtk_pkg_old::format(),
+        crate::formats::mtk_pkg::format(),
+        crate::formats::sony_bdp::format(),
+        crate::formats::mtk_pkg_new::format(),
+        crate::formats::pana_dvd::format(),
+        crate::formats::mtk_bdp::format(),
+    ]
+}

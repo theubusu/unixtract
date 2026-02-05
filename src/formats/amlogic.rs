@@ -1,4 +1,9 @@
-use std::fs::File;
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "amlogic", detect_func: is_amlogic_file, run_func: extract_amlogic }
+}
+
 use std::path::{Path};
 use std::fs::{self, OpenOptions};
 use std::io::{Write, Seek, SeekFrom};
@@ -44,16 +49,17 @@ impl ItemEntry {
     }
 }
 
-pub fn is_amlogic_file(file: &File) -> bool {
-    let header = common::read_file(&file, 8, 4).expect("Failed to read from file.");
+pub fn is_amlogic_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let header = common::read_file(app_ctx.file, 8, 4)?;
     if header == b"\x56\x19\xB5\x27" {
-        true
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
-pub fn extract_amlogic(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_amlogic(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     file.seek(SeekFrom::Start(0))?;
     let header: ImageHeader = file.read_le()?;
 
@@ -85,8 +91,8 @@ pub fn extract_amlogic(mut file: &File, output_folder: &str) -> Result<(), Box<d
             let data = common::read_file(&file, item.offset_in_image, item.item_size as usize)?;
  
             let extension = if item.item_type() == "PARTITION" {"img"} else {&item.item_type()};
-            let output_path = Path::new(&output_folder).join(format!("{}.{}", item.name(), extension));
-            fs::create_dir_all(&output_folder)?;
+            let output_path = Path::new(app_ctx.output_dir).join(format!("{}.{}", item.name(), extension));
+            fs::create_dir_all(app_ctx.output_dir)?;
             
             if item.is_sparse() {
                 println!("- Unsparsing...");

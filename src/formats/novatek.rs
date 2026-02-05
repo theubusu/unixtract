@@ -1,4 +1,9 @@
-use std::fs::File;
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "novatek", detect_func: is_novatek_file, run_func: extract_novatek }
+}
+
 use std::path::Path;
 use std::fs::{self, OpenOptions};
 use std::io::{Write};
@@ -35,16 +40,17 @@ struct PartEntry {
     #[br(count = 16)] _md5_checksum: Vec<u8>,
 }
 
-pub fn is_novatek_file(file: &File) -> bool {
-    let header = common::read_file(&file, 0, 4).expect("Failed to read from file.");
+pub fn is_novatek_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let header = common::read_file(app_ctx.file, 0, 4)?;
     if header == b"NFWB" {
-        true
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
-pub fn extract_novatek(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_novatek(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     let header: Header = file.read_le()?;
 
     println!("File info:\nFirmware name: {}\nVersion: {}.{}\nData size: {}\nPart count: {}",
@@ -63,9 +69,9 @@ pub fn extract_novatek(mut file: &File, output_folder: &str) -> Result<(), Box<d
 
         let data = common::read_file(&file, entry.offset as u64, entry.size as usize)?;
 
-        let output_path = Path::new(&output_folder).join(format!("{}_{}.bin", e_i, entry.id));
+        let output_path = Path::new(app_ctx.output_dir).join(format!("{}_{}.bin", e_i, entry.id));
 
-        fs::create_dir_all(&output_folder)?;
+        fs::create_dir_all(app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new()
             .write(true)
             .create(true)

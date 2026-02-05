@@ -1,4 +1,9 @@
-use std::fs::File;
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "epk2b", detect_func: is_epk2b_file, run_func: extract_epk2b }
+}
+
 use std::path::{Path};
 use std::fs::{self, OpenOptions};
 use std::io::{Write, Seek, SeekFrom};
@@ -51,17 +56,18 @@ struct Pak {
     size : u32,
 }
 
-pub fn is_epk2b_file(file: &File) -> bool {
-    let epk2_magic = common::read_file(&file, 12, 4).expect("Failed to read from file.");
-    let epak_magic = common::read_file(&file, 0, 4).expect("Failed to read from file.");
+pub fn is_epk2b_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let epk2_magic = common::read_file(app_ctx.file, 12, 4)?;
+    let epak_magic = common::read_file(app_ctx.file, 0, 4)?;
     if epak_magic == b"epak" && epk2_magic == b"EPK2" {
-        true
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
-pub fn extract_epk2b(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_epk2b(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     let header: EpkHeader = file.read_le()?;
 
     println!("EPK info -\nData size: {}\nPak count: {}\nOTA ID: {}\nVersion: {:02x?}.{:02x?}.{:02x?}", 
@@ -108,8 +114,8 @@ pub fn extract_epk2b(mut file: &File, output_folder: &str) -> Result<(), Box<dyn
                 pak_header.segment_size
             };
 
-            let output_path = Path::new(&output_folder).join(format!("{}.bin", pak_header.pak_name()));
-            fs::create_dir_all(&output_folder)?;
+            let output_path = Path::new(app_ctx.output_dir).join(format!("{}.bin", pak_header.pak_name()));
+            fs::create_dir_all(app_ctx.output_dir)?;
             let mut out_file = OpenOptions::new().append(true).create(true).open(output_path)?;
             out_file.write_all(&out_data[..segment_limit as usize])?;
 

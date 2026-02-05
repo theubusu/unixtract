@@ -1,4 +1,9 @@
-use std::fs::File;
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "epk1", detect_func: is_epk1_file, run_func: extract_epk1 }
+}
+
 use std::path::{Path};
 use std::fs::{self, OpenOptions};
 use std::io::{Write, Seek, SeekFrom};
@@ -35,17 +40,18 @@ struct Pak {
     size : u32,
 }
 
-pub fn is_epk1_file(file: &File) -> bool {
-    let epk2_magic = common::read_file(&file, 12, 4).expect("Failed to read from file."); //for epk2b
-    let epak_magic = common::read_file(&file, 0, 4).expect("Failed to read from file.");
+pub fn is_epk1_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let epk2_magic = common::read_file(app_ctx.file, 12, 4)?; //for epk2b
+    let epak_magic = common::read_file(app_ctx.file, 0, 4)?;
     if epak_magic == b"epak" && epk2_magic != b"EPK2" {
-        true
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
-pub fn extract_epk1(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_epk1(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     //check type of epk1
     let epk1_type;
     let init_pak_count_bytes = common::read_file(&file, 8, 4)?;
@@ -119,8 +125,8 @@ pub fn extract_epk1(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
 
         let data = common::read_exact(&mut file, pak_header.image_size as usize)?;
 
-        let output_path = Path::new(&output_folder).join(pak_header.pak_name() + ".bin");
-        fs::create_dir_all(&output_folder)?;
+        let output_path = Path::new(app_ctx.output_dir).join(pak_header.pak_name() + ".bin");
+        fs::create_dir_all(app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;        
         out_file.write_all(&data)?;
 

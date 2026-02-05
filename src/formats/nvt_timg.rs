@@ -1,7 +1,12 @@
-use std::str;
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "nvt_timg", detect_func: is_nvt_timg_file, run_func: extract_nvt_timg }
+}
+
 use std::path::{Path};
 use std::io::{Seek, Write};
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, OpenOptions};
 use binrw::{BinRead, BinReaderExt};
 
 use crate::utils::common;
@@ -44,16 +49,17 @@ impl PIMG {
     }
 }
 
-pub fn is_nvt_timg_file(file: &File) -> bool {
-    let header = common::read_file(&file, 0, 4).expect("Failed to read from file.");
+pub fn is_nvt_timg_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let header = common::read_file(app_ctx.file, 0, 4)?;
     if header == b"TIMG" {
-        true
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
-pub fn extract_nvt_timg(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_nvt_timg(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     let file_size = file.metadata()?.len();
     let timg: TIMG = file.read_le()?;
     println!("File info:\nData size: {}", timg.data_size);
@@ -72,7 +78,7 @@ pub fn extract_nvt_timg(mut file: &File, output_folder: &str) -> Result<(), Box<
         println!("\n#{} - {}, Size: {}, Dest: {}, Compression: {}", pimg_i, pimg.name(), pimg.size, pimg.dest_dev(), pimg.comp_type());
 
         let out_data;
-        let output_path = Path::new(&output_folder).join(pimg.name() + ".bin");
+        let output_path = Path::new(app_ctx.output_dir).join(pimg.name() + ".bin");
 
         if pimg.comp_type() == "gzip" && data.starts_with(b"\x1F\x8B") { //additionally check for gzip header, because sometimes its deceptive
             println!("- Decompressing gzip...");
@@ -89,7 +95,7 @@ pub fn extract_nvt_timg(mut file: &File, output_folder: &str) -> Result<(), Box<
             out_data = data;
         }
 
-        fs::create_dir_all(&output_folder)?;
+        fs::create_dir_all(app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new()
             .write(true)
             .create(true)

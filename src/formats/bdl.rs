@@ -1,4 +1,9 @@
-use std::fs::File;
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "bdl", detect_func: is_bdl_file, run_func: extract_bdl }
+}
+
 use std::path::{Path};
 use std::fs::{self, OpenOptions};
 use std::io::{Write, Seek, SeekFrom};
@@ -80,16 +85,17 @@ impl PkgEntry {
     }
 }
 
-pub fn is_bdl_file(file: &File) -> bool {
-    let header = common::read_file(&file, 0, 4).expect("Failed to read from file.");
+pub fn is_bdl_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let header = common::read_file(app_ctx.file, 0, 4)?;
     if header == b"ibdl" {
-        true
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
-pub fn extract_bdl(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_bdl(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     let header: BdlHeader = file.read_le()?;
 
     println!("File info:\nPackage count: {}\nDate: {}\nManufacturer: {}\nModel: {}\nVersion: {}\nInfo: {}",
@@ -116,7 +122,7 @@ pub fn extract_bdl(mut file: &File, output_folder: &str) -> Result<(), Box<dyn s
             pkg_entries.push(pkg_entry);
         }
 
-        let pkg_folder = Path::new(&output_folder).join(pkg_header.name());
+        let pkg_folder = Path::new(app_ctx.output_dir).join(pkg_header.name());
         fs::create_dir_all(&pkg_folder)?;
 
         for (i, pkg_entry) in pkg_entries.iter().enumerate() {

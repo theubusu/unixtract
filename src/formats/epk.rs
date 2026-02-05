@@ -1,30 +1,38 @@
-use std::fs::File;
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "epk", detect_func: is_epk_file, run_func: extract_epk }
+}
 
 use crate::utils::common;
 use crate::formats;
 
-pub fn is_epk_file(file: &File) -> bool {
-    let versions = common::read_file(&file, 1712, 36).expect("Failed to read from file.");
+pub struct EpkContext {
+    epk_version: u8,
+}
 
-    if check_epk_version(&versions).is_some() {
-        true
+pub fn is_epk_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let versions = common::read_file(app_ctx.file, 1712, 36)?;
+
+    if let Some(epk_version) = check_epk_version(&versions) {
+        Ok(Some(Box::new(EpkContext {epk_version})))
     } else {
-        false
+        Ok(None)
     }
 }
 
-fn check_epk_version(versions: &[u8]) -> Option<String> {
+fn check_epk_version(versions: &[u8]) -> Option<u8> {
     //                      _ - 0x00     X - a number    . - a dot
     let epk2_pattern =     "____XXXX.XXXX.XXXX__XX.XX.XXX_______";
     let epk3_pattern =     "____X.X.X___________X.X.X___________";
     let epk3_new_pattern = "____XX.X.X__________XX.X.X__________";
 
     if match_with_pattern(&versions, epk2_pattern) {
-        Some("epk2".to_string())
+        Some(2)
     } else if match_with_pattern(&versions, epk3_pattern) {     
-        Some("epk3".to_string())
+        Some(3)
     } else if match_with_pattern(&versions, epk3_new_pattern) {     
-        Some("epk3".to_string())
+        Some(3)
     }else {
         None
     }
@@ -42,20 +50,21 @@ fn match_with_pattern(data: &[u8], pattern: &str) -> bool {
     true
 }
 
-pub fn extract_epk(file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let versions = common::read_file(&file, 1712, 36)?;
-    let epk_version = check_epk_version(&versions);
+pub fn extract_epk(app_ctx: &ProgramContext, ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let ctx = ctx.and_then(|c| c.downcast::<EpkContext>().ok()).ok_or("Context is invalid or missing!")?;
+
+    let versions = common::read_file(app_ctx.file, 1712, 36)?;
 
     let platform_version = common::string_from_bytes(&versions[4..20]);
     let sdk_version = common::string_from_bytes(&versions[20..36]);
     println!("Platform version: {}\nSDK version: {}", platform_version, sdk_version);
     
-    if epk_version == Some("epk2".to_string()) {
+    if ctx.epk_version == 2 {
         println!("EPK2 detected!\n");
-        formats::epk2::extract_epk2(file, output_folder)?;
-    } else if epk_version == Some("epk3".to_string()) {
+        formats::epk2::extract_epk2(app_ctx, None)?;
+    } else if ctx.epk_version == 3 {
         println!("EPK3 detected!\n");
-        formats::epk3::extract_epk3(file, output_folder)?;
+        formats::epk3::extract_epk3(app_ctx, None)?;
     }
 
     Ok(())

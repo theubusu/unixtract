@@ -1,5 +1,11 @@
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "invincible_image", detect_func: is_invincible_image_file, run_func: extract_invincible_image }
+}
+
 use std::path::{Path};
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, OpenOptions};
 use std::io::{Write, Read, Seek, SeekFrom, Cursor};
 use binrw::{BinRead, BinReaderExt};
 
@@ -56,16 +62,17 @@ impl Entry {
     }
 }
 
-pub fn is_invincible_image_file(file: &File) -> bool {
-    let header = common::read_file(&file, 0, 16).expect("Failed to read from file.");
+pub fn is_invincible_image_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let header = common::read_file(app_ctx.file, 0, 16)?;
     if header == b"INVINCIBLE_IMAGE" {
-        true
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
-pub fn extract_invincible_image(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_invincible_image(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     let header: Header = file.read_le()?;
 
     println!("File info:\nFile Version: {}.{}\nVersion(1): {}\nVersion(2): {}\nVersion(3): {}\nVersion(4): {}\nData size: {}\nData start offset: {}\nKeep data size: {}\nSkip data size: {}\n\nPayload Count: {}",
@@ -113,9 +120,9 @@ pub fn extract_invincible_image(mut file: &File, output_folder: &str) -> Result<
         println!("\n({}/{}) - {}, Size: {}", i, header.payload_count, entry.name(), entry.size);
         let data = common::read_exact(&mut data_reader, entry.size as usize)?;
 
-        let output_path = Path::new(&output_folder).join(entry.name() + ".bin");
+        let output_path = Path::new(app_ctx.output_dir).join(entry.name() + ".bin");
 
-        fs::create_dir_all(&output_folder)?;
+        fs::create_dir_all(app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new()
             .write(true)
             .create(true)

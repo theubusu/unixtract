@@ -1,4 +1,10 @@
-use std::fs::{self, File, OpenOptions};
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "roku", detect_func: is_roku_file, run_func: extract_roku }
+}
+
+use std::fs::{self, OpenOptions};
 use std::path::Path;
 use std::io::{Write, Seek, Read, Cursor};
 use tar::Archive;
@@ -55,18 +61,19 @@ impl ImageHeader {
     }
 }
 
-pub fn is_roku_file(file: &File) -> bool {
-    let header = common::read_file(&file, 0, 32).expect("Failed to read from file.");
-    let try_decrypt_header = decrypt_aes128_cbc_nopad(&header, &FILE_KEY, &FILE_IV).expect("Decryption error!");
+pub fn is_roku_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let header = common::read_file(app_ctx.file, 0, 32)?;
+    let try_decrypt_header = decrypt_aes128_cbc_nopad(&header, &FILE_KEY, &FILE_IV)?;
 
     if try_decrypt_header.starts_with(b"manifest\x00\x00\x00\x00\x00\x00\x00\x00") {
-        true
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
-pub fn extract_roku(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_roku(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     let mut encrypted_data = Vec::new();
     file.read_to_end(&mut encrypted_data)?;
 
@@ -109,7 +116,7 @@ pub fn extract_roku(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
                         common::read_exact(&mut image_reader, image.size1 as usize - image.data_start_offset as usize)?
                     };
 
-                    let folder_path = Path::new(&output_folder).join(&path);
+                    let folder_path = Path::new(app_ctx.output_dir).join(&path);
                     let output_path = Path::new(&folder_path).join(format!("{}_{}.bin", i, image.type_string()));
 
                     fs::create_dir_all(&folder_path)?;
@@ -123,9 +130,9 @@ pub fn extract_roku(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
 
             } else {
                 println!("\nOther/Unknown file: {:?}", path);
-                let output_path = Path::new(&output_folder).join(&path);
+                let output_path = Path::new(app_ctx.output_dir).join(&path);
 
-                fs::create_dir_all(&output_folder)?;
+                fs::create_dir_all(app_ctx.output_dir)?;
                 let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
                 out_file.write_all(&contents)?;
 

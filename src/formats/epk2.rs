@@ -1,4 +1,10 @@
-use std::fs::{self, File, OpenOptions};
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "epk2", detect_func: is_epk2_file, run_func: extract_epk2 }
+}
+
+use std::fs::{self, OpenOptions};
 use std::path::{Path};
 use std::io::{Write, Seek, SeekFrom, Cursor};
 use binrw::{BinRead, BinReaderExt};
@@ -65,16 +71,17 @@ struct Pak {
     name: String,
 }
 
-pub fn is_epk2_file(file: &File) -> bool {
-    let header = common::read_file(&file, 128, 4).expect("Failed to read from file.");
+pub fn is_epk2_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let header = common::read_file(app_ctx.file, 128, 4)?;
     if header == b"epak" {
-        true
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
-pub fn extract_epk2(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_epk2(app_ctx: &ProgramContext, _: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     let _header_signature = common::read_exact(&mut file, SIGNATURE_SIZE as usize)?;
 
     let stored_header = common::read_exact(&mut file, 1584)?; //max header size
@@ -184,8 +191,8 @@ pub fn extract_epk2(mut file: &File, output_folder: &str) -> Result<(), Box<dyn 
             let segment_data = common::read_exact(&mut file, actual_segment_size as usize)?;
             let out_data = decrypt_aes_ecb_auto(&matching_key_bytes, &segment_data)?;
 
-            let output_path = Path::new(&output_folder).join(format!("{}.bin", pak.name));
-            fs::create_dir_all(&output_folder)?;
+            let output_path = Path::new(app_ctx.output_dir).join(format!("{}.bin", pak.name));
+            fs::create_dir_all(app_ctx.output_dir)?;
             let mut out_file = OpenOptions::new().append(true).create(true).open(output_path)?;
             out_file.write_all(&out_data)?;
 

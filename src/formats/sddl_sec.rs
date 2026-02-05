@@ -1,7 +1,12 @@
 //sddl_dec 5.0
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "sddl_sec", detect_func: is_sddl_sec_file, run_func: extract_sddl_sec }
+}
 
 use std::path::{Path, PathBuf};
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, OpenOptions};
 use std::io::{Cursor, Seek, SeekFrom, Write};
 use binrw::{BinRead, BinReaderExt};
 
@@ -98,13 +103,13 @@ static DEC_IV: [u8; 16] = [
     0xCD, 0x88, 0x38, 0xC4, 0xB9, 0x0C, 0x76, 0x66,
 ];
 
-pub fn is_sddl_sec_file(file: &File) -> bool {
-    let header = common::read_file(&file, 0, 32).expect("Failed to read from file.");
+pub fn is_sddl_sec_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let header = common::read_file(app_ctx.file, 0, 32)?;
     let deciph_header = decipher(&header);
     if deciph_header.starts_with(b"\x11\x22\x33\x44") {
-        true
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
@@ -150,7 +155,8 @@ fn decipher(s: &[u8]) -> Vec<u8> {
     out
 }
 
-pub fn extract_sddl_sec(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_sddl_sec(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     let mut hdr_reader = Cursor::new(decipher(&common::read_exact(&mut file, 32)?));
     let hdr: SddlSecHeader = hdr_reader.read_be()?;
 
@@ -168,10 +174,10 @@ pub fn extract_sddl_sec(mut file: &File, output_folder: &str) -> Result<(), Box<
         let data = common::read_exact(&mut file, entry_header.size() as usize)?;
         let dec_data = decrypt_aes128_cbc_pcks7(&data, &DEC_KEY, &DEC_IV)?;
 
-        fs::create_dir_all(&output_folder)?;
+        fs::create_dir_all(app_ctx.output_dir)?;
         //detect the file type based on the counts of each file
         if i == 0 { //SDIT.FDI file
-            let output_path = Path::new(&output_folder).join(entry_header.name());
+            let output_path = Path::new(app_ctx.output_dir).join(entry_header.name());
             let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
             out_file.write_all(&dec_data)?;
             println!("-- Saved file!");
@@ -210,11 +216,11 @@ pub fn extract_sddl_sec(mut file: &File, output_folder: &str) -> Result<(), Box<
                 let file_name = common::string_from_bytes(&file_name_bytes);
                 println!("--- File name: {}", file_name);
 
-                let out_folder_path = Path::new(&output_folder).join(source_name);
+                let out_folder_path = Path::new(app_ctx.output_dir).join(source_name);
                 fs::create_dir_all(&out_folder_path)?;
                 output_path = Path::new(&out_folder_path).join(file_name);
             } else {
-                output_path = Path::new(&output_folder).join(format!("{}.bin", source_name));
+                output_path = Path::new(app_ctx.output_dir).join(format!("{}.bin", source_name));
             }
 
             let data = common::read_exact(&mut content_reader, content_header.size as usize)?;

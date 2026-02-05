@@ -1,4 +1,9 @@
-use std::fs::File;
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "funai_upg", detect_func: is_funai_upg_file, run_func: extract_funai_upg }
+}
+
 use std::path::Path;
 use std::fs::{self, OpenOptions};
 use std::io::{Write};
@@ -20,16 +25,17 @@ struct Entry {
     _unk: u16,
 }
 
-pub fn is_funai_upg_file(file: &File) -> bool {
-    let header = common::read_file(&file, 0, 6).expect("Failed to read from file.");
+pub fn is_funai_upg_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let header = common::read_file(app_ctx.file, 0, 6)?;
     if header == b"UPG\x00\x00\x00" {
-        true
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
-pub fn extract_funai_upg(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_funai_upg(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     let header: Header = file.read_le()?;
     println!("File info:\nFile size: {}\nEntry count: {}", header.file_size, header.entry_count);
 
@@ -45,9 +51,9 @@ pub fn extract_funai_upg(mut file: &File, output_folder: &str) -> Result<(), Box
             println!("Descriptor entry info:\n{}", entry_string);
         }
 
-        let output_path = Path::new(&output_folder).join(format!("{}_{}.bin", i + 1, entry.entry_type));
+        let output_path = Path::new(app_ctx.output_dir).join(format!("{}_{}.bin", i + 1, entry.entry_type));
 
-        fs::create_dir_all(&output_folder)?;
+        fs::create_dir_all(app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
         out_file.write_all(&data)?;
 

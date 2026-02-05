@@ -1,4 +1,10 @@
-use std::fs::{self, File, OpenOptions};
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "mstar", detect_func: is_mstar_file, run_func: extract_mstar }
+}
+
+use std::fs::{self, OpenOptions};
 use std::path::{Path};
 use std::io::{Write};
 
@@ -7,19 +13,14 @@ use crate::utils::compression::{decompress_lzma, decompress_lz4};
 use crate::utils::lzop::{unlzop_to_file};
 use crate::utils::sparse::{unsparse_to_file};
 
-//change whether the "userdata" partition is skipped
-// this is because the userdata partition is sometimes enourmous sizes like 27gb, and it is empty anyways
-// if you want to extract "userdata" you can disable the option
-static CONFIG_SKIP_USERDATA: bool = true;
-
-pub fn is_mstar_file(file: &File) -> bool {
-    let header = common::read_file(&file, 0, 32768).expect("Failed to read from file.");
+pub fn is_mstar_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let header = common::read_file(app_ctx.file, 0, 32768)?;
     let header_string = String::from_utf8_lossy(&header);
 
     if header_string.contains("filepartload"){
-        true
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
@@ -31,7 +32,8 @@ fn parse_number(s: &str) -> Option<u64> {
     }
 }
 
-pub fn extract_mstar(file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_mstar(app_ctx: &ProgramContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let file = app_ctx.file;
 
     let mut script = common::read_file(&file, 0, 32768)?;
 
@@ -132,12 +134,10 @@ pub fn extract_mstar(file: &File, output_folder: &str) -> Result<(), Box<dyn std
 
             if partname == "unknown" {
                 println!("- Unknown destination, skipping!");
-            } else if partname == "userdata" && CONFIG_SKIP_USERDATA {
-                println!("- Skipping userdata according to config!")
             } else {
                 let data = common::read_file(&file, offset, size.try_into().unwrap())?;
                 let out_data; 
-                let output_path = Path::new(&output_folder).join(format!("{}.bin", partname));
+                let output_path = Path::new(app_ctx.output_dir).join(format!("{}.bin", partname));
 
                 if compression == "lzma" {
                     println!("- Decompressing LZMA...");
@@ -166,7 +166,7 @@ pub fn extract_mstar(file: &File, output_folder: &str) -> Result<(), Box<dyn std
                     out_data = data;
                 }
 
-                fs::create_dir_all(&output_folder)?;
+                fs::create_dir_all(app_ctx.output_dir)?;
                 let mut out_file = OpenOptions::new().append(true).create(true).open(output_path)?;
                 out_file.write_all(&out_data)?;
                 println!("-- Saved file!");

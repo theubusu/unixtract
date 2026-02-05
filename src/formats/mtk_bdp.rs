@@ -1,4 +1,9 @@
-use std::fs::File;
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "mtk_bdp", detect_func: is_mtk_bdp_file, run_func: extract_mtk_bdp }
+}
+
 use std::path::{Path};
 use std::fs::{self, OpenOptions};
 use std::io::{Seek, SeekFrom, Read, Write};
@@ -72,7 +77,8 @@ fn find_bytes(data: &[u8], pattern: &[u8]) -> Option<usize> {
     data.windows(pattern.len()).position(|window| window == pattern)
 }
 
-pub fn is_mtk_bdp_file(mut file: &File) -> Result<Option<MtkBdpContext>, Box<dyn std::error::Error>> {
+pub fn is_mtk_bdp_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
     let file_size = file.metadata()?.len();
     let mut data = Vec::new();
 
@@ -83,14 +89,16 @@ pub fn is_mtk_bdp_file(mut file: &File) -> Result<Option<MtkBdpContext>, Box<dyn
     file.read_to_end(&mut data)?;
 
     if let Some(pos) = find_bytes(&data, &PITIT_MAGIC) {
-        Ok(Some(MtkBdpContext {pitit_offset: start_offset + pos as u64}))
+        Ok(Some(Box::new(MtkBdpContext {pitit_offset: start_offset + pos as u64})))
     } else {
         Ok(None)
     }
 }
 
-pub fn extract_mtk_bdp(mut file: &File, output_folder: &str, context: MtkBdpContext) -> Result<(), Box<dyn std::error::Error>> {
-    let offset = context.pitit_offset;
+pub fn extract_mtk_bdp(app_ctx: &ProgramContext, ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
+    let ctx = ctx.and_then(|c: Box<dyn Any>| c.downcast::<MtkBdpContext>().ok()).ok_or("Context is invalid or missing!")?;
+    let offset = ctx.pitit_offset;
     println!("\nReading PITIT at: {}", offset);
 
     file.seek(SeekFrom::Start(offset + 8))?;
@@ -173,8 +181,8 @@ pub fn extract_mtk_bdp(mut file: &File, output_folder: &str, context: MtkBdpCont
 
         let data = common::read_file(&file, bit_entry.offset as u64, bit_entry.size as usize)?;
 
-        let output_path = Path::new(&output_folder).join(format!("{}.bin", name));
-        fs::create_dir_all(&output_folder)?;
+        let output_path = Path::new(app_ctx.output_dir).join(format!("{}.bin", name));
+        fs::create_dir_all(app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new().read(true).write(true).create(true).open(output_path)?;
         out_file.seek(SeekFrom::Start(bit_entry.offset_in_target_part as u64))?;
         out_file.write_all(&data)?;

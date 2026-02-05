@@ -1,5 +1,11 @@
+use std::any::Any;
+use crate::{ProgramContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "mtk_pkg", detect_func: is_mtk_pkg_file, run_func: extract_mtk_pkg }
+}
+
 use std::path::Path;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, OpenOptions};
 use std::io::{Write, Cursor, Seek, SeekFrom};
 use binrw::{BinRead, BinReaderExt};
 
@@ -75,17 +81,17 @@ static HEADER_KEY: [u8; 16] = [
 
 static HEADER_IV: [u8; 16] = [0x00; 16];
 
-pub fn is_mtk_pkg_file(file: &File) -> Result<Option<MtkPkgContext>, Box<dyn std::error::Error>> {
-    let mut encrypted_header = common::read_file(&file, 0, HEADER_SIZE)?;
+pub fn is_mtk_pkg_file(app_ctx: &ProgramContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let mut encrypted_header = common::read_file(app_ctx.file, 0, HEADER_SIZE)?;
     let mut header = decrypt_aes128_cbc_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV)?;
     if &header[4..12] == MTK_HEADER_MAGIC {
-        Ok(Some(MtkPkgContext { is_philips_variant: false, decrypted_header: header}))
+        Ok(Some(Box::new(MtkPkgContext { is_philips_variant: false, decrypted_header: header})))
     } else {
         // try for philips which has additional 128 bytes at beginning
-        encrypted_header = common::read_file(&file, PHILIPS_EXTRA_HEADER_SIZE as u64, HEADER_SIZE)?;
+        encrypted_header = common::read_file(app_ctx.file, PHILIPS_EXTRA_HEADER_SIZE as u64, HEADER_SIZE)?;
         header = decrypt_aes128_cbc_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV)?;
         if &header[4..12] == MTK_HEADER_MAGIC {
-            Ok(Some(MtkPkgContext { is_philips_variant: true, decrypted_header: header }))
+            Ok(Some(Box::new(MtkPkgContext { is_philips_variant: true, decrypted_header: header })))
         } else {
             Ok(None)
 
@@ -93,16 +99,19 @@ pub fn is_mtk_pkg_file(file: &File) -> Result<Option<MtkPkgContext>, Box<dyn std
     }
 }
 
-pub fn extract_mtk_pkg(mut file: &File, output_folder: &str, context: MtkPkgContext) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_mtk_pkg(app_ctx: &ProgramContext, ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file;
+    let ctx = ctx.and_then(|c: Box<dyn Any>| c.downcast::<MtkPkgContext>().ok()).ok_or("Context is invalid or missing!")?;
+
     let file_size = file.metadata()?.len();
-    let header = context.decrypted_header;
+    let header = ctx.decrypted_header;
     let mut hdr_reader = Cursor::new(header); 
     let hdr: Header = hdr_reader.read_le()?;
 
     println!("File info:\nFile size: {}\nVendor magic: {}\nVersion info: {}\nProduct name: {}" , 
             hdr.file_size, hdr.vendor_magic(), hdr.version(), hdr.product_name());
 
-    if context.is_philips_variant {
+    if ctx.is_philips_variant {
         file.seek(SeekFrom::Start(HEADER_SIZE as u64 + PHILIPS_EXTRA_HEADER_SIZE as u64))?;
     } else {
         file.seek(SeekFrom::Start(HEADER_SIZE as u64))?;
@@ -189,13 +198,13 @@ pub fn extract_mtk_pkg(mut file: &File, output_folder: &str, context: MtkPkgCont
         };
         
         //for compressed part create temp file
-        let output_path = Path::new(&output_folder).join(part_entry.name() + if part_entry.is_compressed() {".lzhs"} else {".bin"});
-        fs::create_dir_all(&output_folder)?;
+        let output_path = Path::new(app_ctx.output_dir).join(part_entry.name() + if part_entry.is_compressed() {".lzhs"} else {".bin"});
+        fs::create_dir_all(app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new().write(true).read(true)/* for lzhs */.create(true).open(&output_path)?;
         out_file.write_all(&out_data[CRYPTED_HEADER_SIZE + extra_header_len as usize..])?;
 
         if part_entry.is_compressed() {
-            let lzhs_out_path = Path::new(&output_folder).join(part_entry.name() + ".bin");
+            let lzhs_out_path = Path::new(app_ctx.output_dir).join(part_entry.name() + ".bin");
             match decompress_lzhs_fs_file2file(&out_file, lzhs_out_path) {
                 Ok(()) => {
                     println!("- Decompressed Successfully!");
