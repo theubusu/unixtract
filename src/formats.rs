@@ -4,7 +4,7 @@ use crate::AppContext;
 pub struct Format {
     pub name: &'static str,
     pub detector_func: fn(&AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>>,
-    pub extractor_func: fn(&AppContext, Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>>,
+    pub extractor_func: fn(&AppContext, Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>>,
 }
 
 pub mod mstar;

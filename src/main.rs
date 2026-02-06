@@ -23,6 +23,21 @@ pub struct AppContext {
     pub input: InputTarget,
     pub output_dir: PathBuf,
 }
+impl AppContext {
+    pub fn file(&self) -> Option<&File> {
+        match &self.input {
+            InputTarget::File(f) => Some(f),
+            _ => None,
+        }
+    }
+
+    pub fn dir(&self) -> Option<&PathBuf> {
+        match &self.input {
+            InputTarget::Directory(p) => Some(p),
+            _ => None,
+        }
+    }
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("unixtract Firmware extractor");
@@ -69,12 +84,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let formats: Vec<Format> = get_registry();
-    println!("Loaded {} formats!\n", formats.len());
+    println!("Loaded {} formats!", formats.len());
 
     for format in formats {
         if let Some(ctx) = (format.detector_func)(&app_ctx)? {
-            println!("{} detected!", format.name);
-            (format.extractor_func)(&app_ctx, Some(ctx))?;
+            println!("\n{} detected!", format.name);
+            (format.extractor_func)(&app_ctx, ctx)?;
             return Ok(());
         }
     }

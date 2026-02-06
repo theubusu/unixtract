@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{InputTarget, AppContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "pfl_upg", detector_func: is_pfl_upg_file, extractor_func: extract_pfl_upg }
 }
@@ -49,7 +49,7 @@ impl FileHeader {
 }
 
 pub fn is_pfl_upg_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+    let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
 
     let header = common::read_file(&file, 0, 8)?;
     if header == b"2SWU3TXV" {
@@ -91,8 +91,8 @@ fn decrypt_aes256_ecb(key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, Box<dyn 
     Ok(buffer)
 }
 
-pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
+pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file().ok_or("Extractor expected file")?;
 
     let header: Header = file.read_le()?; 
     let signature = common::read_exact(&mut file, 128)?;

@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{InputTarget, AppContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "mtk_bdp", detector_func: is_mtk_bdp_file, extractor_func: extract_mtk_bdp }
 }
@@ -78,7 +78,7 @@ fn find_bytes(data: &[u8], pattern: &[u8]) -> Option<usize> {
 }
 
 pub fn is_mtk_bdp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+    let mut file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
     let file_size = file.metadata()?.len();
     let mut data = Vec::new();
 
@@ -95,9 +95,9 @@ pub fn is_mtk_bdp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box
     }
 }
 
-pub fn extract_mtk_bdp(app_ctx: &AppContext, ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
-    let ctx = ctx.and_then(|c: Box<dyn Any>| c.downcast::<MtkBdpContext>().ok()).ok_or("Context is invalid or missing!")?;
+pub fn extract_mtk_bdp(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file().ok_or("Extractor expected file")?;
+    let ctx = ctx.downcast::<MtkBdpContext>().expect("Missing context");
 
     let offset = ctx.pitit_offset;
     println!("\nReading PITIT at: {}", offset);

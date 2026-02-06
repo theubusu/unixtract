@@ -1,6 +1,6 @@
 //sddl_dec 5.0
 use std::any::Any;
-use crate::{InputTarget, AppContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "sddl_sec", detector_func: is_sddl_sec_file, extractor_func: extract_sddl_sec }
 }
@@ -104,7 +104,7 @@ static DEC_IV: [u8; 16] = [
 ];
 
 pub fn is_sddl_sec_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+    let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
 
     let header = common::read_file(&file, 0, 32)?;
     let deciph_header = decipher(&header);
@@ -157,8 +157,8 @@ fn decipher(s: &[u8]) -> Vec<u8> {
     out
 }
 
-pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
+pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file().ok_or("Extractor expected file")?;
 
     let mut hdr_reader = Cursor::new(decipher(&common::read_exact(&mut file, 32)?));
     let hdr: SddlSecHeader = hdr_reader.read_be()?;

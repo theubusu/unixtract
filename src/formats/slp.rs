@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{InputTarget, AppContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "slp", detector_func: is_slp_file, extractor_func: extract_slp }
 }
@@ -53,7 +53,7 @@ struct EntryNew {
 }
 
 pub fn is_slp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+    let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
 
     let header = common::read_file(&file, 0, 4)?;
     if header == b"SLP\x00" {
@@ -63,8 +63,8 @@ pub fn is_slp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn
     }
 }
 
-pub fn extract_slp(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
+pub fn extract_slp(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file().ok_or("Extractor expected file")?;
 
     let header: Header = file.read_le()?;
     println!("File info:\nModel: {}\nVersion: {}\nFirmware: {}\nNew type: {}\n",

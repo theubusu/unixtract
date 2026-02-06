@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{InputTarget, AppContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "mtk_pkg_old", detector_func: is_mtk_pkg_old_file, extractor_func: extract_mtk_pkg_old }
 }
@@ -64,8 +64,8 @@ impl PartEntry {
 static HEADER_SIZE: usize = 0x98;
 
 pub fn is_mtk_pkg_old_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
-
+    let mut file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
+    
     let encrypted_header = common::read_file(&file, 0, HEADER_SIZE)?;
     let header = decrypt(&encrypted_header, KEY, Some(HEADER_XOR_MASK));
     if &header[4..12] == MTK_HEADER_MAGIC {
@@ -83,8 +83,8 @@ pub fn is_mtk_pkg_old_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>,
     }
 }
 
-pub fn extract_mtk_pkg_old(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
+pub fn extract_mtk_pkg_old(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file().ok_or("Extractor expected file")?;
 
     let file_size = file.metadata()?.len();
     let encrypted_header = common::read_exact(&mut file, HEADER_SIZE)?;

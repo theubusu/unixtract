@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{InputTarget, AppContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "rvp", detector_func: is_rvp_file, extractor_func: extract_rvp }
 }
@@ -19,7 +19,7 @@ fn decrypt_xor(data: &[u8]) -> Vec<u8> {
 }
 
 pub fn is_rvp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+    let mut file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
     //MVP
     let header = common::read_file(&file, 0, 4)?;
     if header == b"UPDT" {
@@ -39,8 +39,8 @@ pub fn is_rvp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn
     Ok(Some(Box::new(())))
 }
 
-pub fn extract_rvp(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
+pub fn extract_rvp(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file().ok_or("Extractor expected file")?;
 
     let mut obf_data = Vec::new();  //we sadly cannot deXOR on the fly because of its 32 byte pattern
     file.read_to_end(&mut obf_data)?;

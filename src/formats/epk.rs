@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{InputTarget, AppContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "epk", detector_func: is_epk_file, extractor_func: extract_epk }
 }
@@ -12,7 +12,7 @@ pub struct EpkContext {
 }
 
 pub fn is_epk_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+    let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
 
     let versions = common::read_file(&file, 1712, 36)?;
     if let Some(epk_version) = check_epk_version(&versions) {
@@ -51,9 +51,9 @@ fn match_with_pattern(data: &[u8], pattern: &str) -> bool {
     true
 }
 
-pub fn extract_epk(app_ctx: &AppContext, ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
-    let ctx = ctx.and_then(|c| c.downcast::<EpkContext>().ok()).ok_or("Context is invalid or missing!")?;
+pub fn extract_epk(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
+    let file = app_ctx.file().ok_or("Extractor expected file")?;
+    let ctx = ctx.downcast::<EpkContext>().expect("Missing context");
 
     let versions = common::read_file(&file, 1712, 36)?;
 
@@ -63,10 +63,10 @@ pub fn extract_epk(app_ctx: &AppContext, ctx: Option<Box<dyn Any>>) -> Result<()
     
     if ctx.epk_version == 2 {
         println!("EPK2 detected!\n");
-        formats::epk2::extract_epk2(app_ctx, None)?;
+        formats::epk2::extract_epk2(app_ctx, Box::new(()))?;
     } else if ctx.epk_version == 3 {
         println!("EPK3 detected!\n");
-        formats::epk3::extract_epk3(app_ctx, None)?;
+        formats::epk3::extract_epk3(app_ctx, Box::new(()))?;
     }
 
     Ok(())

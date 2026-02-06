@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{InputTarget, AppContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "mtk_pkg", detector_func: is_mtk_pkg_file, extractor_func: extract_mtk_pkg }
 }
@@ -82,7 +82,7 @@ static HEADER_KEY: [u8; 16] = [
 static HEADER_IV: [u8; 16] = [0x00; 16];
 
 pub fn is_mtk_pkg_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+    let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
 
     let mut encrypted_header = common::read_file(&file, 0, HEADER_SIZE)?;
     let mut header = decrypt_aes128_cbc_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV)?;
@@ -101,9 +101,9 @@ pub fn is_mtk_pkg_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box
     }
 }
 
-pub fn extract_mtk_pkg(app_ctx: &AppContext, ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
-    let ctx = ctx.and_then(|c: Box<dyn Any>| c.downcast::<MtkPkgContext>().ok()).ok_or("Context is invalid or missing!")?;
+pub fn extract_mtk_pkg(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file().ok_or("Extractor expected file")?;
+    let ctx = ctx.downcast::<MtkPkgContext>().expect("Missing context");
 
     let file_size = file.metadata()?.len();
     let header = ctx.decrypted_header;

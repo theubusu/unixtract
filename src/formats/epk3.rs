@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{InputTarget, AppContext, formats::Format};
+use crate::{AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "epk3", detector_func: is_epk3_file, extractor_func: extract_epk3 }
 }
@@ -80,8 +80,8 @@ pub fn is_epk3_file(_app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<d
     Ok(None)
 }
 
-pub fn extract_epk3(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
+pub fn extract_epk3(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = app_ctx.file().ok_or("Extractor expected file")?;
     file.seek(SeekFrom::Start(0))?;
     let stored_header = common::read_exact(&mut file, 1712)?;
     let header: Vec<u8>;
