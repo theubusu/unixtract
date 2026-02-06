@@ -8,7 +8,7 @@ pub struct Format {
 }
 
 pub mod mstar;
-//pub mod samsung_old; not sure what to do with this
+pub mod samsung_old;
 pub mod nvt_timg;
 pub mod pfl_upg;
 pub mod sddl_sec;
@@ -45,6 +45,7 @@ pub mod mtk_bdp;
 pub fn get_registry() -> Vec<Format> {
     return vec![
         crate::formats::mstar::format(),
+        crate::formats::samsung_old::format(),
         crate::formats::nvt_timg::format(),
         crate::formats::pfl_upg::format(),
         crate::formats::sddl_sec::format(),

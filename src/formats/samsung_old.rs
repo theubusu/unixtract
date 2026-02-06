@@ -1,5 +1,11 @@
+use std::any::Any;
+use crate::{InputTarget, AppContext, formats::Format};
+pub fn format() -> Format {
+    Format { name: "samsung_old", detector_func: is_samsung_old_dir, extractor_func: extract_samsung_old }
+}
+
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 use std::fs::{File, OpenOptions};
 use std::io::{Write};
 use hex::decode;
@@ -11,11 +17,13 @@ use crate::utils::aes::{decrypt_aes128_cbc_pcks7};
 
 use md5;
 
-pub fn is_samsung_old_dir(path: &PathBuf) -> bool {
-    if Path::new(&path).join("image").is_dir() & Path::new(&path).join("image/info.txt").exists(){
-        true
+pub fn is_samsung_old_dir(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
+    let dir = match &app_ctx.input {InputTarget::Directory(p) => p, InputTarget::File(_) => return Ok(None)};
+
+    if Path::new(&dir).join("image").is_dir() & Path::new(&dir).join("image/info.txt").exists(){
+        Ok(Some(Box::new(())))
     } else {
-        false
+        Ok(None)
     }
 }
 
@@ -27,7 +35,8 @@ fn decrypt_xor(data: &[u8], key: &str) -> Vec<u8> {
         .collect()
 }
 
-pub fn extract_samsung_old(path: &PathBuf, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_samsung_old(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let path = match &app_ctx.input {InputTarget::Directory(p) => p, InputTarget::File(_) => return Err("Extractor expected directory, not file".into())};
 
     let fw_info = fs::read_to_string(Path::new(&path).join("image/info.txt"))?;
     println!("Firmware info: {}", fw_info);
@@ -114,9 +123,9 @@ pub fn extract_samsung_old(path: &PathBuf, output_folder: &str) -> Result<(), Bo
                     let xor_key = fw_info.split_whitespace().next().unwrap();
                     let out_data = decrypt_xor(&decrypted_data, xor_key);
                     
-                    let output_path = Path::new(&output_folder).join(filename.rsplit_once('.').map(|(left, _)| left).unwrap());
+                    let output_path = Path::new(&app_ctx.output_dir).join(filename.rsplit_once('.').map(|(left, _)| left).unwrap());
 
-                    fs::create_dir_all(&output_folder)?;
+                    fs::create_dir_all(&app_ctx.output_dir)?;
                     let mut out_file = OpenOptions::new()
                         .write(true)
                         .create(true)

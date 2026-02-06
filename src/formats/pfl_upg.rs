@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{AppContext, formats::Format};
+use crate::{InputTarget, AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "pfl_upg", detector_func: is_pfl_upg_file, extractor_func: extract_pfl_upg }
 }
@@ -49,7 +49,9 @@ impl FileHeader {
 }
 
 pub fn is_pfl_upg_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let header = common::read_file(app_ctx.file, 0, 8)?;
+    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+
+    let header = common::read_file(&file, 0, 8)?;
     if header == b"2SWU3TXV" {
         Ok(Some(Box::new(())))
     } else {
@@ -90,7 +92,8 @@ fn decrypt_aes256_ecb(key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, Box<dyn 
 }
 
 pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = app_ctx.file;
+    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
+
     let header: Header = file.read_le()?; 
     let signature = common::read_exact(&mut file, 128)?;
     let _ = common::read_exact(&mut file, 32)?; //unknown
@@ -163,7 +166,7 @@ pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Resu
         //its a folder not a file
         if (file_header.attributes[3] & (1 << 1)) != 0 {
             println!("\nFolder - {}", file_header.file_name());
-            let output_path = Path::new(app_ctx.output_dir).join(file_header.file_name().trim_start_matches('/'));
+            let output_path = Path::new(&app_ctx.output_dir).join(file_header.file_name().trim_start_matches('/'));
             fs::create_dir_all(output_path)?;
             continue
         }
@@ -181,7 +184,7 @@ pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Resu
         println!("\nFile - {}, Size: {}", file_name, file_header.real_size);
         let data = common::read_exact(&mut data_reader, file_header.stored_size as usize)?;
 
-        let output_path = Path::new(app_ctx.output_dir).join(file_name.trim_start_matches('/'));
+        let output_path = Path::new(&app_ctx.output_dir).join(file_name.trim_start_matches('/'));
         let output_path_parent = output_path.parent().expect("Failed to get parent of the output path!");
 
         //prevent collisions
@@ -194,11 +197,8 @@ pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Resu
             fs::create_dir_all(parent)?;
         }
 
-        fs::create_dir_all(app_ctx.output_dir)?;
-        let mut out_file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(output_path)?;
+        fs::create_dir_all(&app_ctx.output_dir)?;
+        let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
 
         out_file.write_all(&data[..file_header.real_size as usize])?;
 

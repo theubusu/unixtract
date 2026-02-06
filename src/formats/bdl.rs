@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{AppContext, formats::Format};
+use crate::{InputTarget, AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "bdl", detector_func: is_bdl_file, extractor_func: extract_bdl }
 }
@@ -86,7 +86,9 @@ impl PkgEntry {
 }
 
 pub fn is_bdl_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let header = common::read_file(app_ctx.file, 0, 4)?;
+    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+
+    let header = common::read_file(&file, 0, 4)?;
     if header == b"ibdl" {
         Ok(Some(Box::new(())))
     } else {
@@ -95,7 +97,8 @@ pub fn is_bdl_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn
 }
 
 pub fn extract_bdl(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = app_ctx.file;
+    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
+
     let header: BdlHeader = file.read_le()?;
 
     println!("File info:\nPackage count: {}\nDate: {}\nManufacturer: {}\nModel: {}\nVersion: {}\nInfo: {}",
@@ -122,7 +125,7 @@ pub fn extract_bdl(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(
             pkg_entries.push(pkg_entry);
         }
 
-        let pkg_folder = Path::new(app_ctx.output_dir).join(pkg_header.name());
+        let pkg_folder = Path::new(&app_ctx.output_dir).join(pkg_header.name());
         fs::create_dir_all(&pkg_folder)?;
 
         for (i, pkg_entry) in pkg_entries.iter().enumerate() {

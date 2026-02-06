@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{AppContext, formats::Format};
+use crate::{InputTarget, AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "rvp", detector_func: is_rvp_file, extractor_func: extract_rvp }
 }
@@ -19,16 +19,16 @@ fn decrypt_xor(data: &[u8]) -> Vec<u8> {
 }
 
 pub fn is_rvp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let mut file = app_ctx.file;
+    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
     //MVP
-    let header = common::read_file(file, 0, 4)?;
+    let header = common::read_file(&file, 0, 4)?;
     if header == b"UPDT" {
         file.seek(std::io::SeekFrom::Start(36))?; //skip rest of header // NOT GOOD PRACTICE SHOULD BE REMOVED
         return Ok(Some(Box::new(())))
     }
 
     //RVP
-    let bytes = common::read_file(file, 16, 18)?;
+    let bytes = common::read_file(&file, 16, 18)?;
     for (_i, &b) in bytes.iter().enumerate().step_by(2) {
         if b != 0xA3 {
             return Ok(None);
@@ -40,7 +40,8 @@ pub fn is_rvp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn
 }
 
 pub fn extract_rvp(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = app_ctx.file;
+    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
+
     let mut obf_data = Vec::new();  //we sadly cannot deXOR on the fly because of its 32 byte pattern
     file.read_to_end(&mut obf_data)?;
     println!("DeXORing data..");
@@ -122,9 +123,9 @@ pub fn extract_rvp(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(
 
         println!("Size: {}", size);
         let data = common::read_exact(&mut data_reader, size as usize)?;
-        let output_path = Path::new(app_ctx.output_dir).join(if name=="" {format!("{}.bin", i)} else {format!("{}_{}.bin", i, name)});
+        let output_path = Path::new(&app_ctx.output_dir).join(if name=="" {format!("{}.bin", i)} else {format!("{}_{}.bin", i, name)});
 
-        fs::create_dir_all(app_ctx.output_dir)?;
+        fs::create_dir_all(&app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;      
         out_file.write_all(&data)?;
 

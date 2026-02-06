@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{AppContext, formats::Format};
+use crate::{InputTarget, AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "slp", detector_func: is_slp_file, extractor_func: extract_slp }
 }
@@ -53,7 +53,9 @@ struct EntryNew {
 }
 
 pub fn is_slp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let header = common::read_file(app_ctx.file, 0, 4)?;
+    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+
+    let header = common::read_file(&file, 0, 4)?;
     if header == b"SLP\x00" {
         Ok(Some(Box::new(())))
     } else {
@@ -62,9 +64,9 @@ pub fn is_slp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn
 }
 
 pub fn extract_slp(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = app_ctx.file;
-    let header: Header = file.read_le()?;
+    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
 
+    let header: Header = file.read_le()?;
     println!("File info:\nModel: {}\nVersion: {}\nFirmware: {}\nNew type: {}\n",
             header.model(), header.version(), header.firmware(), header.is_new_type());
 
@@ -99,9 +101,9 @@ pub fn extract_slp(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(
         file.seek(SeekFrom::Start(entry.offset.into()))?;
         let data = common::read_exact(&mut file, entry.size as usize)?;
 
-        let output_path = Path::new(app_ctx.output_dir).join(format!("{}.bin", i));
+        let output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", i));
 
-        fs::create_dir_all(app_ctx.output_dir)?;
+        fs::create_dir_all(&app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new()
             .write(true)
             .create(true)

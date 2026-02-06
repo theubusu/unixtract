@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{AppContext, formats::Format};
+use crate::{InputTarget, AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "mtk_pkg_old", detector_func: is_mtk_pkg_old_file, extractor_func: extract_mtk_pkg_old }
 }
@@ -64,7 +64,8 @@ impl PartEntry {
 static HEADER_SIZE: usize = 0x98;
 
 pub fn is_mtk_pkg_old_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let mut file = app_ctx.file;
+    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+
     let encrypted_header = common::read_file(&file, 0, HEADER_SIZE)?;
     let header = decrypt(&encrypted_header, KEY, Some(HEADER_XOR_MASK));
     if &header[4..12] == MTK_HEADER_MAGIC {
@@ -83,7 +84,8 @@ pub fn is_mtk_pkg_old_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>,
 }
 
 pub fn extract_mtk_pkg_old(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = app_ctx.file;
+    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
+
     let file_size = file.metadata()?.len();
     let encrypted_header = common::read_exact(&mut file, HEADER_SIZE)?;
     let header = decrypt(&encrypted_header, KEY, Some(HEADER_XOR_MASK));
@@ -126,13 +128,13 @@ pub fn extract_mtk_pkg_old(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> 
         };
 
         //for compressed part create temp file
-        let output_path = Path::new(app_ctx.output_dir).join(part_entry.name() + if part_entry.is_compressed() {".lzhs"} else {".bin"});
-        fs::create_dir_all(app_ctx.output_dir)?;
+        let output_path = Path::new(&app_ctx.output_dir).join(part_entry.name() + if part_entry.is_compressed() {".lzhs"} else {".bin"});
+        fs::create_dir_all(&app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new().write(true).read(true)/* for lzhs */.create(true).open(&output_path)?;
         out_file.write_all(&out_data[extra_header_len as usize..])?;
 
         if part_entry.is_compressed() {
-            let lzhs_out_path = Path::new(app_ctx.output_dir).join(part_entry.name() + ".bin");
+            let lzhs_out_path = Path::new(&app_ctx.output_dir).join(part_entry.name() + ".bin");
             match decompress_lzhs_fs_file2file_old(&out_file, lzhs_out_path) {
                 Ok(()) => {
                     println!("- Decompressed Successfully!");

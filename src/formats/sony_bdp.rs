@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{AppContext, formats::Format};
+use crate::{InputTarget, AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "sony_bdp", detector_func: is_sony_bdp_file, extractor_func: extract_sony_bdp }
 }
@@ -64,7 +64,9 @@ struct Entry {
 }
 
 pub fn is_sony_bdp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let header = common::read_file(app_ctx.file, 0, 4)?;
+    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+
+    let header = common::read_file(&file, 0, 4)?;
     if header == b"\x01\x73\xEC\xC9" || header == b"\x01\x73\xEC\x1F" || header == b"\xEC\x7D\xB0\xB0" { //MSB1x, MSB0x, BDPPxx
         Ok(Some(Box::new(())))
     } else {
@@ -73,7 +75,8 @@ pub fn is_sony_bdp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Bo
 }
 
 pub fn extract_sony_bdp(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = app_ctx.file;
+    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
+
     let obf_header = common::read_exact(&mut file, 300)?;
     let header = hex_substitute(&obf_header);
     let mut hdr_reader = Cursor::new(header);
@@ -103,10 +106,10 @@ pub fn extract_sony_bdp(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Res
         let obf_data = common::read_file(&file, entry.offset as u64, entry.size as usize)?;
         let data = hex_substitute(&obf_data);
 
-        let output_path = Path::new(app_ctx.output_dir).join(format!("{}.bin", i));
+        let output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", i));
         last_file_path = Some(output_path.clone());
 
-        fs::create_dir_all(app_ctx.output_dir)?;
+        fs::create_dir_all(&app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;          
         out_file.write_all(&data)?;
 
@@ -119,8 +122,8 @@ pub fn extract_sony_bdp(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Res
         println!("\nChecking if it's also MTK BDP...");
 
         let last_file = File::open(last_file_path.unwrap())?;
-        let mtk_extraction_path = format!("{}/{}", app_ctx.output_dir, i - 1);
-        let ctx: AppContext = AppContext { file: &last_file, output_dir: &mtk_extraction_path };
+        let mtk_extraction_path = app_ctx.output_dir.join(format!("{}", i + 1));
+        let ctx: AppContext = AppContext { input: InputTarget::File(last_file), output_dir: mtk_extraction_path };
 
         if let Some(result) = formats::mtk_bdp::is_mtk_bdp_file(&ctx)? {
             println!("- MTK BDP file detected!\n");

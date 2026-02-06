@@ -1,6 +1,6 @@
 //sddl_dec 5.0
 use std::any::Any;
-use crate::{AppContext, formats::Format};
+use crate::{InputTarget, AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "sddl_sec", detector_func: is_sddl_sec_file, extractor_func: extract_sddl_sec }
 }
@@ -104,7 +104,9 @@ static DEC_IV: [u8; 16] = [
 ];
 
 pub fn is_sddl_sec_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let header = common::read_file(app_ctx.file, 0, 32)?;
+    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+
+    let header = common::read_file(&file, 0, 32)?;
     let deciph_header = decipher(&header);
     if deciph_header.starts_with(b"\x11\x22\x33\x44") {
         Ok(Some(Box::new(())))
@@ -156,7 +158,8 @@ fn decipher(s: &[u8]) -> Vec<u8> {
 }
 
 pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = app_ctx.file;
+    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
+
     let mut hdr_reader = Cursor::new(decipher(&common::read_exact(&mut file, 32)?));
     let hdr: SddlSecHeader = hdr_reader.read_be()?;
 
@@ -174,10 +177,10 @@ pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Res
         let data = common::read_exact(&mut file, entry_header.size() as usize)?;
         let dec_data = decrypt_aes128_cbc_pcks7(&data, &DEC_KEY, &DEC_IV)?;
 
-        fs::create_dir_all(app_ctx.output_dir)?;
+        fs::create_dir_all(&app_ctx.output_dir)?;
         //detect the file type based on the counts of each file
         if i == 0 { //SDIT.FDI file
-            let output_path = Path::new(app_ctx.output_dir).join(entry_header.name());
+            let output_path = Path::new(&app_ctx.output_dir).join(entry_header.name());
             let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
             out_file.write_all(&dec_data)?;
             println!("-- Saved file!");
@@ -216,11 +219,11 @@ pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Res
                 let file_name = common::string_from_bytes(&file_name_bytes);
                 println!("--- File name: {}", file_name);
 
-                let out_folder_path = Path::new(app_ctx.output_dir).join(source_name);
+                let out_folder_path = Path::new(&app_ctx.output_dir).join(source_name);
                 fs::create_dir_all(&out_folder_path)?;
                 output_path = Path::new(&out_folder_path).join(file_name);
             } else {
-                output_path = Path::new(app_ctx.output_dir).join(format!("{}.bin", source_name));
+                output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", source_name));
             }
 
             let data = common::read_exact(&mut content_reader, content_header.size as usize)?;

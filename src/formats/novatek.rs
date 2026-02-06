@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{AppContext, formats::Format};
+use crate::{InputTarget, AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "novatek", detector_func: is_novatek_file, extractor_func: extract_novatek }
 }
@@ -41,7 +41,9 @@ struct PartEntry {
 }
 
 pub fn is_novatek_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let header = common::read_file(app_ctx.file, 0, 4)?;
+    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+
+    let header = common::read_file(&file, 0, 4)?;
     if header == b"NFWB" {
         Ok(Some(Box::new(())))
     } else {
@@ -50,9 +52,9 @@ pub fn is_novatek_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box
 }
 
 pub fn extract_novatek(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = app_ctx.file;
-    let header: Header = file.read_le()?;
+    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
 
+    let header: Header = file.read_le()?;
     println!("File info:\nFirmware name: {}\nVersion: {}.{}\nData size: {}\nPart count: {}",
             header.firmware_name(), header.version_major, header.version_minor, header.data_size, header.part_count);
 
@@ -69,14 +71,10 @@ pub fn extract_novatek(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Resu
 
         let data = common::read_file(&file, entry.offset as u64, entry.size as usize)?;
 
-        let output_path = Path::new(app_ctx.output_dir).join(format!("{}_{}.bin", e_i, entry.id));
+        let output_path = Path::new(&app_ctx.output_dir).join(format!("{}_{}.bin", e_i, entry.id));
 
-        fs::create_dir_all(app_ctx.output_dir)?;
-        let mut out_file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(output_path)?;
-            
+        fs::create_dir_all(&app_ctx.output_dir)?;
+        let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;       
         out_file.write_all(&data)?;
 
         println!("- Saved file!");

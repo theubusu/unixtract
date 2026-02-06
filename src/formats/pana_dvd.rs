@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{AppContext, formats::Format};
+use crate::{InputTarget, AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "pana_dvd", detector_func: is_pana_dvd_file, extractor_func: extract_pana_dvd }
 }
@@ -150,7 +150,8 @@ pub fn find_aes_key_pair<'a>(key_array: &'a [(&'a str, &'a str, &'a str)], data:
 }
 
 pub fn is_pana_dvd_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let header = common::read_file(app_ctx.file, 0, 64)?;
+    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+    let header = common::read_file(&file, 0, 64)?;
     if let Some(matching_key) = find_key(&keys::PANA_DVD_KEYONLY, &header, b"PROG", 0)? {
         Ok(Some(Box::new(PanaDvdContext {
             matching_key: matching_key,
@@ -181,7 +182,7 @@ pub fn is_pana_dvd_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Bo
 }
 
 pub fn extract_pana_dvd(app_ctx: &AppContext, ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = app_ctx.file;
+    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
     let context = ctx.and_then(|c: Box<dyn Any>| c.downcast::<PanaDvdContext>().ok()).ok_or("Context is invalid or missing!")?;
 
     let mut data = Vec::new();  // we need to load the entire file into memory so we can swap it with AES decrypted data if its AES encrypted
@@ -217,12 +218,12 @@ pub fn extract_pana_dvd(app_ctx: &AppContext, ctx: Option<Box<dyn Any>>) -> Resu
     if file_entries.len() == 1 {
         //only one file, standard extraction
         println!("File contains no extra sub-files...\n");
-        extract_file(&mut file_reader, file_entries[0].offset as u64, file_entries[0].base_offset as u64, matching_key, app_ctx.output_dir)?;
+        extract_file(&mut file_reader, file_entries[0].offset as u64, file_entries[0].base_offset as u64, matching_key, &app_ctx.output_dir)?;
     } else {
         println!("File contains {} sub-files...", file_entries.len());
         for (i, file_entry ) in file_entries.iter().enumerate() {
             println!("\nExtracting file {}/{} - Offset: {}, base: {}", i + 1, file_entries.len(), file_entry.offset, file_entry.base_offset);
-            extract_file(&mut file_reader, file_entry.offset as u64, file_entry.base_offset as u64, matching_key, &format!("{}/file_{}", app_ctx.output_dir, i + 1))?;
+            extract_file(&mut file_reader, file_entry.offset as u64, file_entry.base_offset as u64, matching_key, &app_ctx.output_dir.join(format!("file_{}", i + 1)))?;
         }
     }
 
@@ -231,7 +232,7 @@ pub fn extract_pana_dvd(app_ctx: &AppContext, ctx: Option<Box<dyn Any>>) -> Resu
     Ok(())
 }
 
-fn extract_file(file_reader: &mut Cursor<Vec<u8>>, offset: u64, base_offset: u64, key: [u8; 8], output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn extract_file(file_reader: &mut Cursor<Vec<u8>>, offset: u64, base_offset: u64, key: [u8; 8], output_folder: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     file_reader.seek(SeekFrom::Start(offset + base_offset))?;
  
     let enc_header = common::read_exact(file_reader, MAX_HEADER_SIZE)?;

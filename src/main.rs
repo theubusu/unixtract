@@ -14,9 +14,14 @@ struct Args {
     output_directory: Option<String>,
 }
 
-pub struct AppContext<'a> {
-    pub file: &'a std::fs::File,
-    pub output_dir: &'a str,
+pub enum InputTarget {
+    File(File),
+    Directory(PathBuf),
+}
+
+pub struct AppContext {
+    pub input: InputTarget,
+    pub output_dir: PathBuf,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -32,24 +37,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         format!("_{}", target_path.file_name().and_then(|s| s.to_str()).unwrap())
     };
-    println!("Output directory: {}\n", output_path_str);
+    println!("Output directory: {}", output_path_str);
     let output_directory_path = PathBuf::from(&output_path_str);
 
     if output_directory_path.exists() {
         if output_directory_path.is_dir() {
             let is_empty = fs::read_dir(&output_directory_path)?.next().is_none();
             if !is_empty {
-                println!("Warning: Output folder already exists and is NOT empty! Files may be overwritten!");
+                println!("\nWarning: Output folder already exists and is NOT empty! Files may be overwritten!");
                 println!("Press Enter if you want to continue...");
                 io::stdin().read_line(&mut String::new())?;
             }
         }
     }
 
-    let file = File::open(target_path)?;
-    let app_ctx: AppContext = AppContext { file: &file, output_dir: &output_path_str };
+    let app_ctx;
+
+    if target_path.is_file() {
+        let file = File::open(&target_path)?;
+        app_ctx = AppContext {
+            input: InputTarget::File(file),
+            output_dir: output_directory_path,
+        };
+    } else if target_path.is_dir() {
+        app_ctx = AppContext {
+            input: InputTarget::Directory(target_path),
+            output_dir: output_directory_path,
+        };
+    } else {
+        return Err("Invalid input path!".into());
+    }
 
     let formats: Vec<Format> = get_registry();
+    println!("Loaded {} formats!\n", formats.len());
+
     for format in formats {
         if let Some(ctx) = (format.detector_func)(&app_ctx)? {
             println!("{} detected!", format.name);

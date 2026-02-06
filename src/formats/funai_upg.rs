@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{AppContext, formats::Format};
+use crate::{InputTarget, AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "funai_upg", detector_func: is_funai_upg_file, extractor_func: extract_funai_upg }
 }
@@ -26,7 +26,8 @@ struct Entry {
 }
 
 pub fn is_funai_upg_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let header = common::read_file(app_ctx.file, 0, 6)?;
+    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+    let header = common::read_file(&file, 0, 6)?;
     if header == b"UPG\x00\x00\x00" {
         Ok(Some(Box::new(())))
     } else {
@@ -35,7 +36,8 @@ pub fn is_funai_upg_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, B
 }
 
 pub fn extract_funai_upg(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = app_ctx.file;
+    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
+
     let header: Header = file.read_le()?;
     println!("File info:\nFile size: {}\nEntry count: {}", header.file_size, header.entry_count);
 
@@ -51,9 +53,9 @@ pub fn extract_funai_upg(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Re
             println!("Descriptor entry info:\n{}", entry_string);
         }
 
-        let output_path = Path::new(app_ctx.output_dir).join(format!("{}_{}.bin", i + 1, entry.entry_type));
+        let output_path = Path::new(&app_ctx.output_dir).join(format!("{}_{}.bin", i + 1, entry.entry_type));
 
-        fs::create_dir_all(app_ctx.output_dir)?;
+        fs::create_dir_all(&app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
         out_file.write_all(&data)?;
 

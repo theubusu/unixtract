@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{AppContext, formats::Format};
+use crate::{InputTarget, AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "epk", detector_func: is_epk_file, extractor_func: extract_epk }
 }
@@ -12,8 +12,9 @@ pub struct EpkContext {
 }
 
 pub fn is_epk_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let versions = common::read_file(app_ctx.file, 1712, 36)?;
+    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
 
+    let versions = common::read_file(&file, 1712, 36)?;
     if let Some(epk_version) = check_epk_version(&versions) {
         Ok(Some(Box::new(EpkContext {epk_version})))
     } else {
@@ -51,9 +52,10 @@ fn match_with_pattern(data: &[u8], pattern: &str) -> bool {
 }
 
 pub fn extract_epk(app_ctx: &AppContext, ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
+    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
     let ctx = ctx.and_then(|c| c.downcast::<EpkContext>().ok()).ok_or("Context is invalid or missing!")?;
 
-    let versions = common::read_file(app_ctx.file, 1712, 36)?;
+    let versions = common::read_file(&file, 1712, 36)?;
 
     let platform_version = common::string_from_bytes(&versions[4..20]);
     let sdk_version = common::string_from_bytes(&versions[20..36]);

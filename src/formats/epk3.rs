@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{AppContext, formats::Format};
+use crate::{InputTarget, AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "epk3", detector_func: is_epk3_file, extractor_func: extract_epk3 }
 }
@@ -81,7 +81,7 @@ pub fn is_epk3_file(_app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<d
 }
 
 pub fn extract_epk3(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = app_ctx.file;
+    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
     file.seek(SeekFrom::Start(0))?;
     let stored_header = common::read_exact(&mut file, 1712)?;
     let header: Vec<u8>;
@@ -164,8 +164,8 @@ pub fn extract_epk3(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<
             let encrypted_data = common::read_exact(&mut file, entry.segment_size as usize + extra_segment_size)?;
             let out_data = decrypt_aes_ecb_auto(matching_key_bytes, &encrypted_data)?;
 
-            let output_path = Path::new(app_ctx.output_dir).join(format!("{}.bin", entry.package_name()));
-            fs::create_dir_all(app_ctx.output_dir)?;
+            let output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", entry.package_name()));
+            fs::create_dir_all(&app_ctx.output_dir)?;
             let mut out_file = OpenOptions::new().append(true).create(true).open(output_path)?;
             out_file.write_all(&out_data[extra_segment_size..])?;
 

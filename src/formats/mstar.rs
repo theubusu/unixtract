@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{AppContext, formats::Format};
+use crate::{InputTarget, AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "mstar", detector_func: is_mstar_file, extractor_func: extract_mstar }
 }
@@ -14,9 +14,10 @@ use crate::utils::lzop::{unlzop_to_file};
 use crate::utils::sparse::{unsparse_to_file};
 
 pub fn is_mstar_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let header = common::read_file(app_ctx.file, 0, 32768)?;
-    let header_string = String::from_utf8_lossy(&header);
+    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
 
+    let header = common::read_file(&file, 0, 32768)?;
+    let header_string = String::from_utf8_lossy(&header);
     if header_string.contains("filepartload"){
         Ok(Some(Box::new(())))
     } else {
@@ -33,7 +34,7 @@ fn parse_number(s: &str) -> Option<u64> {
 }
 
 pub fn extract_mstar(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let file = app_ctx.file;
+    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
 
     let mut script = common::read_file(&file, 0, 32768)?;
 
@@ -137,7 +138,7 @@ pub fn extract_mstar(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result
             } else {
                 let data = common::read_file(&file, offset, size.try_into().unwrap())?;
                 let out_data; 
-                let output_path = Path::new(app_ctx.output_dir).join(format!("{}.bin", partname));
+                let output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", partname));
 
                 if compression == "lzma" {
                     println!("- Decompressing LZMA...");
@@ -166,7 +167,7 @@ pub fn extract_mstar(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result
                     out_data = data;
                 }
 
-                fs::create_dir_all(app_ctx.output_dir)?;
+                fs::create_dir_all(&app_ctx.output_dir)?;
                 let mut out_file = OpenOptions::new().append(true).create(true).open(output_path)?;
                 out_file.write_all(&out_data)?;
                 println!("-- Saved file!");

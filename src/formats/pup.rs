@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{AppContext, formats::Format};
+use crate::{InputTarget, AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "pup", detector_func: is_pup_file, extractor_func: extract_pup }
 }
@@ -57,7 +57,9 @@ struct BlockEntry {
 }
 
 pub fn is_pup_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let header = common::read_file(app_ctx.file, 0, 4)?;
+    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+
+    let header = common::read_file(&file, 0, 4)?;
     if header == b"\x4F\x15\x3D\x1D" || header == b"\x54\x14\xF5\xEE" { //ps4, ps5
         Ok(Some(Box::new(())))
     } else {
@@ -66,9 +68,9 @@ pub fn is_pup_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn
 }
 
 pub fn extract_pup(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = app_ctx.file;
-    let header: Header = file.read_le()?;
+    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
 
+    let header: Header = file.read_le()?;
     println!("File info:\nFile size: {}\nEntry count: {}",
             header.file_size, header.entry_count);
 
@@ -139,14 +141,10 @@ pub fn extract_pup(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(
                     out_data = data;
                 }
 
-                let output_path = Path::new(app_ctx.output_dir).join(format!("{}.bin", entry.id()));
+                let output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", entry.id()));
             
-                fs::create_dir_all(app_ctx.output_dir)?;
-                let mut out_file = OpenOptions::new()
-                    .append(true)
-                    .create(true)
-                    .open(output_path)?;
-            
+                fs::create_dir_all(&app_ctx.output_dir)?;
+                let mut out_file = OpenOptions::new().append(true).create(true).open(output_path)?;       
                 out_file.write_all(&out_data)?;
 
                 println!("-- Saved!");
@@ -165,14 +163,10 @@ pub fn extract_pup(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(
                 out_data = data;
             }
 
-            let output_path = Path::new(app_ctx.output_dir).join(format!("{}.bin", entry.id()));
+            let output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", entry.id()));
             
-            fs::create_dir_all(app_ctx.output_dir)?;
-            let mut out_file = OpenOptions::new()
-                .write(true)
-                .create(true)
-                .open(output_path)?;
-            
+            fs::create_dir_all(&app_ctx.output_dir)?;
+            let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;        
             out_file.write_all(&out_data)?;
 
             println!("-- Saved file!");

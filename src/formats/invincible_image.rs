@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{AppContext, formats::Format};
+use crate::{InputTarget, AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "invincible_image", detector_func: is_invincible_image_file, extractor_func: extract_invincible_image }
 }
@@ -63,7 +63,9 @@ impl Entry {
 }
 
 pub fn is_invincible_image_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let header = common::read_file(app_ctx.file, 0, 16)?;
+    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+
+    let header = common::read_file(&file, 0, 16)?;
     if header == b"INVINCIBLE_IMAGE" {
         Ok(Some(Box::new(())))
     } else {
@@ -72,9 +74,9 @@ pub fn is_invincible_image_file(app_ctx: &AppContext) -> Result<Option<Box<dyn A
 }
 
 pub fn extract_invincible_image(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = app_ctx.file;
-    let header: Header = file.read_le()?;
+    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
 
+    let header: Header = file.read_le()?;
     println!("File info:\nFile Version: {}.{}\nVersion(1): {}\nVersion(2): {}\nVersion(3): {}\nVersion(4): {}\nData size: {}\nData start offset: {}\nKeep data size: {}\nSkip data size: {}\n\nPayload Count: {}",
             header.file_version[0], header.file_version[1], header.ver1(), header.ver2(), header.ver3(), header.ver4(), header.data_size, header.data_start_offset, header.keep_size, header.skip_size, header.payload_count);
 
@@ -120,14 +122,10 @@ pub fn extract_invincible_image(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>
         println!("\n({}/{}) - {}, Size: {}", i, header.payload_count, entry.name(), entry.size);
         let data = common::read_exact(&mut data_reader, entry.size as usize)?;
 
-        let output_path = Path::new(app_ctx.output_dir).join(entry.name() + ".bin");
+        let output_path = Path::new(&app_ctx.output_dir).join(entry.name() + ".bin");
 
-        fs::create_dir_all(app_ctx.output_dir)?;
-        let mut out_file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(output_path)?;
-            
+        fs::create_dir_all(&app_ctx.output_dir)?;
+        let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
         out_file.write_all(&data)?;
 
         println!("- Saved file!");

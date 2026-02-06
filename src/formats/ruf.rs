@@ -1,10 +1,10 @@
 use std::any::Any;
-use crate::{AppContext, formats::Format};
+use crate::{InputTarget, AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "ruf", detector_func: is_ruf_file, extractor_func: extract_ruf }
 }
 
-use std::path::{Path};
+use std::path::{Path, PathBuf};
 use std::fs::{self, File, OpenOptions};
 use binrw::{BinRead, BinReaderExt};
 use std::io::{Write, Seek, SeekFrom, Cursor};
@@ -76,7 +76,9 @@ impl RufEntry {
 }
 
 pub fn is_ruf_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let header = common::read_file(app_ctx.file, 0, 6)?;
+    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+
+    let header = common::read_file(&file, 0, 6)?;
     if header == b"RUF\x00\x00\x00" {
         Ok(Some(Box::new(())))
     } else {
@@ -85,22 +87,23 @@ pub fn is_ruf_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn
 }
 
 pub fn extract_ruf(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = app_ctx.file;
+    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
+
     let header: RufHeader = file.read_be()?;
     if header.is_dual_ruf() {
         println!("\nDual RUF detected! Extracting 1st RUF...\n");
-        actually_extract_ruf(file, &format!("{}/RUF_1", app_ctx.output_dir), 0)?;
+        actually_extract_ruf(file, &app_ctx.output_dir.join("RUF_1"), 0)?;
         println!("\nExtracting 2nd RUF...\n");
-        actually_extract_ruf(file, &format!("{}/RUF_2", app_ctx.output_dir), 41943088)?;
+        actually_extract_ruf(file, &app_ctx.output_dir.join("RUF_2"), 41943088)?;
     } else {
-        actually_extract_ruf(file, app_ctx.output_dir, 0)?;
+        actually_extract_ruf(file, &app_ctx.output_dir, 0)?;
     }
 
     println!("\nExtraction finished!");
     Ok(())
 }
 
-fn actually_extract_ruf(mut file: &File, output_folder: &str, start_offset: u64) -> Result<(), Box<dyn std::error::Error>> {
+fn actually_extract_ruf(mut file: &File, output_folder: &PathBuf, start_offset: u64) -> Result<(), Box<dyn std::error::Error>> {
     file.seek(SeekFrom::Start(start_offset))?;
     let header: RufHeader = file.read_be()?;
 
@@ -166,10 +169,7 @@ fn actually_extract_ruf(mut file: &File, output_folder: &str, start_offset: u64)
 
         let output_path = Path::new(&output_folder).join(format!("{}_{}.bin", entry.payload_type_bytes, entry.payload_type()));
         fs::create_dir_all(&output_folder)?;
-        let mut out_file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(output_path)?;
+        let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
             
         out_file.write_all(&data)?;
 

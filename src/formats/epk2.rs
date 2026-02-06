@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{AppContext, formats::Format};
+use crate::{InputTarget, AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "epk2", detector_func: is_epk2_file, extractor_func: extract_epk2 }
 }
@@ -72,7 +72,9 @@ struct Pak {
 }
 
 pub fn is_epk2_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let header = common::read_file(app_ctx.file, 128, 4)?;
+    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+
+    let header = common::read_file(&file, 128, 4)?;
     if header == b"epak" {
         Ok(Some(Box::new(())))
     } else {
@@ -81,9 +83,9 @@ pub fn is_epk2_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dy
 }
 
 pub fn extract_epk2(app_ctx: &AppContext, _: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = app_ctx.file;
-    let _header_signature = common::read_exact(&mut file, SIGNATURE_SIZE as usize)?;
+    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
 
+    let _header_signature = common::read_exact(&mut file, SIGNATURE_SIZE as usize)?;
     let stored_header = common::read_exact(&mut file, 1584)?; //max header size
     let header;
 
@@ -191,8 +193,8 @@ pub fn extract_epk2(app_ctx: &AppContext, _: Option<Box<dyn Any>>) -> Result<(),
             let segment_data = common::read_exact(&mut file, actual_segment_size as usize)?;
             let out_data = decrypt_aes_ecb_auto(&matching_key_bytes, &segment_data)?;
 
-            let output_path = Path::new(app_ctx.output_dir).join(format!("{}.bin", pak.name));
-            fs::create_dir_all(app_ctx.output_dir)?;
+            let output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", pak.name));
+            fs::create_dir_all(&app_ctx.output_dir)?;
             let mut out_file = OpenOptions::new().append(true).create(true).open(output_path)?;
             out_file.write_all(&out_data)?;
 

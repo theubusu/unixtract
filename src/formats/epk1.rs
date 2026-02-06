@@ -1,5 +1,5 @@
 use std::any::Any;
-use crate::{AppContext, formats::Format};
+use crate::{InputTarget, AppContext, formats::Format};
 pub fn format() -> Format {
     Format { name: "epk1", detector_func: is_epk1_file, extractor_func: extract_epk1 }
 }
@@ -41,8 +41,10 @@ struct Pak {
 }
 
 pub fn is_epk1_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let epk2_magic = common::read_file(app_ctx.file, 12, 4)?; //for epk2b
-    let epak_magic = common::read_file(app_ctx.file, 0, 4)?;
+    let file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Ok(None)};
+
+    let epk2_magic = common::read_file(&file, 12, 4)?; //for epk2b
+    let epak_magic = common::read_file(&file, 0, 4)?;
     if epak_magic == b"epak" && epk2_magic != b"EPK2" {
         Ok(Some(Box::new(())))
     } else {
@@ -51,7 +53,7 @@ pub fn is_epk1_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dy
 }
 
 pub fn extract_epk1(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = app_ctx.file;
+    let mut file = match &app_ctx.input {InputTarget::File(f) => f, InputTarget::Directory(_) => return Err("Extractor expected file, not directory".into())};
     //check type of epk1
     let epk1_type;
     let init_pak_count_bytes = common::read_file(&file, 8, 4)?;
@@ -125,8 +127,8 @@ pub fn extract_epk1(app_ctx: &AppContext, _ctx: Option<Box<dyn Any>>) -> Result<
 
         let data = common::read_exact(&mut file, pak_header.image_size as usize)?;
 
-        let output_path = Path::new(app_ctx.output_dir).join(pak_header.pak_name() + ".bin");
-        fs::create_dir_all(app_ctx.output_dir)?;
+        let output_path = Path::new(&app_ctx.output_dir).join(pak_header.pak_name() + ".bin");
+        fs::create_dir_all(&app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;        
         out_file.write_all(&data)?;
 
