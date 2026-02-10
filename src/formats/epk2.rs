@@ -75,6 +75,8 @@ pub fn is_epk2_file(file: &File) -> bool {
 }
 
 pub fn extract_epk2(mut file: &File, output_folder: &str) -> Result<(), Box<dyn std::error::Error>> {
+    file.seek(SeekFrom::Start(0))?;
+
     let _header_signature = common::read_exact(&mut file, SIGNATURE_SIZE as usize)?;
 
     let stored_header = common::read_exact(&mut file, 1584)?; //max header size
