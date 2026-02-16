@@ -84,6 +84,9 @@ pub fn is_epk2_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dy
 
 pub fn extract_epk2(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
+    file.seek(SeekFrom::Start(0))?;
+
+    let _header_signature = common::read_exact(&mut file, SIGNATURE_SIZE as usize)?;
 
     let _header_signature = common::read_exact(&mut file, SIGNATURE_SIZE as usize)?;
     let stored_header = common::read_exact(&mut file, 1584)?; //max header size

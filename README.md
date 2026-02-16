@@ -92,7 +92,7 @@ If an output folder is not provided, extracted files will be saved in folder `_<
 
 ## Panasonic Blu-Ray (PANA_DVD.FRM, PANA_ESD.FRM, PANAEUSB.FRM)
 **Used in:** Panasonic Blu-Ray Players and Recorders  
-**Notes:** **Depends on keys** - see keys.rs, and there is an issue with some ancient files not extracting correctly. 
+**Notes:** **Depends on keys** - see keys.rs (Included keys should work for 99% of players released in and before 2014, and some released in 2018), Note that there is currently an issue with MAIN in some very ancient files not extracting correctly. 
 
 ## Philips UPG (Autorun.upg, 2SWU3TXV)
 **Used in:** Philips pre-TPVision TVs 200?-2013  
