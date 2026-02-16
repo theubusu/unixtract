@@ -84,8 +84,10 @@ struct MainListEntry {
     checksum: u32, //checksum of this MAIN entrys' data
 }
 
+const COMPRESSED_FILE_MAGIC: &[u8; 8] = b"EXTRHEAD";
+
 #[derive(BinRead)]
-struct MainEntryHeader {
+struct CompressedFileHeader {
     #[br(count = 14)] _header_string: Vec<u8>, //EXTRHEADDRV \x01\x00
     compression_type_byte: u16,
     decompressed_size: u32,
@@ -98,12 +100,12 @@ struct MainEntryHeader {
     _checksum_flag: u8,
     #[br(count = 19)] _unused: Vec<u8>,
 }
-impl MainEntryHeader {
+impl CompressedFileHeader {
     fn compression_type(&self) -> &str {
         if self.compression_type_byte == 0 {
             return "Uncompressed"
         } else if self.compression_type_byte == 1 {
-            return "GZIP + LZSS"
+            return "GZIP"
         } else if self.compression_type_byte == 2 {
             return "LZSS"
         } else {
@@ -198,7 +200,9 @@ pub fn extract_pana_dvd(mut file: &File, output_folder: &str, context: PanaDvdCo
             if file_entry.size == 0 && file_entry.offset == 0 {
                 break
             }
-            file_entries.push(FileEntry { offset: file_entry.offset, base_offset: context.base_hdr_size });
+            if !file_entries.iter().any(|f| f.offset == file_entry.offset ){
+                file_entries.push(FileEntry { offset: file_entry.offset, base_offset: context.base_hdr_size });
+            } 
         }
 
     } else {
@@ -231,14 +235,20 @@ fn extract_file(file_reader: &mut Cursor<Vec<u8>>, offset: u64, base_offset: u64
     let mut modules: Vec<ModuleEntry> = Vec::new();
 
     for i in 0..100 {
-        let entry: ModuleEntry = hdr_reader.read_le()?;
+        let mut entry: ModuleEntry = hdr_reader.read_le()?;
         if !entry.is_valid() {break};
         println!("Module {} - Name: {}, Version: {}, Platform: {}, ID: {}, Offset: {}, Size: {}",
                 i + 1, entry.name(), entry.version(), entry.platform(), entry.id(), entry.offset, entry.size);
-        if modules.iter().any(|m| m.name() == entry.name()){
+        if modules.iter().any(|m| m.offset == entry.offset ){
             println!("- Duplicate module, skipping!");
             continue
         }
+
+        //prevent collision of modules with the same name
+        if modules.iter().any(|m| m.name() == entry.name() ){
+            entry.name_bytes = format!("{}({})", entry.name(), i + 1).as_bytes().to_vec();
+        }
+
         modules.push(entry);
     }
 
@@ -254,14 +264,19 @@ fn extract_file(file_reader: &mut Cursor<Vec<u8>>, offset: u64, base_offset: u64
         file_reader.seek(SeekFrom::Start(rel_offset))?;
 
         if module.name() == "MAIN" {
-            println!("Extracting MAIN...");
+            println!("- Extracting MAIN...");
             extract_main(file_reader, key, output_path)?;
             continue
         }
 
         let data = common::read_exact(file_reader, module.size as usize)?;
         println!("- Decrypting...");
-        let dec_data = decrypt_data(&data, &key);
+        let mut dec_data = decrypt_data(&data, &key);
+
+        if module.name().starts_with("DRV") {
+            println!("- Extracting DRIVE firmware...");
+            dec_data = extract_drv(dec_data, &key)?;
+        }
         
         fs::create_dir_all(&output_folder)?;
         let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
@@ -275,9 +290,12 @@ fn extract_file(file_reader: &mut Cursor<Vec<u8>>, offset: u64, base_offset: u64
 
 fn extract_main(file_reader: &mut Cursor<Vec<u8>>, key: [u8; 8], output_path: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let main_list_hdr: MainListHeader = file_reader.read_le()?;
-    println!("MAIN - Entry count: {}, Decompressed part size: {}", main_list_hdr.entry_count(), main_list_hdr.decompressed_part_size);
-    assert!(main_list_hdr.entry_count() < 200, "Unreasonable MAIN entry count!");
+    if main_list_hdr.entry_count() > 200 {
+        println!("Unsupported MAIN data, skipping!");
+        return Ok(())
+    }
 
+    println!("MAIN - Entry count: {}, Decompressed part size: {}", main_list_hdr.entry_count(), main_list_hdr.decompressed_part_size);
     let mut main_entries: Vec<MainListEntry> = Vec::new();
     for i in 0..main_list_hdr.entry_count() {
         let main_entry: MainListEntry = file_reader.read_le()?;
@@ -304,37 +322,9 @@ fn extract_main(file_reader: &mut Cursor<Vec<u8>>, key: [u8; 8], output_path: Pa
             data.copy_from_slice(&decrypted);
         }
         
-        let mut data_reader = Cursor::new(data);
-        let header: MainEntryHeader = data_reader.read_le()?;
-        println!("\nMAIN ({}/{}) - Compressed size: {}, Decompressed size: {}, Compression type: {}({})", 
-                maine_i, main_entries.len(), header.compressed_size, header.decompressed_size, header.compression_type_byte, header.compression_type());
-        let compressed_data = common::read_exact(&mut data_reader, header.compressed_size as usize)?;
-
-        let decompressed_data;
-        if header.compression_type_byte == 1 { //gzip + lzss
-            println!("- (1/2) Decompressing GZIP...");
-            let decompressed_gzip = decompress_gzip(&compressed_data)?;
-            // the decompressed data has another header
-            let mut decompressed_gzip_reader = Cursor::new(decompressed_gzip);
-            let header: MainEntryHeader = decompressed_gzip_reader.read_le()?;
-            println!("- (2/2) Decompressing LZSS... (Compressed size: {}, Decompressed size: {})", header.compressed_size, header.decompressed_size);
-            let compressed_lzss = common::read_exact(&mut decompressed_gzip_reader, header.compressed_size as usize)?;
-            decompressed_data = decompress_lzss(&compressed_lzss);
-            assert!(decompressed_data.len() == header.decompressed_size as usize, "Decompressed size does not match size in header, decompression failed!");
-
-        } else if header.compression_type_byte == 2 { //only lzss
-            println!("- Decompressing LZSS...");
-            decompressed_data = decompress_lzss(&compressed_data);
-            assert!(decompressed_data.len() == header.decompressed_size as usize, "Decompressed size does not match size in header, decompression failed!");
-
-        } else if header.compression_type_byte == 0 { //no compression. havent encountered one yet
-            decompressed_data = compressed_data;
-            
-        } else {
-            println!("- Unknown compression method!");
-            decompressed_data = compressed_data;
-        }
-
+        print!("\nMAIN ({}/{}) - ", maine_i, main_entries.len());
+        let decompressed_data = decompress_data(&data)?;
+        
         let mut out_file = OpenOptions::new().append(true).create(true).open(&output_path)?;
         out_file.write_all(&decompressed_data)?;
         
@@ -342,4 +332,62 @@ fn extract_main(file_reader: &mut Cursor<Vec<u8>>, key: [u8; 8], output_path: Pa
     }
 
     Ok(())
+}
+
+fn decompress_data(data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let mut data_reader = Cursor::new(data);
+    let header: CompressedFileHeader = data_reader.read_le()?;
+    println!("Compressed size: {}, Decompressed size: {}, Compression type: {}({})", 
+            header.compressed_size, header.decompressed_size, header.compression_type_byte, header.compression_type());
+
+    let compressed_data = common::read_exact(&mut data_reader, header.compressed_size as usize)?;
+    let decompressed_data;
+
+    if header.compression_type_byte == 1 { //gzip + optionally lzss
+        println!("- Decompressing GZIP...");
+        let decompressed_gzip = decompress_gzip(&compressed_data)?;
+
+        // the decompressed data can have another header
+        if decompressed_gzip.starts_with(COMPRESSED_FILE_MAGIC) {
+            decompressed_data = decompress_data(&decompressed_gzip)?;
+        } else {
+            decompressed_data = decompressed_gzip;
+        }
+    } else if header.compression_type_byte == 2 { //only lzss
+        println!("- Decompressing LZSS...");
+        decompressed_data = decompress_lzss(&compressed_data);
+        if decompressed_data.len() != header.decompressed_size as usize {
+            return Err("Decompressed size does not match size in header, decompression failed!".into());
+        }
+    } else if header.compression_type_byte == 0 { //no compression. havent encountered one yet
+        decompressed_data = compressed_data;
+            
+    } else {
+        println!("- Unknown compression method!");
+        decompressed_data = compressed_data;
+    }
+
+    Ok(decompressed_data)
+}
+
+fn extract_drv(mut data: Vec<u8>, key: &[u8; 8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let data_size = data.len();
+    let decrypt_size: usize = 10240;
+    let header_size = 0x20;
+
+    //decrypt first and last 10240b (execpt last 48b)
+    let first_decrypted = decrypt_data(&data[..decrypt_size], &key);
+    data[..decrypt_size].copy_from_slice(&first_decrypted);
+
+    let last_decrypted = decrypt_data(&data[data_size as usize - decrypt_size - 48..data_size - 48], &key);
+    data[data_size as usize - decrypt_size - 48..data_size - 48].copy_from_slice(&last_decrypted);
+
+    //can be compressed
+    if data[header_size..].starts_with(COMPRESSED_FILE_MAGIC) {
+        let decompressed = decompress_data(&data[header_size..])?;
+        data.truncate(header_size);
+        data.extend_from_slice(&decompressed);
+    }
+    
+    Ok(data)
 }
