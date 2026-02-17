@@ -72,7 +72,9 @@ pub fn extract_sony_bdp(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
 
         let last_file = File::open(last_file_path.unwrap())?;
         let mtk_extraction_path = app_ctx.output_dir.join(format!("{}", i + 1));
-        let ctx: AppContext = AppContext { input: InputTarget::File(last_file), output_dir: mtk_extraction_path };
+
+        //this is getting stupid...
+        let ctx: AppContext = AppContext { input: InputTarget::File(last_file), output_dir: mtk_extraction_path, options: app_ctx.options.clone() };
 
         if let Some(result) = formats::mtk_bdp::is_mtk_bdp_file(&ctx)? {
             println!("- MTK BDP file detected!\n");

@@ -27,6 +27,7 @@ pub fn is_msd10_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<d
 
 pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
+    let save_cmac = app_ctx.options.iter().any(|e| e == "msd10:save_cmac");
 
     let header: FileHeader = file.read_le()?;
     println!("\nNumber of sections: {}", header.section_count);
@@ -109,7 +110,7 @@ pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
                 out_data = stored_data;
             }
 
-            let output_path = Path::new(&app_ctx.output_dir).join(item.name.clone());
+            let output_path = Path::new(&app_ctx.output_dir).join(format!("{}", item.name));
             fs::create_dir_all(&app_ctx.output_dir)?;
             let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;   
             out_file.write_all(&out_data)?;
@@ -137,9 +138,14 @@ pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
                 return Err("Item ID in TOC does not match ID from header!".into());
             }
 
-            if item.item_type == 0x11 { //Skip CMAC DATA
-                println!("- Skipping CMAC Data...");
-                continue
+            let mut out_filename = format!("{}", item.name);
+            if item.item_type == 0x11 { //CMAC DATA
+                if save_cmac {
+                    out_filename = format!("{}.cmac", item.name); //add an additional extension, because the CMAC data has the same name as its item
+                } else {
+                    println!("- Skipping CMAC Data...");
+                    continue
+                } 
             }
             
             file.seek(SeekFrom::Start(offset as u64))?;
@@ -156,7 +162,7 @@ pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
                 out_data = stored_data;
             }
 
-            let output_path = Path::new(&app_ctx.output_dir).join(item.name.clone());
+            let output_path = Path::new(&app_ctx.output_dir).join(out_filename);
             fs::create_dir_all(&app_ctx.output_dir)?;
             let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
             out_file.write_all(&out_data)?;

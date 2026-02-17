@@ -66,6 +66,8 @@ fn parse_tdi_to_modules(tdi_data: Vec<u8>) -> Result<Vec<TdiTgtInf>, Box<dyn std
 
 pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
+    let save_extra = app_ctx.options.iter().any(|e| e == "sddl_sec:save_extra");
+
     let mut secfile_hdr_reader = Cursor::new(decipher(&common::read_exact(&mut file, 32)?));
     let secfile_header: SecHeader = secfile_hdr_reader.read_be()?;
 
@@ -74,10 +76,10 @@ pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
 
     let (tdi_file, tdi_data) = get_sec_file(&file)?;
     println!("[TDI] Name: {}, Size: {}", tdi_file.name(), tdi_file.size());
-    //if save_extra { //Save SDIT
-    //    let mut out_file = OpenOptions::new().write(true).create(true).open(Path::new(&output_folder).join(tdi_file.name()))?;
-    //    out_file.write_all(&tdi_data)?;
-    //}
+    if save_extra { //Save SDIT
+        let mut out_file = OpenOptions::new().write(true).create(true).open(Path::new(&app_ctx.output_dir).join(tdi_file.name()))?;
+        out_file.write_all(&tdi_data)?;
+    }
     if tdi_file.name() != TDI_FILENAME {
         return Err(format!("Invalid TDI filename {}!, expected: {}", tdi_file.name(), TDI_FILENAME).into());
     }
@@ -91,10 +93,10 @@ pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
         if !info_file.name().ends_with(INFO_FILE_EXTENSION) {
             return Err(format!("Info file {} does not have the expected extension {}!", info_file.name(), INFO_FILE_EXTENSION).into());
         }
-        //if save_extra { //Save info file
-        //    let mut out_file = OpenOptions::new().write(true).create(true).open(Path::new(&output_folder).join(info_file.name()))?;
-        //    out_file.write_all(&info_data)?;
-        //}
+        if save_extra { //Save info file
+            let mut out_file = OpenOptions::new().write(true).create(true).open(Path::new(&app_ctx.output_dir).join(info_file.name()))?;
+            out_file.write_all(&info_data)?;
+        }
         //print info file
         println!("{}", String::from_utf8_lossy(&info_data));
     }

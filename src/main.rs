@@ -12,6 +12,10 @@ use crate::formats::{Format, get_registry};
 struct Args {
     input_target: String,
     output_directory: Option<String>,
+
+    ///format specific options
+    #[arg(short, long)]
+    options: Vec<String>,
 }
 
 pub enum InputTarget {
@@ -22,6 +26,7 @@ pub enum InputTarget {
 pub struct AppContext {
     pub input: InputTarget,
     pub output_dir: PathBuf,
+    pub options: Vec<String>,
 }
 impl AppContext {
     pub fn file(&self) -> Option<&File> {
@@ -73,11 +78,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         app_ctx = AppContext {
             input: InputTarget::File(file),
             output_dir: output_directory_path,
+            options: args.options,
         };
     } else if target_path.is_dir() {
         app_ctx = AppContext {
             input: InputTarget::Directory(target_path),
             output_dir: output_directory_path,
+            options: args.options,
         };
     } else {
         return Err("Invalid input path!".into());
