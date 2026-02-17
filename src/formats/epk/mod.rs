@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::io::Seek;
 use crate::AppContext;
 
 use crate::utils::common;
@@ -49,7 +50,7 @@ fn match_with_pattern(data: &[u8], pattern: &str) -> bool {
 }
 
 pub fn extract_epk(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
-    let file = app_ctx.file().ok_or("Extractor expected file")?;
+    let mut file = app_ctx.file().ok_or("Extractor expected file")?;
     let ctx = ctx.downcast::<EpkContext>().expect("Missing context");
 
     let versions = common::read_file(&file, 1712, 36)?;
@@ -58,6 +59,8 @@ pub fn extract_epk(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<dy
     let sdk_version = common::string_from_bytes(&versions[20..36]);
     println!("Platform version: {}\nSDK version: {}", platform_version, sdk_version);
     
+    file.seek(std::io::SeekFrom::Start(0))?;
+
     if ctx.epk_version == 2 {
         println!("EPK2 detected!\n");
         formats::epk2::extract_epk2(app_ctx, Box::new(()))?;

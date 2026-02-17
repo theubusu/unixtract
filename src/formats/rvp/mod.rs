@@ -9,13 +9,16 @@ use std::io::{Write, Read, Cursor, Seek};
 use crate::utils::common;
 use include::*;
 
+pub struct RvpContext {
+    header_offset: u64,
+}
+
 pub fn is_rvp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let mut file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
+    let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
     //MVP
     let header = common::read_file(&file, 0, 4)?;
     if header == b"UPDT" {
-        file.seek(std::io::SeekFrom::Start(36))?; //skip rest of header // NOT GOOD PRACTICE SHOULD BE REMOVED
-        return Ok(Some(Box::new(())))
+        return Ok(Some(Box::new(RvpContext {header_offset: 36})))
     }
 
     //RVP
@@ -26,12 +29,14 @@ pub fn is_rvp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn
         }
     }
     
-    file.seek(std::io::SeekFrom::Start(64))?; //skip rest of header // NOT GOOD PRACTICE SHOULD BE REMOVED
-    Ok(Some(Box::new(())))
+    Ok(Some(Box::new(RvpContext {header_offset: 64})))
 }
 
-pub fn extract_rvp(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_rvp(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
+    let ctx = ctx.downcast::<RvpContext>().expect("Missing context");
+
+    file.seek(std::io::SeekFrom::Start(ctx.header_offset))?;
 
     let mut obf_data = Vec::new();  //we sadly cannot deXOR on the fly because of its 32 byte pattern
     file.read_to_end(&mut obf_data)?;

@@ -66,7 +66,6 @@ fn parse_tdi_to_modules(tdi_data: Vec<u8>) -> Result<Vec<TdiTgtInf>, Box<dyn std
 
 pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
-    file.seek(SeekFrom::Start(0))?;
     let mut secfile_hdr_reader = Cursor::new(decipher(&common::read_exact(&mut file, 32)?));
     let secfile_header: SecHeader = secfile_hdr_reader.read_be()?;
 

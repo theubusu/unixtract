@@ -4,7 +4,7 @@ use crate::AppContext;
 
 use std::path::Path;
 use std::fs::{self, OpenOptions};
-use std::io::{Write, Seek, SeekFrom};
+use std::io::Write;
 use binrw::BinReaderExt;
 
 use crate::utils::common;
@@ -25,9 +25,7 @@ pub fn is_amlogic_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box
 pub fn extract_amlogic(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
 
-    file.seek(SeekFrom::Start(0))?;
     let header: ImageHeader = file.read_le()?;
-
     println!("File info -\nImage size: {}\nItem align size: {}\nItem count: {}\nFormat version: {}", 
             header.image_size, header.item_align_size, header.item_count, header.version);
 

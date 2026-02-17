@@ -4,7 +4,7 @@ use crate::AppContext;
 
 use std::fs::{self, OpenOptions};
 use std::path::Path;
-use std::io::{Write, Seek, SeekFrom, Cursor};
+use std::io::{Write, Cursor};
 use binrw::BinReaderExt;
 
 use crate::utils::common;
@@ -18,7 +18,7 @@ pub fn is_epk3_file(_app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<d
 
 pub fn extract_epk3(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
-    file.seek(SeekFrom::Start(0))?;
+
     let stored_header = common::read_exact(&mut file, 1712)?;
     let header: Vec<u8>;
     let _header_signature;

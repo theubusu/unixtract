@@ -4,7 +4,7 @@ mod utils;
 
 use clap::Parser;
 use std::path::{PathBuf};
-use std::io::{self};
+use std::io::{self, Seek, SeekFrom};
 use std::fs::{self, File};
 use crate::formats::{Format, get_registry};
 
@@ -89,6 +89,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for format in formats {
         if let Some(ctx) = (format.detector_func)(&app_ctx)? {
             println!("\n{} detected!", format.name);
+
+            //reset seek of the file if present
+            if let Some(mut file) = app_ctx.file() {
+                file.seek(SeekFrom::Start(0))?;
+            }
+
             (format.extractor_func)(&app_ctx, ctx)?;
 
             //extractor returned with no error

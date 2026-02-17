@@ -13,8 +13,8 @@ use include::*;
 pub fn is_epk2b_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
 
-    let epk2_magic = common::read_file(&file, 12, 4)?;
     let epak_magic = common::read_file(&file, 0, 4)?;
+    let epk2_magic = common::read_file(&file, 12, 4)?;    
     if epak_magic == b"epak" && epk2_magic == b"EPK2" {
         Ok(Some(Box::new(())))
     } else {
