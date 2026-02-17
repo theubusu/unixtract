@@ -82,8 +82,6 @@ pub fn extract_sony_bdp(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
             println!("- Not an MTK BDP file.");    
         }
     }
-
-    println!("\nExtraction finished!");
      
     Ok(())
 }

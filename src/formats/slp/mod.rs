@@ -62,19 +62,13 @@ pub fn extract_slp(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<d
         let output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", i));
 
         fs::create_dir_all(&app_ctx.output_dir)?;
-        let mut out_file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(output_path)?;
-            
+        let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;         
         out_file.write_all(&data)?;
 
         println!("- Saved file!");
 
         i += 1;
     }
-
-    println!("\nExtraction finished!");
 
     Ok(())
 }

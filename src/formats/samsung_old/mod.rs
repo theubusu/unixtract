@@ -45,8 +45,7 @@ pub fn extract_samsung_old(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(
     if let Some(p) = secret {
         println!("Secret: {}", p);
     } else {
-        println!("Sorry, this firmware is not supported!");
-        std::process::exit(1);
+        return Err("This firmware is not supported!".into());
     }
     
     for entry in fs::read_dir(image_path)? {
@@ -128,8 +127,6 @@ pub fn extract_samsung_old(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(
             }
         }
     }
-
-    println!("\nExtraction finished!");
 
     Ok(())
 }

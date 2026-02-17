@@ -105,8 +105,6 @@ pub fn extract_pana_dvd(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), B
         }
     }
 
-    println!("\nExtraction finished!");
-
     Ok(())
 }
 

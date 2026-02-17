@@ -102,7 +102,5 @@ pub fn extract_mtk_pkg_old(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(
         println!("-- Saved file!");
     }
 
-    println!("\nExtraction finished!");
-
     Ok(())
 }

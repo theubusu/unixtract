@@ -133,6 +133,5 @@ pub fn extract_pup(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<d
 
     } 
 
-    println!("\nExtraction finished!");
     Ok(())
 }

@@ -36,7 +36,6 @@ pub fn extract_ruf(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<d
         actually_extract_ruf(file, &app_ctx.output_dir, 0)?;
     }
 
-    println!("\nExtraction finished!");
     Ok(())
 }
 
@@ -86,8 +85,7 @@ fn actually_extract_ruf(mut file: &File, output_folder: &PathBuf, start_offset: 
         println!("\nKey: {}", k);
         key_bytes = hex::decode(k)?.as_slice().try_into()?;
     } else {
-        println!("\nSorry, this firmware is not supported!");
-        std::process::exit(1);
+        return Err("This firmware is not supported!".into());
     }
 
     file.seek(SeekFrom::Start(start_offset + 2048))?;

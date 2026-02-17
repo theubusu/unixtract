@@ -155,7 +155,5 @@ pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
         }
     }
 
-    println!("\nExtraction finished!");
-
     Ok(())
 }

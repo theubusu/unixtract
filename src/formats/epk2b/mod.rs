@@ -39,7 +39,9 @@ pub fn extract_epk2b(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
         paks.push(Pak { offset: pak.offset, size: pak.size });
     }
 
-    assert!(header.pak_count as usize == paks.len(), "Paks count in header does not match the amount of non empty pak entries!");
+    if header.pak_count as usize != paks.len() {
+        return Err(format!("Paks count in header({}) does not match the amount of non empty pak entries({})!", header.pak_count, paks.len()).into());
+    }
 
     for (i, pak) in paks.iter().enumerate() {
         file.seek(SeekFrom::Start(pak.offset as u64))?;
@@ -56,7 +58,9 @@ pub fn extract_epk2b(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
                 pak_header = file.read_le()?;
             }
 
-            assert!(i == pak_header.segment_index, "Unexpected segment index in pak header!, expected: {}, got: {}", i , pak_header.segment_index);
+            if i != pak_header.segment_index {
+                return Err(format!("Unexpected segment index in pak header!, expected: {}, got: {}", i , pak_header.segment_index).into());
+            }
 
             println!("- Segment {}/{} - Size: {}", i + 1, pak_header.segment_count, pak_header.segment_size);
             let out_data = common::read_exact(&mut file, pak_header.segment_size as usize)?;
@@ -78,8 +82,6 @@ pub fn extract_epk2b(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
             println!("-- Saved to file!");
         }
     }
-
-    println!("\nExtraction finished!");
 
     Ok(())
 }

@@ -32,8 +32,7 @@ pub fn extract_amlogic(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), B
             header.image_size, header.item_align_size, header.item_count, header.version);
 
     if header.version != 2 {
-        println!("\nSorry, this format version is not yet supported!");
-        return Ok(());
+        return Err("Unsupported format version! (Only 2 is supported right now)".into());
     }
 
     let mut items: Vec<ItemEntry> = Vec::new();
@@ -74,6 +73,5 @@ pub fn extract_amlogic(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), B
         }
     }
 
-    println!("\nExtraction finished!");
     Ok(())
 }

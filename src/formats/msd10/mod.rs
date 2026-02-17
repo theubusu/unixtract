@@ -70,8 +70,7 @@ pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
         passphrase_bytes = hex::decode(p)?;
         println!("Firmware type: {}", firmware_type);
     } else {
-        println!("Sorry, this firmware is not supported!");
-        std::process::exit(1);
+        return Err("This firmware is not supported!".into());
     }
 
     let toc_offset = headers[0].offset;
@@ -95,7 +94,9 @@ pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
             println!("\n({}/{}) - {}, Size: {}",
                     i + 1, items.len(), item.name, size);
 
-            assert!(sections[i as usize].index == item.item_id, "Item ID in TOC does not match ID from header!");
+            if sections[i as usize].index != item.item_id {
+                return Err("Item ID in TOC does not match ID from header!".into());
+            }
 
             let stored_data = common::read_file(&file, offset as u64, size as usize)?;
 
@@ -132,7 +133,9 @@ pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
             println!("\n({}/{}) - {}, Type: {}, Size: {}",
                     item.item_id, items.len(), item.name, type_str, item.all_size);
 
-            assert!(sections[i as usize].index == item.item_id, "Item ID in TOC does not match ID from header!");
+            if sections[i as usize].index != item.item_id {
+                return Err("Item ID in TOC does not match ID from header!".into());
+            }
 
             if item.item_type == 0x11 { //Skip CMAC DATA
                 println!("- Skipping CMAC Data...");
@@ -161,8 +164,6 @@ pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
             println!("-- Saved file!");
         }
     }
-
-    println!("\nExtraction finished!");
 
     Ok(())
 }

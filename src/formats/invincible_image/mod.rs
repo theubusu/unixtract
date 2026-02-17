@@ -39,8 +39,7 @@ pub fn extract_invincible_image(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Res
     }
 
     if header.file_version[0] != 3 {
-        println!("\nSorry, this version of the file is not supported!");
-        return Ok(())
+        return Err("Unsupported format version! (Only 3 is supported right now)".into());
     }
 
     let mut encrypted_data = Vec::new();
@@ -76,8 +75,6 @@ pub fn extract_invincible_image(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Res
         println!("- Saved file!");
         i += 1;
     }
-
-    println!("\nExtraction finished!");
 
     Ok(())
 }

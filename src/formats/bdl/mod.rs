@@ -70,7 +70,5 @@ pub fn extract_bdl(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<d
         }
     }
 
-    println!("\nExtraction finished!");
-
     Ok(())
 }

@@ -35,8 +35,7 @@ pub fn extract_nvt_timg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
         pimg_i += 1;
         let pimg: PIMG = file.read_le()?;
         if &pimg.magic_bytes != b"PIMG" {
-            println!("Invalid PIMG magic!");
-            return Ok(());
+            return Err("Invalid PIMG magic!".into());
         }
 
         let data = common::read_exact(&mut file, pimg.size as usize)?;
@@ -57,7 +56,7 @@ pub fn extract_nvt_timg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
             println!("-- Saved file!");
             continue
         } else {
-            println!("- Warning: unsupported compression type!");
+            println!("- Warning: unsupported compression type, saving stored data!");
             out_data = data;
         }
 
@@ -67,8 +66,6 @@ pub fn extract_nvt_timg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
 
         println!("-- Saved file!");
     }
-
-    println!("\nExtraction finished!");
 
     Ok(())
 }

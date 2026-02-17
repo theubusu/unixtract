@@ -43,8 +43,7 @@ pub fn extract_epk3(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
         new_type = true;
 
     } else {
-        println!("No valid key found!");
-        return Ok(());
+        return Err("No valid key found!".into());
     }
 
     let signature_size = if new_type {256} else {128};
@@ -110,6 +109,5 @@ pub fn extract_epk3(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
         pak_i += 1;
     }
 
-    println!("\nExtraction finished!");
     Ok(())
 }

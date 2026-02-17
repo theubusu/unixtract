@@ -12,7 +12,9 @@ type Aes128CbcDec = Decryptor<Aes128>;
 pub fn decrypt_aes_salted_old(encrypted_data: &[u8], passphrase_bytes: &Vec<u8>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut data = encrypted_data.to_vec();
 
-    assert!(data[0..8].to_vec() == b"Salted__", "invalid encrypted data!");
+    if data[0..8].to_vec() != b"Salted__" {
+        return Err("Invalid encrypted data!".into());
+    }
     let salt = &data[8..16];
 
     //key = md5 of (passphrase + salt)
@@ -38,7 +40,9 @@ pub fn decrypt_aes_salted_old(encrypted_data: &[u8], passphrase_bytes: &Vec<u8>)
 pub fn decrypt_aes_salted_tizen(encrypted_data: &[u8], passphrase_bytes: &Vec<u8>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut data = encrypted_data.to_vec();
 
-    assert!(data[0..8].to_vec() == b"Salted__", "invalid encrypted data!");
+    if data[0..8].to_vec() != b"Salted__" {
+        return Err("Invalid encrypted data!".into());
+    }
     let salt = &data[8..16];
 
     //iv = md5 of salt

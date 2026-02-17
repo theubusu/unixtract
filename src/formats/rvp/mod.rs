@@ -122,7 +122,5 @@ pub fn extract_rvp(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<d
         println!("- Saved file!");
     }
 
-    println!("\nExtraction finished!");
-
     Ok(())
 }

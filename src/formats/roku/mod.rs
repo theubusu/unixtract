@@ -95,6 +95,5 @@ pub fn extract_roku(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
         }
     }
 
-    println!("\nExtraction finished!");
     Ok(())
 }

@@ -90,6 +90,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(ctx) = (format.detector_func)(&app_ctx)? {
             println!("\n{} detected!", format.name);
             (format.extractor_func)(&app_ctx, ctx)?;
+
+            //extractor returned with no error
+            println!("\nExtraction finished! Saved extracted files to {}", output_path_str);
             return Ok(());
         }
     }

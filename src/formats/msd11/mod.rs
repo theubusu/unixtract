@@ -65,8 +65,7 @@ pub fn extract_msd11(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
         println!("Passphrase: {}", p);
         passphrase_bytes = hex::decode(p)?;
     } else {
-        println!("Sorry, this firmware is not supported!");
-        std::process::exit(1);
+        return Err("This firmware is not supported!".into());
     }
 
     let toc_offset = headers[0].offset + 8;
@@ -88,7 +87,9 @@ pub fn extract_msd11(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
         println!("\n({}/{}) - {}, Size: {}",
                 i + 1, items.len(), item.name, size);
 
-        assert!(sections[i as usize].index == item.item_id, "Item ID in TOC does not match ID from header!");
+        if sections[i as usize].index != item.item_id {
+            return Err("Item ID in TOC does not match ID from header!".into());
+        }
 
         let stored_data = common::read_file(&file, offset as u64, size as usize)?;
 
@@ -108,8 +109,6 @@ pub fn extract_msd11(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
 
         println!("-- Saved file!");
     }
-
-    println!("\nExtraction finished!");
 
     Ok(())
 }

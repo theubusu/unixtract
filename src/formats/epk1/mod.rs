@@ -36,8 +36,7 @@ pub fn extract_epk1(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
         println!("\nLittle endian EPK1 detected.");
         epk1_type = "le";
     } else {
-        println!("\nUnknown EPK1 variant!");
-        return Ok(());
+        return Err("Unknown EPK1 variant!".into());
     }
 
     file.seek(SeekFrom::Start(0))?;
@@ -54,7 +53,10 @@ pub fn extract_epk1(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
             }
             paks.push(Pak { offset: pak.offset, size: pak.size });
         }
-        assert!(header.pak_count as usize == paks.len(), "Paks count in header({}) does not match the amount of non empty pak entries({})!", header.pak_count, paks.len());
+        
+        if header.pak_count as usize != paks.len() {
+            return Err(format!("Paks count in header({}) does not match the amount of non empty pak entries({})!", header.pak_count, paks.len()).into());
+        }
 
         let version = common::read_exact(&mut file, 4)?;
 
@@ -68,7 +70,9 @@ pub fn extract_epk1(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
         let header_size_bytes = common::read_file(&file, 12, 4)?; //offset of first entry, can be treated as header size
         let header_size = u32::from_le_bytes(header_size_bytes.try_into().unwrap());
         let max_pak_count = (header_size - 48) / 8; //header size minus common header + ota id (48) divide by size of pak entry (8). 
-        assert!(max_pak_count < 128, "Unreasonable calculated pak count {}!!", max_pak_count);
+        if max_pak_count > 128 {
+            return Err(format!("Unreasonable calculated pak count {}!!", max_pak_count).into());
+        }
 
         for _i in 0..max_pak_count {
             let pak: Pak = file.read_le()?;
@@ -77,7 +81,10 @@ pub fn extract_epk1(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
             }
             paks.push(Pak { offset: pak.offset, size: pak.size });
         }
-        assert!(header.pak_count as usize == paks.len(), "Paks count in header({}) does not match the amount of non empty pak entries({})!", header.pak_count, paks.len());
+
+        if header.pak_count as usize != paks.len() {
+            return Err(format!("Paks count in header({}) does not match the amount of non empty pak entries({})!", header.pak_count, paks.len()).into());
+        }
 
         let version = common::read_exact(&mut file, 4)?;
 
@@ -104,8 +111,6 @@ pub fn extract_epk1(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
 
         println!("- Saved file!");
     }
-    
-    println!("\nExtraction finished!");
 
     Ok(())
 }

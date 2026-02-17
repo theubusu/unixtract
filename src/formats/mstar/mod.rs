@@ -47,7 +47,7 @@ pub fn extract_mstar(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
         script_string = String::from_utf8_lossy(&script);
 
         if script_string == "" {
-            println!("Failed to get script.");
+            return Err("Failed to get script".into());
         }
     }
 
@@ -167,9 +167,6 @@ pub fn extract_mstar(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
 
         i += 1;
     }
-
-    println!();
-    println!("Extraction finished!");
 
     Ok(())
 }

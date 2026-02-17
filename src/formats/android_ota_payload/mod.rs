@@ -32,8 +32,7 @@ pub fn extract_android_ota_payload(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> 
     println!("File info:\nFormat version: {}\nManifest size: {}", header.file_format_version, header.manifest_size);
 
     if header.file_format_version != 2 {
-        println!("\nSorry, this version of the file is not supported!");
-        return Ok(())
+        return Err("Unsupported format version! (Only 2 is supported right now)".into());
     }
 
     let base_offset = 24 /* size of header */ + header.manifest_size + header.metadata_signature_size as u64;
@@ -84,8 +83,6 @@ pub fn extract_android_ota_payload(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> 
         }
         println!("\n-- Saved!");
     }
-
-    println!("\nExtraction finished!");
 
     Ok(())
 }

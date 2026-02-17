@@ -72,8 +72,7 @@ pub fn extract_mtk_bdp(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Bo
     let mut pit_entries: Vec<PITEntry> = Vec::new();
     let pit_header: PITHeader = file.read_le()?;
     if pit_header.pit_magic != PIT_MAGIC {
-        println!("Invalid PIT Magic!");
-        return Ok(());
+        return Err("Invalid PIT magic!".into());
     }
     println!("PIT Info - First entry offs: {}, Entry size: {}, Entry count: {}", pit_header.first_entry_offset, pit_header.entry_size, pit_header.entry_count);
     file.seek(SeekFrom::Start(pit_offset + pit_header.first_entry_offset as u64))?;
@@ -90,8 +89,7 @@ pub fn extract_mtk_bdp(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Bo
     let mut bit_entries: Vec<BITEntry> = Vec::new();
     let bit_magic = common::read_exact(&mut file, 20)?;
     if bit_magic != BIT_MAGIC {
-        println!("Invalid BIT Magic!");
-        return Ok(());
+        return Err("Invalid BIT magic!".into());
     }
 
     let mut bit_i = 0;
@@ -127,8 +125,6 @@ pub fn extract_mtk_bdp(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Bo
 
         println!("-- Saved file!");
     }
-
-    println!("\nExtraction finished!");
-
+    
     Ok(())
 }

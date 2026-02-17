@@ -46,8 +46,6 @@ pub fn extract_funai_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(),
 
         println!("- Saved file!");
     }
-
-    println!("\nExtraction finished!");
-
+    
     Ok(())
 }

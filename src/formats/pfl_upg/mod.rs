@@ -52,8 +52,7 @@ pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), B
             }
         }
         if key.is_none() {
-            println!("Sorry, this firmware is not supported!");
-            std::process::exit(1);
+            return Err("This firmware is not supported!".into());
         }
 
         //get key
@@ -142,8 +141,6 @@ pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), B
 
         println!("- Saved file!");
     }
-
-    println!("\nExtraction finished!");
     
     Ok(())
 }

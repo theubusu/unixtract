@@ -47,8 +47,7 @@ pub fn extract_epk2(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
             matching_key = Some(key_bytes);
             header = decrypt_aes_ecb_auto(matching_key.as_ref().unwrap(), &stored_header)?;
         } else {
-            println!("No valid key found!");
-            return Ok(());
+            return Err("No valid key found!".into());
         }    
     }
     //parse header
@@ -86,8 +85,7 @@ pub fn extract_epk2(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
                 println!("Found correct key: {}", key_name);
                 matching_key = Some(key_bytes);
             } else {
-                println!("No valid key found!");
-                return Ok(());
+                return Err("No valid key found!".into());
             }
         }
         let matching_key_bytes = matching_key.as_ref().unwrap();
@@ -109,7 +107,9 @@ pub fn extract_epk2(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
                 pak_header = pak_header_reader.read_le()?;
             }
 
-            assert!(i == pak_header.segment_index, "Unexpected segment index in pak header!, expected: {}, got: {}", i , pak_header.segment_index);
+            if i != pak_header.segment_index {
+                return Err(format!("Unexpected segment index in pak header!, expected: {}, got: {}", i , pak_header.segment_index).into());
+            }
 
             let actual_segment_size = 
             // check if this is the last segment and not the last PAK
@@ -143,8 +143,6 @@ pub fn extract_epk2(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
             println!("-- Saved to file!");
         }
     }
-
-    println!("\nExtraction finished!");
 
     Ok(())
 }
