@@ -1,6 +1,7 @@
 mod include;
 mod pana_dvd_crypto;
 mod lzss;
+mod util;
 use std::any::Any;
 use crate::AppContext;
 
@@ -16,6 +17,7 @@ use crate::utils::compression::{decompress_gzip};
 use pana_dvd_crypto::{decrypt_data};
 use lzss::{decompress_lzss};
 use include::*;
+use util::split_main_file;
 
 pub struct PanaDvdContext {
     matching_key: [u8; 8],
@@ -96,24 +98,25 @@ pub fn extract_pana_dvd(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), B
     if file_entries.len() == 1 {
         //only one file, standard extraction
         println!("File contains no extra sub-files...\n");
-        extract_file(&mut file_reader, file_entries[0].offset as u64, file_entries[0].base_offset as u64, matching_key, &app_ctx.output_dir)?;
+        extract_file(app_ctx, &mut file_reader, file_entries[0].offset as u64, file_entries[0].base_offset as u64, matching_key, &app_ctx.output_dir)?;
     } else {
         println!("File contains {} sub-files...", file_entries.len());
         for (i, file_entry ) in file_entries.iter().enumerate() {
             println!("\nExtracting file {}/{} - Offset: {}, base: {}", i + 1, file_entries.len(), file_entry.offset, file_entry.base_offset);
-            extract_file(&mut file_reader, file_entry.offset as u64, file_entry.base_offset as u64, matching_key, &app_ctx.output_dir.join(format!("file_{}", i + 1)))?;
+            extract_file(app_ctx, &mut file_reader, file_entry.offset as u64, file_entry.base_offset as u64, matching_key, &app_ctx.output_dir.join(format!("file_{}", i + 1)))?;
         }
     }
 
     Ok(())
 }
 
-fn extract_file(file_reader: &mut Cursor<Vec<u8>>, offset: u64, base_offset: u64, key: [u8; 8], output_folder: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+fn extract_file(app_ctx: &AppContext, file_reader: &mut Cursor<Vec<u8>>, offset: u64, base_offset: u64, key: [u8; 8], output_folder: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     file_reader.seek(SeekFrom::Start(offset + base_offset))?;
  
     let enc_header = common::read_exact(file_reader, MAX_HEADER_SIZE)?;
     let mut hdr_reader = Cursor::new(decrypt_data(&enc_header, &key));
     let mut modules: Vec<ModuleEntry> = Vec::new();
+    let split_main = app_ctx.options.iter().any(|e| e == "pana_dvd:split_main");
 
     for i in 0..100 {
         let mut entry: ModuleEntry = hdr_reader.read_le()?;
@@ -146,7 +149,11 @@ fn extract_file(file_reader: &mut Cursor<Vec<u8>>, offset: u64, base_offset: u64
 
         if module.name() == "MAIN" {
             println!("- Extracting MAIN...");
-            extract_main(file_reader, key, output_path)?;
+            extract_main(file_reader, key, &output_path)?;
+            if split_main {
+                println!("\n- Splitting MAIN...");
+                split_main_file(&output_path, output_folder)?;
+            }
             continue
         }
 
@@ -169,7 +176,7 @@ fn extract_file(file_reader: &mut Cursor<Vec<u8>>, offset: u64, base_offset: u64
     Ok(())
 }
 
-fn extract_main(file_reader: &mut Cursor<Vec<u8>>, key: [u8; 8], output_path: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+fn extract_main(file_reader: &mut Cursor<Vec<u8>>, key: [u8; 8], output_path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let main_list_hdr: MainListHeader = file_reader.read_le()?;
     if main_list_hdr.entry_count() > 200 {
         println!("Unsupported MAIN data, skipping!");
