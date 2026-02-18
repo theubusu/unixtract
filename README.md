@@ -8,10 +8,13 @@ Please note that this project is still under active development and errors may o
 Build from source, by downloading the code or cloning the respository and running `cargo build --release`. The binary will be saved in `target/release`.  
 
 # Usage
-`unixtract <INPUT_TARGET> [OUTPUT_FOLDER]`   
+`unixtract [OPTIONS] <INPUT_TARGET> [OUTPUT_FOLDER]`  
+Arguments:   
 `<INPUT_TARGET>` - The target to analyze/extract.  
 `[OUTPUT_FOLDER]` - Folder to save extracted files to.  
 If an output folder is not provided, extracted files will be saved in folder `_<INPUT_TARGET>`.   
+Options:  
+`-o, --options <OPTIONS>` - Format specific or global(for all formats that implement it) options, see the list below for format specific options. You can use this multiple times to activate multiple options.    
 
 # Supported formats
 ## Amlogic burning image  
@@ -55,6 +58,8 @@ If an output folder is not provided, extracted files will be saved in folder `_<
 **Used in:** Samsung TVs 2013-2015  
 **Notes:** **Depends on keys** - see keys.rs  
 **Thanks to:** https://github.com/bugficks/msddecrypt  
+**Options:**   
+`msd10:save_cmac` - Save CMAC data for files that is skipped by default.
 
 ## MSD 1.1
 **Used in:** Samsung TVs 2016+  
@@ -123,7 +128,9 @@ If an output folder is not provided, extracted files will be saved in folder `_<
 
 ## SDDL.SEC
 **Used in:** Panasonic TVs  
-**Notes:** Pre-2011 files are not supported. 
+**Notes:** Pre-2011 files are not supported.  
+**Options:**   
+`sddl_sec:save_extra` - Save SDIT.FDI and .TXT files that are not extracted by default.
 
 ## SLP
 **Used in:** Samsung Tizen-based NX series cameras  
