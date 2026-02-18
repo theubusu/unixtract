@@ -46,6 +46,7 @@ pub fn is_mtk_pkg_new_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>,
 pub fn extract_mtk_pkg_new(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
     let ctx = ctx.downcast::<MtkPkgNewContext>().expect("Missing context");
+    let no_del_comp = app_ctx.options.iter().any(|e| e == "mtk_pkg:no_del_comp");
 
     let file_size = file.metadata()?.len();
 
@@ -119,8 +120,10 @@ pub fn extract_mtk_pkg_new(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<()
             match decompress_lzhs_fs_file2file(&out_file, lzhs_out_path) {
                 Ok(()) => {
                     println!("-- Decompressed Successfully!");
-                    //after successfull decompression remove the temporary .lzhs file
-                    fs::remove_file(&output_path)?;
+                    if !no_del_comp {
+                        //after successfull decompression remove the temporary .lzhs file
+                        fs::remove_file(&output_path)?;
+                    }
                 },
                 Err(e) => {
                     eprintln!("Failed to decompress partition!, Error: {}. Saving compressed data...", e);

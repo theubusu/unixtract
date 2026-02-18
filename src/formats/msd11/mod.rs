@@ -26,6 +26,7 @@ pub fn is_msd11_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<d
 
 pub fn extract_msd11(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
+    let print_ouith_tree = app_ctx.options.iter().any(|e| e == "msd:print_ouith");
 
     let header: FileHeader = file.read_le()?;
     println!("\nNumber of sections: {}", header.section_count);
@@ -73,7 +74,7 @@ pub fn extract_msd11(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
     let toc_data = common::read_file(&file, toc_offset as u64, toc_size as usize)?;
 
     let toc = decrypt_aes_salted_tizen(&toc_data, &passphrase_bytes)?;
-    let (items, info) = parse_blob_1_9(&toc)?;
+    let (items, info) = parse_blob_1_9(&toc, print_ouith_tree)?;
 
     if let Some(info) = info {
         println!("\nImage info:\n{} {}.{}",

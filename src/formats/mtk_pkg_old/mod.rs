@@ -36,6 +36,7 @@ pub fn is_mtk_pkg_old_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>,
 
 pub fn extract_mtk_pkg_old(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
+    let no_del_comp = app_ctx.options.iter().any(|e| e == "mtk_pkg:no_del_comp");
 
     let file_size = file.metadata()?.len();
     let encrypted_header = common::read_exact(&mut file, HEADER_SIZE)?;
@@ -89,8 +90,10 @@ pub fn extract_mtk_pkg_old(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(
             match decompress_lzhs_fs_file2file_old(&out_file, lzhs_out_path) {
                 Ok(()) => {
                     println!("- Decompressed Successfully!");
-                    //after successfull decompression remove the temporary .lzhs file
-                    fs::remove_file(&output_path)?;
+                    if !no_del_comp {
+                        //after successfull decompression remove the temporary .lzhs file
+                        fs::remove_file(&output_path)?;
+                    }
                 },
                 Err(e) => {
                     eprintln!("Failed to decompress partition!, Error: {}. Saving compressed data...", e);

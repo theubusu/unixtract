@@ -59,12 +59,15 @@ Options:
 **Notes:** **Depends on keys** - see keys.rs  
 **Thanks to:** https://github.com/bugficks/msddecrypt  
 **Options:**   
-`msd10:save_cmac` - Save CMAC data for files that is skipped by default.
+`msd10:save_cmac` - Save CMAC data for files that is skipped by default.   
+`msd:print_ouith` - Prints the entire parsed OUITH header.  
 
 ## MSD 1.1
 **Used in:** Samsung TVs 2016+  
 **Notes:** **Depends on keys** - see keys.rs (keys 2015-2018, 2020 included)  
 **Thanks to:** https://github.com/bugficks/msddecrypt  
+**Options:**   
+`msd:print_ouith` - Prints the entire parsed OUITH header.  
 
 ## MStar upgrade bin
 **Used in:** Many MStar-based TVs (Hisense, Toshiba...)  
@@ -77,15 +80,21 @@ Options:
 ## MediaTek PKG (New)
 **Used in:** Newer MediaTek-based TVs (TCL, Hisense, Sony, Philips, CVT...)  
 **Notes:** **Depends on keys** - see keys.rs (Keys for Philips and Sony included)  
+**Options:**   
+`mtk_pkg:no_del_comp` - Don't delete LZHS compressed partition file after decompressing.      
 
 ## MediaTek PKG (Old)
 **Used in:** Older MediaTek-based TVs (Philips, Sony, Hisense...)  
-**Notes:** All files should be supported, decryption + decompression 
+**Notes:** All files should be supported, decryption + decompression   
+**Options:**   
+`mtk_pkg:no_del_comp` - Don't delete LZHS compressed partition file after decompressing.      
 
 ## MediaTek PKG
 **Used in:** MediaTek-based TVs (Sony, Philips, Panasonic, Sharp...)  
 **Notes:** All files should be supported, decryption + decompression, however some Philips files use custom keys - most are included some could be missing  
-**Thanks to:** https://github.com/openlgtv/epk2extract
+**Thanks to:** https://github.com/openlgtv/epk2extract   
+**Options:**   
+`mtk_pkg:no_del_comp` - Don't delete LZHS compressed partition file after decompressing.      
 
 ## Novatek PKG (NFWB)
 **Used in:** Some older Novatek-based TVs (LG, Philips)  

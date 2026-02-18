@@ -48,7 +48,10 @@ pub struct Header {
 }
 impl Header {
     pub fn description(&self) -> String {
-        common::string_from_bytes(&self.description_bytes)
+        common::string_from_bytes(&self.description_bytes).replace('\r', "\n")
+    }
+    pub fn is_encrypted(&self) -> bool {
+        (self.mask & 0x2000_0000) != 0
     }
 }
 
@@ -63,5 +66,14 @@ pub struct FileHeader {
 impl FileHeader {
     pub fn file_name(&self) -> String {
         common::string_from_bytes(&self.file_name_bytes)
+    }
+    pub fn is_folder(&self) -> bool {
+        (self.attributes[3] & (1 << 1)) != 0
+    }
+    pub fn has_extended_name(&self) -> bool {
+        (self.attributes[2] & (1 << 7)) != 0
+    }
+    pub fn _is_package(&self) -> bool {
+        (self.attributes[3] & (1 << 1)) != 0
     }
 }

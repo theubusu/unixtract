@@ -28,6 +28,7 @@ pub fn is_msd10_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<d
 pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
     let save_cmac = app_ctx.options.iter().any(|e| e == "msd10:save_cmac");
+    let print_ouith_tree = app_ctx.options.iter().any(|e| e == "msd:print_ouith");
 
     let header: FileHeader = file.read_le()?;
     println!("\nNumber of sections: {}", header.section_count);
@@ -81,7 +82,7 @@ pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
     //parse TOC
     if firmware_type == "tizen" {
         let toc = decrypt_aes_salted_tizen(&toc_data, &passphrase_bytes)?;
-        let (items, info) = parse_blob_1_8(&toc)?;
+        let (items, info) = parse_blob_1_8(&toc, print_ouith_tree)?;
 
         if let Some(info) = info {
             println!("\nImage info:\n{} {}.{} {}/{}/{}",
@@ -121,7 +122,7 @@ pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
 
     } else if firmware_type == "old" {
         let toc = decrypt_aes_salted_old(&toc_data, &passphrase_bytes)?;
-        let (items, info) = parse_ouith_blob(&toc)?;
+        let (items, info) = parse_ouith_blob(&toc, print_ouith_tree)?;
 
         if let Some(info) = info {
             println!("\nImage info:\n{} {}.{} {}/{}/20{}",

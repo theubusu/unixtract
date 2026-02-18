@@ -39,7 +39,7 @@ pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), B
     println!("Data size: {}", header.data_size);
 
     let mut decrypted_data;
-    if (header.mask & 0x2000_0000) != 0 {
+    if header.is_encrypted() {
         println!("File is encrypted.");
         let mut key = None;
         let mut n_hex = None;
@@ -95,16 +95,14 @@ pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), B
     while (data_reader.position() as usize) < data_reader.get_ref().len() {
         let file_header: FileHeader = data_reader.read_le()?; 
 
-        //its a folder not a file
-        if (file_header.attributes[3] & (1 << 1)) != 0 {
+        if file_header.is_folder() {
             println!("\nFolder - {}", file_header.file_name());
             let output_path = Path::new(&app_ctx.output_dir).join(file_header.file_name().trim_start_matches('/'));
             fs::create_dir_all(output_path)?;
             continue
         }
 
-        //extended name is used
-        let file_name = if (file_header.attributes[2] & (1 << 7)) != 0 {
+        let file_name = if file_header.has_extended_name() {
             let ex_name_size = file_header.header_size - 76; //76 is base file header size
             //println!("extended name {}, org name: {}", ex_name_size, file_header.file_name());
             let ex_name_bytes = common::read_exact(&mut data_reader, ex_name_size as usize)?;
@@ -133,11 +131,6 @@ pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), B
         let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
 
         out_file.write_all(&data[..file_header.real_size as usize])?;
-
-        //if it contains a PFL upg in itself to extract
-        //if (file_header.attributes[3] & (1 << 2)) != 0 {
-        //   println!("Container file");
-        //}
 
         println!("- Saved file!");
     }
