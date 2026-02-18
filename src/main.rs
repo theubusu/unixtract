@@ -4,165 +4,112 @@ mod utils;
 
 use clap::Parser;
 use std::path::{PathBuf};
-use std::io::{self};
+use std::io::{self, Seek, SeekFrom};
 use std::fs::{self, File};
+use crate::formats::{Format, get_registry};
 
 #[derive(Parser, Debug)]
 struct Args {
     input_target: String,
-    output_folder: Option<String>,
+    output_directory: Option<String>,
+
+    ///format specific options
+    #[arg(short, long)]
+    options: Vec<String>,
+}
+
+pub enum InputTarget {
+    File(File),
+    Directory(PathBuf),
+}
+
+pub struct AppContext {
+    pub input: InputTarget,
+    pub output_dir: PathBuf,
+    pub options: Vec<String>,
+}
+impl AppContext {
+    pub fn file(&self) -> Option<&File> {
+        match &self.input {
+            InputTarget::File(f) => Some(f),
+            _ => None,
+        }
+    }
+
+    pub fn dir(&self) -> Option<&PathBuf> {
+        match &self.input {
+            InputTarget::Directory(p) => Some(p),
+            _ => None,
+        }
+    }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("unixtract Firmware extractor");
     let args = Args::parse();
 
-    let target_path = args.input_target;
-    println!("Input target: {}", target_path);
-    let path = PathBuf::from(target_path);
-
-    let output_path = if args.output_folder.is_some() {
-        args.output_folder.unwrap()
+    let target_path_str = args.input_target;
+    println!("Input target: {}", target_path_str);
+    let target_path = PathBuf::from(&target_path_str);
+    
+    let output_path_str = if args.output_directory.is_some() {
+        args.output_directory.unwrap()
     } else {
-        format!("_{}", path.file_name().and_then(|s| s.to_str()).unwrap())
+        format!("_{}", target_path.file_name().and_then(|s| s.to_str()).unwrap())
     };
-    println!("Output folder: {}\n", output_path);
+    println!("Output directory: {}", output_path_str);
+    let output_directory_path = PathBuf::from(&output_path_str);
 
-    let output_folder_path = PathBuf::from(&output_path);
-    if output_folder_path.exists() {
-        if output_folder_path.is_dir() {
-            let is_empty = fs::read_dir(&output_folder_path)?.next().is_none();
+    if output_directory_path.exists() {
+        if output_directory_path.is_dir() {
+            let is_empty = fs::read_dir(&output_directory_path)?.next().is_none();
             if !is_empty {
-                println!("Warning: Output folder already exists and is NOT empty! Files may be overwritten!");
+                println!("\nWarning: Output folder already exists and is NOT empty! Files may be overwritten!");
                 println!("Press Enter if you want to continue...");
                 io::stdin().read_line(&mut String::new())?;
             }
         }
     }
- 
-    if path.is_dir() {
-        if formats::samsung_old::is_samsung_old_dir(&path) {
-            println!("Samsung old firmware dir detected!\n");
-            formats::samsung_old::extract_samsung_old(&path, &output_path)?
-        } else {
-            println!("Input format not recognized!");
-        }
+
+    let app_ctx;
+
+    if target_path.is_file() {
+        let file = File::open(&target_path)?;
+        app_ctx = AppContext {
+            input: InputTarget::File(file),
+            output_dir: output_directory_path,
+            options: args.options,
+        };
+    } else if target_path.is_dir() {
+        app_ctx = AppContext {
+            input: InputTarget::Directory(target_path),
+            output_dir: output_directory_path,
+            options: args.options,
+        };
     } else {
-        let file = File::open(path)?;
-        if formats::sddl_sec::is_sddl_sec_file(&file) {
-            println!("SDDL.SEC file detected!");
-            formats::sddl_sec::extract_sddl_sec(&file, &output_path)?;
-        } 
-        else if formats::invincible_image::is_invincible_image_file(&file) {
-            println!("INVINCIBLE_IMAGE file detected!");
-            formats::invincible_image::extract_invincible_image(&file, &output_path)?;
-        } 
-        else if formats::msd10::is_msd10_file(&file) {
-            println!("MSD10 file detected!");
-            formats::msd10::extract_msd10(&file, &output_path)?;
-        } 
-        else if formats::msd11::is_msd11_file(&file) {
-            println!("MSD11 file detected!");
-            formats::msd11::extract_msd11(&file, &output_path)?;
-        } 
-        else if formats::nvt_timg::is_nvt_timg_file(&file) {
-            println!("Novatek TIMG file detected!");
-            formats::nvt_timg::extract_nvt_timg(&file, &output_path)?;
-        }
-        else if formats::bdl::is_bdl_file(&file) {
-            println!("BDL file detected!");
-            formats::bdl::extract_bdl(&file, &output_path)?;
-        }
-        else if formats::android_ota_payload::is_android_ota_payload_file(&file) {
-            println!("Android OTA payload file detected!");
-            formats::android_ota_payload::extract_android_ota_payload(&file, &output_path)?;
-        }
-        else if formats::novatek::is_novatek_file(&file) {
-            println!("Novatek file detected!");
-            formats::novatek::extract_novatek(&file, &output_path)?;
-        } 
-        else if formats::slp::is_slp_file(&file) {
-            println!("SLP file detected!");
-            formats::slp::extract_slp(&file, &output_path)?;
-        } 
-        else if formats::epk1::is_epk1_file(&file) {
-            println!("EPK1 file detected!");
-            formats::epk1::extract_epk1(&file, &output_path)?;
-        }
-        else if formats::epk2b::is_epk2b_file(&file) {
-            println!("EPK2B file detected!");
-            formats::epk2b::extract_epk2b(&file, &output_path)?;
-        }
-        //epk with encrypted header - it can be epk2 or epk3 so we need to check
-        else if formats::epk::is_epk_file(&file) {
-            println!("EPK file detected!");
-            formats::epk::extract_epk(&file, &output_path)?;
-        }
-        //epk2 with unencrypted header
-        else if formats::epk2::is_epk2_file(&file) {
-            println!("EPK2 file detected!");
-            formats::epk2::extract_epk2(&file, &output_path)?;
-        }
-        else if formats::ruf::is_ruf_file(&file) {
-            println!("RUF file detected!");
-            formats::ruf::extract_ruf(&file, &output_path)?;
-        }
-        else if formats::funai_upg::is_funai_upg_file(&file) {
-            println!("Funai UPG file detected!");
-            formats::funai_upg::extract_funai_upg(&file, &output_path)?;
-        }
-        else if formats::pfl_upg::is_pfl_upg_file(&file) {
-            println!("PFL UPG file detected!");
-            formats::pfl_upg::extract_pfl_upg(&file, &output_path)?;
-        }
-        else if formats::amlogic::is_amlogic_file(&file) {
-            println!("Amlogic image file detected!");
-            formats::amlogic::extract_amlogic(&file, &output_path)?;
-        }
-        else if let Some(result) = formats::pana_dvd::is_pana_dvd_file(&file)? {
-            println!("PANA_DVD file detected!");
-            formats::pana_dvd::extract_pana_dvd(&file, &output_path, result)?;
-        }
-        else if formats::pup::is_pup_file(&file) {
-            println!("PUP file detected!");
-            formats::pup::extract_pup(&file, &output_path)?;
-        }
-        else if formats::sony_bdp::is_sony_bdp_file(&file) {
-            println!("Sony BDP file detected!");
-            formats::sony_bdp::extract_sony_bdp(&file, &output_path)?;
-        }
-        else if formats::rvp::is_rvp_file(&file) {
-            println!("RVP/MVP file detected!");
-            formats::rvp::extract_rvp(&file, &output_path)?;
-        }
-        else if formats::mstar::is_mstar_file(&file) {
-            println!("Mstar upgrade file detected!");
-            formats::mstar::extract_mstar(&file, &output_path)?;
-        }  
-        else if formats::roku::is_roku_file(&file) {
-            println!("Roku file detected!");
-            formats::roku::extract_roku(&file, &output_path)?;
-        }
-        else if let Some(result) = formats::mtk_pkg::is_mtk_pkg_file(&file)? {
-            println!("MTK PKG file detected!");
-            formats::mtk_pkg::extract_mtk_pkg(&file, &output_path, result)?;
-        } 
-        else if formats::mtk_pkg_old::is_mtk_pkg_old_file(&file) {
-            println!("MTK PKG (Old) file detected!");
-            formats::mtk_pkg_old::extract_mtk_pkg_old(&file, &output_path)?;
-        }
-        else if let Some(result) = formats::mtk_pkg_new::is_mtk_pkg_new_file(&file)? {
-            println!("MTK PKG (New) file detected!");
-            formats::mtk_pkg_new::extract_mtk_pkg_new(&file, &output_path, result)?;
-        }
-        else if let Some(result) = formats::mtk_bdp::is_mtk_bdp_file(&file)? {
-            println!("MTK BDP file detected!");
-            formats::mtk_bdp::extract_mtk_bdp(&file, &output_path, result)?;
-        }
-        else {
-            println!("Input format not recognized!");
+        return Err("Invalid input path!".into());
+    }
+
+    let formats: Vec<Format> = get_registry();
+    println!("Loaded {} formats!", formats.len());
+
+    for format in formats {
+        if let Some(ctx) = (format.detector_func)(&app_ctx)? {
+            println!("\n{} detected!", format.name);
+
+            //reset seek of the file if present
+            if let Some(mut file) = app_ctx.file() {
+                file.seek(SeekFrom::Start(0))?;
+            }
+
+            (format.extractor_func)(&app_ctx, ctx)?;
+
+            //extractor returned with no error
+            println!("\nExtraction finished! Saved extracted files to {}", output_path_str);
+            return Ok(());
         }
     }
 
+    println!("\nInput format not recognized!");
     Ok(())
 }
