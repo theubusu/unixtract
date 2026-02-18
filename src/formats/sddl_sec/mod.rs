@@ -1,5 +1,6 @@
 //sddl_dec 6.0 https://github.com/theubusu/sddl_dec
 mod include;
+mod util;
 use std::any::Any;
 use crate::AppContext;
 
@@ -12,6 +13,7 @@ use crate::utils::common;
 use crate::utils::aes::{decrypt_aes128_cbc_pcks7};
 use crate::utils::compression::{decompress_zlib};
 use include::*;
+use util::split_peaks_file;
 
 pub fn is_sddl_sec_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
@@ -67,6 +69,7 @@ fn parse_tdi_to_modules(tdi_data: Vec<u8>) -> Result<Vec<TdiTgtInf>, Box<dyn std
 pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
     let save_extra = app_ctx.options.iter().any(|e| e == "sddl_sec:save_extra");
+    let split_peaks = app_ctx.options.iter().any(|e| e == "sddl_sec:split_peaks");
 
     let mut secfile_hdr_reader = Cursor::new(decipher(&common::read_exact(&mut file, 32)?));
     let secfile_header: SecHeader = secfile_hdr_reader.read_be()?;
@@ -105,6 +108,8 @@ pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
     for (i, module) in modules.iter().enumerate(){
         println!("\nModule #{}/{} - {}, Target ID: {}, Segment count: {}, Version: {}", 
                 i+1, &modules.len(), module.module_name(), module.target_id, module.num_of_txx, module.version_string());
+
+        let mut final_out_path: Option<PathBuf> = None;
 
         for i in 0..module.num_of_txx {
             let (module_file, module_data) = get_sec_file(&file)?;
@@ -147,12 +152,20 @@ pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
             } else {
                 output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", module.module_name()));
             }
+            final_out_path = Some(output_path.clone());
 
             let data = common::read_exact(&mut content_reader, content_header.size as usize)?;
-            let mut out_file = OpenOptions::new().read(true).write(true).create(true).open(output_path)?;
+            let mut out_file = OpenOptions::new().read(true).write(true).create(true).open(&output_path)?;
             out_file.seek(SeekFrom::Start(content_header.dest_offset() as u64))?;
             out_file.write_all(&data)?;
 
+        }
+
+        if split_peaks && module.module_name() == "PEAKS" {
+            println!("\n- Splitting PEAKS");
+            if let Some(ref path) = final_out_path {
+                split_peaks_file(path, &app_ctx.output_dir)?;
+            }
         }
     }
 

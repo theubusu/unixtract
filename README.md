@@ -132,7 +132,8 @@ Options:
 **Used in:** Panasonic TVs  
 **Notes:** Pre-2011 files are not supported.  
 **Options:**   
-`sddl_sec:save_extra` - Save SDIT.FDI and .TXT files that are not extracted by default.
+`sddl_sec:save_extra` - Save SDIT.FDI and .TXT files that are not extracted by default.   
+`sddl_sec:split_peaks` - Split PEAKS module into partitions (only on older files).
 
 ## SLP
 **Used in:** Samsung Tizen-based NX series cameras  
