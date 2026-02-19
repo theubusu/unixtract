@@ -226,12 +226,12 @@ fn decompress_data(data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut data_reader = Cursor::new(data);
     let header: CompressedFileHeader = data_reader.read_le()?;
     println!("Compressed size: {}, Decompressed size: {}, Compression type: {}({})", 
-            header.compressed_size, header.decompressed_size, header.compression_type_byte, header.compression_type());
+            header.src_size, header.dest_size, header.compression_type, header.compression_type_str());
 
-    let compressed_data = common::read_exact(&mut data_reader, header.compressed_size as usize)?;
+    let compressed_data = common::read_exact(&mut data_reader, header.src_size as usize)?;
     let decompressed_data;
 
-    if header.compression_type_byte == 1 { //gzip + optionally lzss
+    if header.compression_type == 1 { //gzip + optionally lzss
         println!("- Decompressing GZIP...");
         let decompressed_gzip = decompress_gzip(&compressed_data)?;
 
@@ -241,13 +241,13 @@ fn decompress_data(data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         } else {
             decompressed_data = decompressed_gzip;
         }
-    } else if header.compression_type_byte == 2 { //only lzss
+    } else if header.compression_type == 2 { //only lzss
         println!("- Decompressing LZSS...");
         decompressed_data = decompress_lzss(&compressed_data);
-        if decompressed_data.len() != header.decompressed_size as usize {
+        if decompressed_data.len() != header.dest_size as usize {
             return Err("Decompressed size does not match size in header, decompression failed!".into());
         }
-    } else if header.compression_type_byte == 0 { //no compression. havent encountered one yet
+    } else if header.compression_type == 0 { //no compression. havent encountered one yet
         decompressed_data = compressed_data;
             
     } else {

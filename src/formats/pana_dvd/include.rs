@@ -104,25 +104,27 @@ pub const COMPRESSED_FILE_MAGIC: &[u8; 8] = b"EXTRHEAD";
 
 #[derive(BinRead)]
 pub struct CompressedFileHeader {
-    _header_string: [u8; 14], //EXTRHEADDRV \x01\x00
-    pub compression_type_byte: u16,
-    pub decompressed_size: u32,
-    _destination_address: u32,
-    pub compressed_size: u32,
+    _magic_bytes: [u8; 8],      // EXTRHEAD
+    _unk_string: [u8; 4],       // DRV\x20 ?
+    _compressed_flag: u16,      // checks for 1 here, else -> "Error! Not compress"
+    pub compression_type: u16,  // 0 - not compressed, 1 - GZIP , 2 - LZSS
+    pub dest_size: u32,         // decompressed size
+    _dest_address: u32,
+    pub src_size: u32,          // compressed size
+    _src_address: u32,
+    _footer_offset: u32,        // offset to EXTRFOOT
     _unk: u32,
-    _footer_offset: u32,
-    _base_address: u32,
-    _checksum: u32, //unknown type of checksum
-    _checksum_flag: u8,
-    _unused: [u8; 19],
+    _checksum: u32,             // adler32 calculated every checksum_skip bytes of decompressed data
+    _checksum_skip: u32,
+    _unused: [u8; 16],
 }
 impl CompressedFileHeader {
-    pub fn compression_type(&self) -> &str {
-        if self.compression_type_byte == 0 {
+    pub fn compression_type_str(&self) -> &str {
+        if self.compression_type == 0 {
             return "Uncompressed"
-        } else if self.compression_type_byte == 1 {
+        } else if self.compression_type == 1 {
             return "GZIP"
-        } else if self.compression_type_byte == 2 {
+        } else if self.compression_type == 2 {
             return "LZSS"
         } else {
             return "Unknown"

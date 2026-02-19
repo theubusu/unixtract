@@ -60,18 +60,24 @@ pub static PFLUPG: &[(&str, &str)] = &[
 
 //pana dvd keys (no AES)
 pub static PANA_DVD_KEYONLY: &[&str] = &[
-    ("08E03D859AF9F3EE"), //B3A25A0B9D864F08 # 87 firmwares, ..-~2011
-    ("AF4D5B16C298C16D"), //720FCB305F2F6EDA # 3 firmwares, ~2011
-    ("9407311B7561F97E"), //FBCC4CEA55466CA6 # 12 firmwares, ~2012
-    ("38BB0C17D362701F"), //8AC6E0CFF65651F5 # 8 firmwares, ~2013
-    ("EC238CD791456646"), //5FF6D2A1B8675D6F # 3 firmwares, ~2013
-    ("8F8CA88482E43D9B"), //918C319720ACFEC1 # 5 firmwares, ~2014
-    ("21FCA17361E66B4E"), //542FD3A55F200FD5 # 5 firmwares, ~2014
+    ("08E03D859AF9F3EE"), //<=2011
+
+    // Thanks to 
+    // https://git.gammaspectra.live/WeebDataHoarder/pana-fw#cmd-recover-lzss-cramfs &
+    // https://git.gammaspectra.live/WeebDataHoarder/pana-fw#cmd-recover-gzip-cramfs
+    // for these <3
+    ("AF4D5B16C298C16D"), // ~2011
+    ("9407311B7561F97E"), // ~2012
+    ("5D88719745A4EFFF"), // ~2012
+    ("38BB0C17D362701F"), // ~2013
+    ("EC238CD791456646"), // ~2013
+    ("8F8CA88482E43D9B"), // ~2014
+    ("21FCA17361E66B4E"), // ~2014
 ];
 
 //pana dvd keys (PANAEUSB pair - AES key, AES IV, cust)
 pub static PANA_DVD_AESPAIR: &[(&str, &str, &str)] = &[
-    ("62A39E1C5594AE09244EB326EF7938FA", "46D03C52B1A398FA03276FDE7CC4EA26", "06C943F3B997F7E0"), //# 9 firmwares, ~2018
+    ("62A39E1C5594AE09244EB326EF7938FA", "46D03C52B1A398FA03276FDE7CC4EA26", "06C943F3B997F7E0"), // ~2018
 ];
 
 //mtk pkg custom keys
