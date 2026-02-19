@@ -7,6 +7,8 @@ use lz4::block::decompress;
 use bzip2::read::BzDecoder;
 use liblzma::read::XzDecoder;
 
+use crate::utils::common;
+
 pub fn decompress_zlib(data: &[u8]) -> io::Result<Vec<u8>> {
     let mut decoder = ZlibDecoder::new(data);
     let mut decompressed = Vec::new();
@@ -20,6 +22,20 @@ pub fn decompress_gzip(compressed_data: &[u8]) -> Result<Vec<u8>, Box<dyn std::e
     let mut decompressed = Vec::new();
     decoder.read_to_end(&mut decompressed)?;
     Ok(decompressed)
+}
+
+pub fn decompress_gzip_get_filename(compressed_data: &[u8]) -> Result<(Vec<u8>, Option<String>), Box<dyn std::error::Error>> {
+    let mut decoder = GzDecoder::new(compressed_data);
+    
+    let mut filename: Option<String> = None;
+    if let Some(filename_bytes) = decoder.header().unwrap().filename() {
+        filename = Some(common::string_from_bytes(filename_bytes));
+    }
+
+    let mut decompressed = Vec::new();
+    decoder.read_to_end(&mut decompressed)?;
+
+    Ok((decompressed, filename))
 }
 
 pub fn decompress_lzma(compressed_data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {

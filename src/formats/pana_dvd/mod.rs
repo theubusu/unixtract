@@ -13,7 +13,7 @@ use binrw::BinReaderExt;
 use crate::keys;
 use crate::utils::common;
 use crate::utils::aes::{decrypt_aes128_cbc_nopad};
-use crate::utils::compression::{decompress_gzip};
+use crate::utils::compression::{decompress_gzip_get_filename};
 use pana_dvd_crypto::{decrypt_data};
 use lzss::{decompress_lzss};
 use include::*;
@@ -233,8 +233,10 @@ fn decompress_data(data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 
     if header.compression_type == 1 { //gzip + optionally lzss
         println!("- Decompressing GZIP...");
-        let decompressed_gzip = decompress_gzip(&compressed_data)?;
-
+        let (decompressed_gzip, gzip_filename) = decompress_gzip_get_filename(&compressed_data)?;
+        if let Some(gzip_filename) = gzip_filename {
+            println!("- GZIP filename: {}", gzip_filename);
+        }
         // the decompressed data can have another header
         if decompressed_gzip.starts_with(COMPRESSED_FILE_MAGIC) {
             decompressed_data = decompress_data(&decompressed_gzip)?;
