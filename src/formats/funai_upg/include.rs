@@ -11,5 +11,6 @@ pub struct Header {
 pub struct Entry {
     pub entry_type: u16,
     pub entry_size: u32,
-    _unk: u16,
+    _unk_flag: u8,
+    pub encryption_flag: u8,
 }

@@ -30,10 +30,16 @@ pub fn extract_funai_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(),
         let entry: Entry = file.read_le()?;
         println!("\n({}/{}) - Type: {}, Size: {}", i + 1, header.entry_count, entry.entry_type, entry.entry_size);
 
-        let data = common::read_exact(&mut file, entry.entry_size as usize - 2 - 4)?; //size has the unk field + crc32 at the end
-        let _crc32 = common::read_exact(&mut file, 4)?; //btw the CRC32 includes the entry header
+        let data = common::read_exact(&mut file, entry.entry_size as usize - 0x46)?; //size has the flags + crc32 + hash
+        let _crc32 = common::read_exact(&mut file, 4)?; //crc32 includes the entry header and hash
+        let _hash = common::read_exact(&mut file, 64)?; //hash is only used on encrypted entries
 
-        if entry.entry_type == 0 {
+        if entry.encryption_flag == 1 {
+            //not supported yet
+            println!("- Warning: Cannot decrypt entry, saving encrypted data!");
+        }
+
+        if entry.encryption_flag == 0 && entry.entry_type == 0 {
             let entry_string = common::string_from_bytes(&data);
             println!("Descriptor entry info:\n{}", entry_string);
         }
