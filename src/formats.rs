@@ -20,6 +20,7 @@ pub mod roku;
 pub mod sony_bdp;
 pub mod rvp;
 pub mod funai_upg;
+pub mod funai_upg_phl;
 pub mod pana_dvd;
 pub mod android_ota_payload;
 pub mod bdl;
@@ -109,6 +110,11 @@ pub fn get_registry() -> Vec<Format> {
             name: "funai_upg",
             detector_func: crate::formats::funai_upg::is_funai_upg_file,
             extractor_func: crate::formats::funai_upg::extract_funai_upg,
+        },
+        Format {
+            name: "funai_upg_phl",
+            detector_func: crate::formats::funai_upg_phl::is_funai_upg_phl_file,
+            extractor_func: crate::formats::funai_upg_phl::extract_funai_upg_phl,
         },
         Format {
             name: "pana_dvd",

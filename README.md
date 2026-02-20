@@ -48,7 +48,11 @@ Options:
 
 ## Funai UPG   
 **Used in:** Some Funai TVs  
-**Notes:** Decryption is not yet supported.    
+**Notes:** **Depends on keys** - see keys.rs.    
+
+## Funai UPG PHL   
+**Used in:** Funai & Funai-made Philips TVs (USA market)  
+**Notes:** **Depends on keys** - see keys.rs (most common keys should be included).    
 
 ## INVINCIBLE_IMAGE   
 **Used in:** LG Broadcom-based Blu-Ray players  

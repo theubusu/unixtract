@@ -96,6 +96,18 @@ pub static MTK_PKG_CUST: &[(&str, &str, &str)] = &[
     ("07A30C2E4AAE4849EC3DD2301C381868", "BC1443A0D17AAB2DB1EA0302EF280717", "Philips Android"), //worked on TPM171E(2017), TPM191E(2019), TPM211E(2021)
 ];
 
+//Funai UPG keys
+pub static FUNAI_UPG: &[&str] = &[
+    ("696B6A75"), //FNI-0CF, FNI-0BF
+    ("312E3149"), //PHL-0AA, PHL-0CA
+    ("6D6B6161"), //PHL-0AB
+    ("34624848"), //PHL-0BA, PHL-0DA
+    ("386A376D"), //PHL-0CCX
+    ("77303131"), //PHL-0CEX
+    ("75303231"), //PHL-0CFX
+    ("68353031"), //PHL-0SDX
+];
+
 //EPK keys
 //github.com/openlgtv/epk2extract
 pub static EPK: &[(&str, &str)] = &[
