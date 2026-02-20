@@ -70,6 +70,7 @@ pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
     let save_extra = app_ctx.options.iter().any(|e| e == "sddl_sec:save_extra");
     let split_peaks = app_ctx.options.iter().any(|e| e == "sddl_sec:split_peaks");
+    let decomp_peaks = !app_ctx.options.iter().any(|e| e == "sddl_sec:no_decomp_peaks");
 
     let mut secfile_hdr_reader = Cursor::new(decipher(&common::read_exact(&mut file, 32)?));
     let secfile_header: SecHeader = secfile_hdr_reader.read_be()?;
@@ -164,7 +165,7 @@ pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
         if split_peaks && module.module_name() == "PEAKS" {
             println!("\n- Splitting PEAKS");
             if let Some(ref path) = final_out_path {
-                split_peaks_file(path, &app_ctx.output_dir)?;
+                split_peaks_file(path, &app_ctx.output_dir, decomp_peaks)?;
             }
         }
     }
