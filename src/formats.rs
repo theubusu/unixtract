@@ -21,6 +21,7 @@ pub mod sony_bdp;
 pub mod rvp;
 pub mod funai_upg;
 pub mod funai_upg_phl;
+pub mod funai_bdp;
 pub mod pana_dvd;
 pub mod android_ota_payload;
 pub mod bdl;
@@ -115,6 +116,11 @@ pub fn get_registry() -> Vec<Format> {
             name: "funai_upg_phl",
             detector_func: crate::formats::funai_upg_phl::is_funai_upg_phl_file,
             extractor_func: crate::formats::funai_upg_phl::extract_funai_upg_phl,
+        },
+        Format {
+            name: "funai_bdp",
+            detector_func: crate::formats::funai_bdp::is_funai_bdp_file,
+            extractor_func: crate::formats::funai_bdp::extract_funai_bdp,
         },
         Format {
             name: "pana_dvd",

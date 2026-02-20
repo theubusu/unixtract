@@ -46,6 +46,10 @@ Options:
 **Notes:** **Depends on keys** - see keys.rs  
 **Thanks to:** https://github.com/openlgtv/epk2extract
 
+## Funai BDP   
+**Used in:** Funai & Funai-made Philips Blu-Ray player/HTS (USA market)  
+**Notes:** N/A   
+
 ## Funai UPG   
 **Used in:** Some Funai TVs  
 **Notes:** **Depends on keys** - see keys.rs.    

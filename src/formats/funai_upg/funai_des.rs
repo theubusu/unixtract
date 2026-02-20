@@ -34,7 +34,7 @@ fn des_function(mut state: u32, key: u32) -> u32 {
 }
 
 pub fn funai_des_decrypt(input: &[u8], key: u32) -> Vec<u8> {
-    assert!(input.len() % 8 == 0);
+    //assert!(input.len() % 8 == 0);
     let mut buf = input.to_vec();
 
     for chunk in buf.chunks_exact_mut(8) {
