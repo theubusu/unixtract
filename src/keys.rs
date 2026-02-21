@@ -108,6 +108,13 @@ pub static FUNAI_UPG: &[&str] = &[
     ("68353031"), //PHL-0SDX
 ];
 
+//Funai BDP keys
+pub static FUNAI_BDP: &[&str] = &[
+    ("981A6413"),
+    ("81AE6734"),
+    ("09E87783"),
+];
+
 //EPK keys
 //github.com/openlgtv/epk2extract
 pub static EPK: &[(&str, &str)] = &[
