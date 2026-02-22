@@ -120,7 +120,6 @@ fn extract_file(app_ctx: &AppContext, file_reader: &mut Cursor<Vec<u8>>, offset:
 
     let mut hdr_reader = Cursor::new(dec_header);
     let mut modules: Vec<ModuleEntry> = Vec::new();
-    let split_main = app_ctx.options.iter().any(|e| e == "pana_dvd:split_main");
 
     for i in 0..100 {
         let mut entry: ModuleEntry = hdr_reader.read_le()?;
@@ -154,7 +153,7 @@ fn extract_file(app_ctx: &AppContext, file_reader: &mut Cursor<Vec<u8>>, offset:
         if module.name() == "MAIN" {
             println!("- Extracting MAIN...");
             extract_main(file_reader, key, &output_path)?;
-            if split_main {
+            if app_ctx.has_option("pana_dvd:split_main") {
                 println!("\n- Splitting MAIN...");
                 split_main_file(&output_path, output_folder)?;
             }

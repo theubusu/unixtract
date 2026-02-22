@@ -28,8 +28,6 @@ pub fn is_msd10_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<d
 
 pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
-    let save_cmac = app_ctx.options.iter().any(|e| e == "msd10:save_cmac");
-    let print_ouith_tree = app_ctx.options.iter().any(|e| e == "msd:print_ouith");
 
     let header: FileHeader = file.read_le()?;
     println!("\nNumber of sections: {}", header.section_count);
@@ -102,7 +100,7 @@ pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
         let toc = decrypt_aes_salted_tizen(&toc_data, &passphrase_bytes)?;
         opt_dump_dec_hdr(app_ctx, &toc, "toc")?;
         
-        let (items, info) = parse_blob_1_8(&toc, print_ouith_tree)?;
+        let (items, info) = parse_blob_1_8(&toc, app_ctx.has_option("msd:print_ouith"))?;
 
         if let Some(info) = info {
             println!("\nImage info:\n{} {}.{} {}/{}/{}",
@@ -144,7 +142,7 @@ pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
         let toc = decrypt_aes_salted_old(&toc_data, &passphrase_bytes)?;
         opt_dump_dec_hdr(app_ctx, &toc, "toc")?;
         
-        let (items, info) = parse_ouith_blob(&toc, print_ouith_tree)?;
+        let (items, info) = parse_ouith_blob(&toc, app_ctx.has_option("msd:print_ouith"))?;
 
         if let Some(info) = info {
             println!("\nImage info:\n{} {}.{} {}/{}/20{}",
@@ -163,7 +161,7 @@ pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
 
             let mut out_filename = format!("{}", item.name);
             if item.item_type == 0x11 { //CMAC DATA
-                if save_cmac {
+                if app_ctx.has_option("msd10:save_cmac") {
                     out_filename = format!("{}.cmac", item.name); //add an additional extension, because the CMAC data has the same name as its item
                 } else {
                     println!("- Skipping CMAC Data...");

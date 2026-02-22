@@ -42,6 +42,10 @@ impl AppContext {
             _ => None,
         }
     }
+
+    pub fn has_option(&self, option: &'static str) -> bool {
+        self.options.iter().any(|o| o == option)
+    }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

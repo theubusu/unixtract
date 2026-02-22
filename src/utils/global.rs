@@ -3,7 +3,7 @@ use std::{fs::{self, OpenOptions}, io::Write, path::Path};
 use crate::AppContext;
 
 pub fn opt_dump_dec_hdr(app_ctx: &AppContext, data: &[u8], name: &str) -> Result<(), Box<dyn std::error::Error>> {
-    if !app_ctx.options.iter().any(|e| e == "dump_dec_hdrs") {
+    if !app_ctx.has_option("dump_dec_hdrs") {
         return Ok(())
     }
 
