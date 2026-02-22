@@ -8,6 +8,7 @@ use std::io::{Write, Seek, SeekFrom, Cursor};
 use binrw::BinReaderExt;
 
 use crate::utils::common;
+use crate::utils::global::opt_dump_dec_hdr;
 use crate::keys;
 use crate::formats::epk::{decrypt_aes_ecb_auto, find_key};
 use include::*;
@@ -45,6 +46,8 @@ pub fn extract_epk2(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
             println!("Found valid key: {}", key_name);
             matching_key = Some(key_bytes);
             header = decrypt_aes_ecb_auto(matching_key.as_ref().unwrap(), &stored_header)?;
+            opt_dump_dec_hdr(app_ctx, &header, "header")?;
+
         } else {
             return Err("No valid key found!".into());
         }    

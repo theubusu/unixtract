@@ -7,6 +7,7 @@ use std::path::Path;
 use std::io::Write;
 
 use crate::utils::common;
+use crate::utils::global::opt_dump_dec_hdr;
 use crate::utils::compression::{decompress_lzma, decompress_lz4};
 use crate::utils::lzop::{unlzop_to_file};
 use crate::utils::sparse::{unsparse_to_file};
@@ -50,6 +51,7 @@ pub fn extract_mstar(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
             return Err("Failed to get script".into());
         }
     }
+    opt_dump_dec_hdr(app_ctx, &script, "script")?;
 
     let lines: Vec<&str> = script_string.lines().map(|l| l.trim()).collect();
     let mut i = 0;

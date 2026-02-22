@@ -8,6 +8,7 @@ use std::io::{Write, Cursor};
 use binrw::BinReaderExt;
 
 use crate::utils::common;
+use crate::utils::global::opt_dump_dec_hdr;
 use crate::keys;
 use crate::formats::epk::{decrypt_aes_ecb_auto, find_key};
 use include::*;
@@ -33,6 +34,7 @@ pub fn extract_epk3(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
         matching_key = Some(key_bytes);
         _header_signature = &stored_header[..128];
         header = decrypt_aes_ecb_auto(matching_key.as_ref().unwrap(), &stored_header[128..])?;
+        opt_dump_dec_hdr(app_ctx, &header, "header")?;
 
     //try for new format epk3 (new type 256 byte signature)
     } else if let Some((key_name, key_bytes)) = find_key(&keys::EPK, &stored_header[256..], b"EPK3")? {
@@ -40,6 +42,7 @@ pub fn extract_epk3(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
         matching_key = Some(key_bytes);
         _header_signature = &stored_header[..256];
         header = decrypt_aes_ecb_auto(matching_key.as_ref().unwrap(), &stored_header[256..])?;
+        opt_dump_dec_hdr(app_ctx, &header, "header")?;
         new_type = true;
 
     } else {
@@ -72,6 +75,8 @@ pub fn extract_epk3(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
     //PKG INFO
     let pkg_info_encrypted = common::read_exact(&mut file, hdr.package_info_size as usize)?;
     let pkg_info = decrypt_aes_ecb_auto(matching_key_bytes, &pkg_info_encrypted)?;
+    opt_dump_dec_hdr(app_ctx, &pkg_info, "pkg_info")?;
+
     let mut pkg_info_reader = Cursor::new(pkg_info);
     let pkg_info_hdr: PkgInfoHeader = pkg_info_reader.read_le()?;
 

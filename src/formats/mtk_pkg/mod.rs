@@ -10,6 +10,7 @@ use std::io::{Write, Cursor, Seek, SeekFrom};
 use binrw::BinReaderExt;
 
 use crate::utils::common;
+use crate::utils::global::opt_dump_dec_hdr;
 use crate::utils::aes::{decrypt_aes128_cbc_nopad};
 use crate::keys;
 use lzhs::{decompress_lzhs_fs_file2file};
@@ -47,6 +48,8 @@ pub fn extract_mtk_pkg(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Bo
 
     let file_size = file.metadata()?.len();
     let header = ctx.decrypted_header;
+    opt_dump_dec_hdr(app_ctx, &header, "header")?;
+
     let mut hdr_reader = Cursor::new(header); 
     let hdr: Header = hdr_reader.read_le()?;
 

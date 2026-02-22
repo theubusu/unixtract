@@ -12,6 +12,7 @@ use binrw::BinReaderExt;
 
 use crate::keys;
 use crate::utils::common;
+use crate::utils::global::opt_dump_dec_hdr;
 use crate::utils::aes::{decrypt_aes128_cbc_nopad};
 use crate::utils::compression::{decompress_gzip_get_filename};
 use pana_dvd_crypto::{decrypt_data};
@@ -114,7 +115,10 @@ fn extract_file(app_ctx: &AppContext, file_reader: &mut Cursor<Vec<u8>>, offset:
     file_reader.seek(SeekFrom::Start(offset + base_offset))?;
  
     let enc_header = common::read_exact(file_reader, MAX_HEADER_SIZE)?;
-    let mut hdr_reader = Cursor::new(decrypt_data(&enc_header, &key));
+    let dec_header = decrypt_data(&enc_header, &key);
+    opt_dump_dec_hdr(app_ctx, &dec_header, "header")?;
+
+    let mut hdr_reader = Cursor::new(dec_header);
     let mut modules: Vec<ModuleEntry> = Vec::new();
     let split_main = app_ctx.options.iter().any(|e| e == "pana_dvd:split_main");
 

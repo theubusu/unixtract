@@ -8,6 +8,7 @@ use std::io::{Write, Seek, SeekFrom};
 use binrw::BinReaderExt;
 
 use crate::utils::common;
+use crate::utils::global::opt_dump_dec_hdr;
 use crate::keys;
 use crate::formats::msd::{decrypt_aes_salted_old, decrypt_aes_salted_tizen, decrypt_aes_tizen};
 use crate::formats::msd::msd_ouith_parser_old::{parse_ouith_blob};
@@ -82,6 +83,8 @@ pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
     //parse TOC
     if firmware_type == "tizen" {
         let toc = decrypt_aes_salted_tizen(&toc_data, &passphrase_bytes)?;
+        opt_dump_dec_hdr(app_ctx, &toc, "toc")?;
+        
         let (items, info) = parse_blob_1_8(&toc, print_ouith_tree)?;
 
         if let Some(info) = info {
@@ -122,6 +125,8 @@ pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
 
     } else if firmware_type == "old" {
         let toc = decrypt_aes_salted_old(&toc_data, &passphrase_bytes)?;
+        opt_dump_dec_hdr(app_ctx, &toc, "toc")?;
+        
         let (items, info) = parse_ouith_blob(&toc, print_ouith_tree)?;
 
         if let Some(info) = info {

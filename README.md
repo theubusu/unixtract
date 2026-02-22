@@ -15,6 +15,8 @@ Arguments:
 If an output folder is not provided, extracted files will be saved in folder `_<INPUT_TARGET>`.   
 Options:  
 `-o, --options <OPTIONS>` - Format specific or global(for all formats that implement it) options, see the list below for format specific options. You can use this multiple times to activate multiple options.    
+## Global options
+`dump_dec_hdrs` - For formats with an encrypted header - dump the decrypted header(s).    
 
 # Supported formats
 ## Amlogic burning image  
@@ -39,12 +41,16 @@ Options:
 ## EPK v2  
 **Used in:** LG TVs since ~2010  
 **Notes:** **Depends on keys** - see keys.rs (most common keys should be included)  
-**Thanks to:** https://github.com/openlgtv/epk2extract
+**Thanks to:** https://github.com/openlgtv/epk2extract   
+**Options:**   
+※ Support `dump_dec_hdrs` option
 
 ## EPK v3  
 **Used in:** LG webOS-based TVs  
 **Notes:** **Depends on keys** - see keys.rs  
-**Thanks to:** https://github.com/openlgtv/epk2extract
+**Thanks to:** https://github.com/openlgtv/epk2extract   
+**Options:**   
+※ Support `dump_dec_hdrs` option
 
 ## Funai BDP   
 **Used in:** Funai & Funai-made Philips Blu-Ray player/HTS (USA market)  
@@ -69,6 +75,7 @@ Options:
 **Options:**   
 `msd10:save_cmac` - Save CMAC data for files that is skipped by default.   
 `msd:print_ouith` - Prints the entire parsed OUITH header.  
+※ Support `dump_dec_hdrs` option
 
 ## MSD 1.1
 **Used in:** Samsung TVs 2016+  
@@ -76,10 +83,13 @@ Options:
 **Thanks to:** https://github.com/bugficks/msddecrypt  
 **Options:**   
 `msd:print_ouith` - Prints the entire parsed OUITH header.  
+※ Support `dump_dec_hdrs` option
 
 ## MStar upgrade bin
 **Used in:** Many MStar-based TVs (Hisense, Toshiba...)  
 **Notes:** All files should be supported, includes lzop, lz4, lzma, sparse_write support  
+**Options:**  
+※ Support `dump_dec_hdrs` option (will save the script)   
 
 ## MediaTek BDP
 **Used in:** Many MediaTek-based Blu-Ray players (LG, Samsung, Philips, Panasonic...)  
@@ -90,12 +100,14 @@ Options:
 **Notes:** **Depends on keys** - see keys.rs (Keys for Philips and Sony included)  
 **Options:**   
 `mtk_pkg:no_del_comp` - Don't delete LZHS compressed partition file after decompressing.      
+※ Support `dump_dec_hdrs` option
 
 ## MediaTek PKG (Old)
 **Used in:** Older MediaTek-based TVs (Philips, Sony, Hisense...)  
 **Notes:** All files should be supported, decryption + decompression   
 **Options:**   
 `mtk_pkg:no_del_comp` - Don't delete LZHS compressed partition file after decompressing.      
+※ Support `dump_dec_hdrs` option
 
 ## MediaTek PKG
 **Used in:** MediaTek-based TVs (Sony, Philips, Panasonic, Sharp...)  
@@ -103,6 +115,7 @@ Options:
 **Thanks to:** https://github.com/openlgtv/epk2extract   
 **Options:**   
 `mtk_pkg:no_del_comp` - Don't delete LZHS compressed partition file after decompressing.      
+※ Support `dump_dec_hdrs` option
 
 ## Novatek PKG (NFWB)
 **Used in:** Some older Novatek-based TVs (LG, Philips)  
@@ -116,7 +129,8 @@ Options:
 **Used in:** Panasonic Blu-Ray Players and Recorders  
 **Notes:** **Depends on keys** - see keys.rs (Included keys should work for 99% of players released in and before 2014, and some released in 2018), Note that there is currently an issue with MAIN in some very ancient files not extracting correctly.   
 **Options:**   
-`pana_dvd:split_main` - Automatically split the MAIN module into seperate partitions.
+`pana_dvd:split_main` - Automatically split the MAIN module into seperate partitions.   
+※ Support `dump_dec_hdrs` option
 
 ## Philips UPG (Autorun.upg, 2SWU3TXV)
 **Used in:** Philips pre-TPVision TVs 200?-2013  

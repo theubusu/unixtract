@@ -8,6 +8,7 @@ use std::io::Write;
 use binrw::BinReaderExt;
 
 use crate::utils::common;
+use crate::utils::global::opt_dump_dec_hdr;
 use crate::keys;
 use crate::formats::msd::{decrypt_aes_salted_tizen, decrypt_aes_tizen};
 use crate::formats::msd::msd_ouith_parser_tizen_1_9::{parse_blob_1_9};
@@ -74,6 +75,8 @@ pub fn extract_msd11(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
     let toc_data = common::read_file(&file, toc_offset as u64, toc_size as usize)?;
 
     let toc = decrypt_aes_salted_tizen(&toc_data, &passphrase_bytes)?;
+    opt_dump_dec_hdr(app_ctx, &toc, "toc")?;
+
     let (items, info) = parse_blob_1_9(&toc, print_ouith_tree)?;
 
     if let Some(info) = info {

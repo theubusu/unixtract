@@ -5,42 +5,50 @@ use crate::AppContext;
 
 use std::path::Path;
 use std::fs::{self, OpenOptions};
-use std::io::{Write, Cursor, Seek};
+use std::io::{Cursor, Seek, SeekFrom, Write};
 use binrw::BinReaderExt;
 
 use crate::utils::common;
+use crate::utils::global::opt_dump_dec_hdr;
 use crate::formats::mtk_pkg::lzhs::{decompress_lzhs_fs_file2file_old};
 use crate::formats::mtk_pkg::include::{PartEntry, MTK_HEADER_MAGIC, MTK_META_MAGIC, MTK_META_PAD_MAGIC};
 use mtk_crypto::{decrypt};
 use include::*;
 
+pub struct MtkPkgOldContext {
+    header_offset: u64,
+}
+
 pub fn is_mtk_pkg_old_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let mut file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
+    let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
     
     let encrypted_header = common::read_file(&file, 0, HEADER_SIZE)?;
     let header = decrypt(&encrypted_header, KEY, Some(HEADER_XOR_MASK));
     if &header[4..12] == MTK_HEADER_MAGIC {
-        Ok(Some(Box::new(())))
+        Ok(Some(Box::new(MtkPkgOldContext {header_offset: 0})))
     } else if &header[68..76] == MTK_HEADER_MAGIC {
-        //check for 64 byte additional header used in some Sony and Philips firmwares and skip it
-        file.seek(std::io::SeekFrom::Start(64))?;
-        Ok(Some(Box::new(())))
+        //check for 64 byte additional header used in some Sony and Philips firmwares
+        Ok(Some(Box::new(MtkPkgOldContext {header_offset: 64})))
     } else if &header[132..140] == MTK_HEADER_MAGIC {
-        //check for 128 byte additional header used in some Philips firmwares and skip it
-        file.seek(std::io::SeekFrom::Start(128))?;
-        Ok(Some(Box::new(())))
+        //check for 128 byte additional header used in some Philips firmwares
+        Ok(Some(Box::new(MtkPkgOldContext {header_offset: 128})))
     } else {
         Ok(None)
     }
 }
 
-pub fn extract_mtk_pkg_old(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn extract_mtk_pkg_old(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
+    let ctx = ctx.downcast::<MtkPkgOldContext>().expect("Missing context");
     let no_del_comp = app_ctx.options.iter().any(|e| e == "mtk_pkg:no_del_comp");
 
     let file_size = file.metadata()?.len();
+
+    file.seek(SeekFrom::Start(ctx.header_offset))?;
     let encrypted_header = common::read_exact(&mut file, HEADER_SIZE)?;
     let header = decrypt(&encrypted_header, KEY, Some(HEADER_XOR_MASK));
+    opt_dump_dec_hdr(app_ctx, &header, "header")?;
+    
     let mut hdr_reader = Cursor::new(header); 
     let hdr: Header = hdr_reader.read_le()?;
 
