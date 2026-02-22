@@ -14,32 +14,31 @@ pub static SAMSUNG: &[(&str, &str)] = &[
 ];
 
 //MSD10 keys
-//fw prefix, type, key
-pub static MSD10: &[(&str, &str, &str)] = &[
-    ("T-ECP",   "old",   "3ef6067262cf0c678598bff22169d1f1ea57c284"), //EchoP   - 2012 Samsung
-    ("T-MST12", "old",   "010287362008be691dc8c9f6d2c5ca5aa210ecb8"), //X12     - 2013 Mstar
-    ("T-MST14", "old",   "d145f1d55aee3ef520d194e1275b429c580baacb"), //X14     - 2014 Mstar
-    ("T-MS14J", "old",   "d145f1d55aee3ef520d194e1275b429c580baacb"), //X14J    - 2014 Mstar (For 2015 models)
-    ("T-M14HK", "old",   "d145f1d55aee3ef520d194e1275b429c580baacb"), //X14HK   - 2014 Mstar (For 2016 models)
-    ("T-NT14M", "old",   "95d01e0bae861a05695bc8a6edb2ea835a09accd"), //NT14M   - 2014 Novatek (low-end)
-    ("T-N14MJ", "old",   "95d01e0bae861a05695bc8a6edb2ea835a09accd"), //NT14M_J - 2014 Novatek (low-end) (for 2015 models)
+//20 bytes is OLD key, 16 bytes is TIZEN key
+//key, key desc
+pub static MSD10: &[(&str, &str)] = &[
+    ("3ef6067262cf0c678598bff22169d1f1ea57c284", "EchoP"),  //T-ECP* - 2012 Samsung
+    ("010287362008be691dc8c9f6d2c5ca5aa210ecb8", "X12"),    //T-MST12* - 2013 Mstar
+    ("d145f1d55aee3ef520d194e1275b429c580baacb", "X14"),    //T-MST14*/T-MS14J*/T-M14HK* - 2014 Mstar
+    ("95d01e0bae861a05695bc8a6edb2ea835a09accd", "NT14M"),  //T-NT14M*/T-N14MJ* - 2014 Novatek (low-end)
 
     //github.com/bugficks/msddecrypt
-    ("T-HKM",   "tizen", "1ac8989ff57db5e75ea67b033050871c"), //HawkM - 2015 Samsung
-    ("T-HKP",   "tizen", "cce8a3ef92f3e94895999e928f4dd6c3"), //HawkP - 2015 Samsung
+    ("1ac8989ff57db5e75ea67b033050871c", "HawkM"), //T-HKM* - 2015 Samsung
+    ("cce8a3ef92f3e94895999e928f4dd6c3", "HawkP"), //T-HKP* - 2015 Samsung
 ];
 
 //MSD11 keys
 //github.com/bugficks/msddecrypt
+//key, key desc
 pub static MSD11: &[(&str, &str)] = &[
-    ("T-HKM",   "c7097975e8ab994beb5eaae57e0ba77c"), //HawkM    - 2015 Samsung (for 2016 models)
-    ("T-JZM",   "9b1d077c0d137d406c79ddacb6b159fe"), //JazzM    - 2016 Samsung
-    ("T-KTM2L", "46b04f5e794ca4377a20951c9ea00427"), //KantM2L  - 2018 Samsung
-    ("T-KTM2",  "29110e0ce940b3a9b67d3e158f3f1342"), //KantM2   - 2018 Samsung
-    ("T-KTM",   "d0d49d5f36f5c0da50062fbf32168f5b"), //KantM    - 2017 Samsung
-    ("T-KTSU",  "19e1ba41163f03735e692d9daa2cbb47"), //KantSU   - 2018 Samsung
-    ("T-KTSD",  "39332605ff47a0aea999b10ce9087389"), //KantSD?  - ???? Samsung
-    ("T-NKL",   "5bab1098dab48792619ebd63650d929f"), //NikeL    - 2020 Samsung
+    ("c7097975e8ab994beb5eaae57e0ba77c", "HawkM"),   //T-HKM* - 2015 Samsung (for 2016 models)
+    ("9b1d077c0d137d406c79ddacb6b159fe", "JazzM"),   //T-JZM* - 2016 Samsung
+    ("46b04f5e794ca4377a20951c9ea00427", "KantM2L"), //T-KTM2L* - 2018 Samsung
+    ("29110e0ce940b3a9b67d3e158f3f1342", "KantM2"),  //T-KTM2* - 2018 Samsung
+    ("d0d49d5f36f5c0da50062fbf32168f5b", "KantM"),   //T-KTM* - 2017 Samsung
+    ("19e1ba41163f03735e692d9daa2cbb47", "KantSU"),  //T-KTSU* - 2018 Samsung
+    ("39332605ff47a0aea999b10ce9087389", "KantSD?"), //T-KTSD* - ???? Samsung
+    ("5bab1098dab48792619ebd63650d929f", "NikeL"),   //T-NKL* - 2020 Samsung
 ];
 
 //RUF keys

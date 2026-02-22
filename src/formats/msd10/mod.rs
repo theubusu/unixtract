@@ -56,32 +56,49 @@ pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
     let firmware_name = &headers[0].name();
     println!("\nFirmware name: {}", firmware_name);
 
-    let mut passphrase: Option<&str> = None;
-    let mut firmware_type = "";
-    let passphrase_bytes;
-
-    //find passphrase
-    for (prefix, fw_type, value) in keys::MSD10 {
-        if firmware_name.starts_with(prefix) {
-            passphrase = Some(value);
-            firmware_type = fw_type;
-            break;
-        }
-    }
-    if let Some(p) = passphrase {
-        println!("Passphrase: {}", p);
-        passphrase_bytes = hex::decode(p)?;
-        println!("Firmware type: {}", firmware_type);
-    } else {
-        return Err("This firmware is not supported!".into());
-    }
-
     let toc_offset = headers[0].offset;
     let toc_size = headers[0].size;
     let toc_data = common::read_file(&file, toc_offset as u64, toc_size as usize)?;
 
+    //find passphrase
+    let mut passphrase_bytes: Option<Vec<u8>> = None;
+    let mut passphrase_name: &str = "";
+    let mut firmware_type: Option<FirmwareType> = None;
+    for (key_hex, name) in keys::MSD10 {
+        let key_bytes = hex::decode(key_hex)?;
+        if key_bytes.len() == 20 {
+            match decrypt_aes_salted_old(&toc_data, &key_bytes) {
+                Ok(_) => {
+                    passphrase_bytes = Some(key_bytes);
+                    passphrase_name = name;
+                    firmware_type = Some(FirmwareType::Old);
+                    break
+                },
+                Err(_) => continue,
+            };
+        }
+        else if key_bytes.len() == 16 {
+            match decrypt_aes_salted_tizen(&toc_data, &key_bytes) {
+                Ok(_) => {
+                    passphrase_bytes = Some(key_bytes);
+                    passphrase_name = name;
+                    firmware_type = Some(FirmwareType::Tizen);
+                    break
+                },
+                Err(_) => continue,
+            };
+        }
+    }
+
+    let (passphrase_bytes, firmware_type) = if let (Some(p), Some(t)) = (passphrase_bytes, firmware_type) {
+        println!("Using passphrase: {}", passphrase_name);
+        (p, t)
+    } else {
+        return Err("No matching key found!".into());
+    };
+
     //parse TOC
-    if firmware_type == "tizen" {
+    if firmware_type == FirmwareType::Tizen {
         let toc = decrypt_aes_salted_tizen(&toc_data, &passphrase_bytes)?;
         opt_dump_dec_hdr(app_ctx, &toc, "toc")?;
         
@@ -123,7 +140,7 @@ pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
 
         }
 
-    } else if firmware_type == "old" {
+    } else if firmware_type == FirmwareType::Old {
         let toc = decrypt_aes_salted_old(&toc_data, &passphrase_bytes)?;
         opt_dump_dec_hdr(app_ctx, &toc, "toc")?;
         

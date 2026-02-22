@@ -53,26 +53,31 @@ pub fn extract_msd11(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
     let firmware_name = &headers[0].name();
     println!("\nFirmware name: {}", firmware_name);
 
-    let mut passphrase: Option<&str> = None;
-    let passphrase_bytes;
-
-    //find passphrase
-    for (prefix, value) in keys::MSD11 {
-        if firmware_name.starts_with(prefix) {
-            passphrase = Some(value);
-            break;
-        }
-    }
-    if let Some(p) = passphrase {
-        println!("Passphrase: {}", p);
-        passphrase_bytes = hex::decode(p)?;
-    } else {
-        return Err("This firmware is not supported!".into());
-    }
-
     let toc_offset = headers[0].offset + 8;
     let toc_size = headers[0].size - 8;
     let toc_data = common::read_file(&file, toc_offset as u64, toc_size as usize)?;
+
+    //find passphrase
+    let mut passphrase_bytes: Option<Vec<u8>> = None;
+    let mut passphrase_name: &str = "";
+    for (key_hex, name) in keys::MSD11 {
+        let key_bytes = hex::decode(key_hex)?;
+        match decrypt_aes_salted_tizen(&toc_data, &key_bytes) {
+            Ok(_) => {
+                passphrase_bytes = Some(key_bytes);
+                passphrase_name = name;
+                break
+            },
+            Err(_) => continue,
+        };
+    }
+
+    let passphrase_bytes = if let Some(p) = passphrase_bytes {
+        println!("Using passphrase: {}", passphrase_name);
+        p
+    } else {
+        return Err("No matching key found!".into());
+    };
 
     let toc = decrypt_aes_salted_tizen(&toc_data, &passphrase_bytes)?;
     opt_dump_dec_hdr(app_ctx, &toc, "toc")?;

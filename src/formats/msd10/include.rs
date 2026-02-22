@@ -1,6 +1,12 @@
 use crate::utils::common;
 use binrw::BinRead;
 
+#[derive(PartialEq)]
+pub enum FirmwareType{
+    Old,
+    Tizen,
+}
+
 #[derive(BinRead)]
 pub struct FileHeader {
     _magic_bytes: [u8; 6],
