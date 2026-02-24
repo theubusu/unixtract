@@ -1,3 +1,14 @@
+
+#[derive(PartialEq)]
+pub enum CompressionType {
+    None,
+    Lzma,
+    DoubleLzma,
+    Lz4,
+    Lzo,
+    Sparse,
+}
+
 pub fn parse_number(s: &str) -> Option<u64> {
     if let Some(hex_str) = s.strip_prefix("0x") {
         u64::from_str_radix(hex_str, 16).ok()

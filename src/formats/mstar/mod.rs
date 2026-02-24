@@ -69,7 +69,7 @@ pub fn extract_mstar(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
             //    "unknown"
             //};
             let mut partname = "unknown";
-            let mut compression = "none";
+            let mut compression: CompressionType = CompressionType::None;
             let mut lz4_expect_size = 0;
             let mut j = i + 1;
                 
@@ -77,20 +77,20 @@ pub fn extract_mstar(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
             while j < lines.len() && !lines[j].starts_with("filepartload") {
                 //get compression method
                 if lines[j].starts_with("mscompress7"){
-                    if compression == "none" {
-                        compression = "lzma";
-                    } else if compression == "lzma" {
+                    if compression == CompressionType::None {
+                        compression = CompressionType::Lzma;
+                    } else if compression == CompressionType::Lzma {
                         //thank the turks
-                        compression = "double_lzma";
+                        compression = CompressionType::DoubleLzma;
                     }
                 }
                 if lines[j].starts_with("lz4"){
-                    compression = "lz4";
+                    compression = CompressionType::Lz4;
                     let parts: Vec<&str> = lines[j].split_whitespace().collect();
                     lz4_expect_size = parse_number(parts[5]).unwrap_or(0);
                 }
                 if lines[j].starts_with("mmc unlzo"){
-                    compression = "lzo";
+                    compression = CompressionType::Lzo;
                     let parts: Vec<&str> = lines[j].split_whitespace().collect();
                     // get part name from mmc unlzo
                     if partname == "unknown" {
@@ -98,7 +98,7 @@ pub fn extract_mstar(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
                     }
                 }
                 if lines[j].starts_with("sparse_write"){
-                    compression = "sparse"; //its not really compression but anyway
+                    compression = CompressionType::Sparse; //its not really compression but anyway
                     let parts: Vec<&str> = lines[j].split_whitespace().collect();
                     // get part name from sparse_write
                     if partname == "unknown" {
@@ -133,24 +133,24 @@ pub fn extract_mstar(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
                 let out_data; 
                 let output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", partname));
 
-                if compression == "lzma" {
+                if compression == CompressionType::Lzma {
                     println!("- Decompressing LZMA...");
                     out_data = decompress_lzma(&data)?;
-                } else if compression == "double_lzma" {
+                } else if compression == CompressionType::DoubleLzma {
                     println!("- Decompressing LZMA (Pass 1)...");
                     let pass_1 = decompress_lzma(&data)?;
                     println!("- Decompressing LZMA (Pass 2)...");
                     out_data = decompress_lzma(&pass_1)?;
-                } else if compression == "lz4" {
+                } else if compression == CompressionType::Lz4 {
                     println!("- Decompressing lz4, expected size: {}", lz4_expect_size);
                     out_data = decompress_lz4(&data, lz4_expect_size.try_into().unwrap())?;
-                } else if compression == "lzo" {
+                } else if compression == CompressionType::Lzo {
                     println!("- Decompessing LZO..");
                     unlzop_to_file(&data, output_path)?;
                     println!("-- Saved file!");
                     i += 1;
                     continue
-                } else if compression == "sparse" {
+                } else if compression == CompressionType::Sparse {
                     println!("- Unsparsing...");
                     unsparse_to_file(&data, output_path)?;
                     println!("-- Saved file!");

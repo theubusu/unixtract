@@ -91,6 +91,10 @@ pub fn extract_epk3(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
 
         println!("\n({}) - {}, Size: {}, Segments: {}",
                 pak_i, entry.package_name(), entry.package_size, entry.segment_count);
+
+        let output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", entry.package_name()));
+        fs::create_dir_all(&app_ctx.output_dir)?;
+        let mut out_file = OpenOptions::new().write(true).create(true).truncate(true).open(output_path)?;
         
         for i in 0..entry.segment_count {
             if i > 0 {
@@ -104,9 +108,6 @@ pub fn extract_epk3(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
             let encrypted_data = common::read_exact(&mut file, entry.segment_size as usize + extra_segment_size)?;
             let out_data = decrypt_aes_ecb_auto(matching_key_bytes, &encrypted_data)?;
 
-            let output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", entry.package_name()));
-            fs::create_dir_all(&app_ctx.output_dir)?;
-            let mut out_file = OpenOptions::new().append(true).create(true).open(output_path)?;
             out_file.write_all(&out_data[extra_segment_size..])?;
 
             println!("-- Saved to file!");

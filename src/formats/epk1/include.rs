@@ -1,6 +1,12 @@
 use crate::utils::common;
 use binrw::BinRead;
 
+#[derive(PartialEq)]
+pub enum Epk1Type {
+    LittleEndian,
+    BigEndian,
+}
+
 #[derive(BinRead)]
 pub struct CommonHeader {
     _magic_bytes: [u8; 4],

@@ -44,7 +44,11 @@ pub fn extract_android_ota_payload(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> 
         let operation_count = partition.operations.len();
         println!("\n#{} - {}, Size: {}, Operations: {}", 
                 i + 1, partition.partition_name, partition.new_partition_info.unwrap().size.unwrap(), operation_count);
-        
+
+        fs::create_dir_all(&app_ctx.output_dir)?;
+        let output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", partition.partition_name));
+        let mut out_file = OpenOptions::new().write(true).create(true).truncate(true).open(output_path)?;
+
         for (i, operation) in partition.operations.into_iter().enumerate() {
             let operation_name_str = match install_operation::Type::try_from(operation.r#type) {
                 Ok(t) => t.as_str_name(),
@@ -76,9 +80,6 @@ pub fn extract_android_ota_payload(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> 
                 break
             }
 
-            fs::create_dir_all(&app_ctx.output_dir)?;
-            let output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", partition.partition_name));
-            let mut out_file = OpenOptions::new().append(true).create(true).open(output_path)?;
             out_file.write_all(&out_data)?;
         }
         println!("\n-- Saved!");

@@ -25,16 +25,16 @@ pub fn is_epk1_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dy
 pub fn extract_epk1(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
     //check type of epk1
-    let epk1_type;
+    let epk1_type: Epk1Type;
     let init_pak_count_bytes = common::read_file(&file, 8, 4)?;
     let init_pak_count = u32::from_le_bytes(init_pak_count_bytes.try_into().unwrap());
 
     if init_pak_count > 256 {
         println!("\nBig endian EPK1 detected.");
-        epk1_type = "be";
+        epk1_type = Epk1Type::BigEndian;
     } else if init_pak_count < 33 {
         println!("\nLittle endian EPK1 detected.");
-        epk1_type = "le";
+        epk1_type = Epk1Type::LittleEndian;
     } else {
         return Err("Unknown EPK1 variant!".into());
     }
@@ -43,7 +43,7 @@ pub fn extract_epk1(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
 
     let mut paks: Vec<Pak> = Vec::new();
 
-    if epk1_type == "be" {
+    if epk1_type == Epk1Type::BigEndian {
         let header: CommonHeader = file.read_be()?;
 
         for _i in 0..10 { //header can fit max 10 pak entries
@@ -63,7 +63,7 @@ pub fn extract_epk1(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
         println!("EPK info -\nData size: {}\nPak count: {}\nVersion: {:02x?}.{:02x?}.{:02x?}",
                 header.file_size, header.pak_count, version[1], version[2], version[3]);
 
-    } else if epk1_type == "le" {
+    } else if epk1_type == Epk1Type::LittleEndian {
         let header: CommonHeader = file.read_le()?;
 
         //this is to make an odd variant with 32 max pak entries work
@@ -97,7 +97,7 @@ pub fn extract_epk1(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
 
     for (i, pak) in paks.iter().enumerate() {
         file.seek(SeekFrom::Start(pak.offset as u64))?;
-        let pak_header: PakHeader = if epk1_type == "be" {file.read_be()?} else {file.read_le()?};
+        let pak_header: PakHeader = if epk1_type == Epk1Type::BigEndian {file.read_be()?} else {file.read_le()?};
 
         println!("\n({}/{}) - {}, Offset: {}, Size: {}, Platform: {}", 
                 i + 1, paks.len(), pak_header.pak_name(), pak.offset, pak_header.image_size, pak_header.platform_id());

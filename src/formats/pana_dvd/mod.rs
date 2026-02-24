@@ -196,6 +196,7 @@ fn extract_main(file_reader: &mut Cursor<Vec<u8>>, key: [u8; 8], output_path: &P
     }
 
     let mut maine_i = 0;
+    let mut main_out_file = OpenOptions::new().write(true).create(true).truncate(true).open(&output_path)?;
     for entry in &main_entries {
         maine_i += 1;
         let mut data = common::read_exact(file_reader, entry.size as usize)?;
@@ -215,9 +216,8 @@ fn extract_main(file_reader: &mut Cursor<Vec<u8>>, key: [u8; 8], output_path: &P
         
         print!("\nMAIN ({}/{}) - ", maine_i, main_entries.len());
         let decompressed_data = decompress_data(&data)?;
-        
-        let mut out_file = OpenOptions::new().append(true).create(true).open(&output_path)?;
-        out_file.write_all(&decompressed_data)?;
+           
+        main_out_file.write_all(&decompressed_data)?;
         
         println!("-- Saved to MAIN!");
     }

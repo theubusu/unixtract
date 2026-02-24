@@ -98,6 +98,10 @@ pub fn extract_epk2(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
         println!("\n({}/{}) - {}, Size: {}, Segment count: {}, Platform: {}",
                 pak_n + 1, paks.len(), pak.name, pak_header.image_size, pak_header.segment_count, pak_header.platform_id());
 
+        let output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", pak.name));
+        fs::create_dir_all(&app_ctx.output_dir)?;
+        let mut out_file = OpenOptions::new().write(true).create(true).truncate(true).open(output_path)?;
+
         for i in 0..pak_header.segment_count {
             // for first segment we already read the header so skip doing that for it
             if i > 0 {
@@ -137,9 +141,6 @@ pub fn extract_epk2(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
             let segment_data = common::read_exact(&mut file, actual_segment_size as usize)?;
             let out_data = decrypt_aes_ecb_auto(&matching_key_bytes, &segment_data)?;
 
-            let output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", pak.name));
-            fs::create_dir_all(&app_ctx.output_dir)?;
-            let mut out_file = OpenOptions::new().append(true).create(true).open(output_path)?;
             out_file.write_all(&out_data)?;
 
             println!("-- Saved to file!");
