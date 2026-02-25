@@ -1,11 +1,12 @@
 # unixtract
 Extractor for various file formats.   
 This is a tool that is able to extract the contents of various firmware package formats, mostly from TVs and AV devices.   
-Built in Rust, and made to not depend on any external dependancies, only Rust crates. This way it can work on Windows, Linux and MacOS and even Android without any issue.   
+Built in Rust, and made to not depend on any external dependancies, only Rust crates. This way it can work on Windows, Linux and MacOS and even Android.   
 Please note that this project is still under active development and errors may occur. Feel free to make an issue in that case, or if you have any feature request.   
 
 # Installation
-Build from source, by downloading the code or cloning the respository and running `cargo build --release`. The binary will be saved in `target/release`.  
+You can download the latest auto build for Windows and Linux x86-64 from [here](https://nightly.link/theubusu/unixtract/workflows/rust/main).   
+Or, build from source, by downloading the code or cloning the respository and running `cargo build --release`. The binary will be saved in `target/release`.  
 
 # Usage
 `unixtract [OPTIONS] <INPUT_TARGET> [OUTPUT_FOLDER]`  
