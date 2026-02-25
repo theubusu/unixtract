@@ -11,33 +11,30 @@ env:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-
+  
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            label: linux
+          - os: windows-latest
+            label: windows
+
+    runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v4
     - name: Build
       run: cargo build --release
 
-    - name: Zip linux binary
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        cd target/release
-        zip unixtract-linux-auto.zip unixtract
-
-    - name: Zip windows binary
-      if: matrix.os == 'windows-latest'
-      run: |
-        cd target/release
-        7z a unixtract-windows-auto.zip unixtract.exe
-
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v4
       with:
-        name: unixtract-${{ matrix.os }}-auto
-        path: target/release/*.zip
+        name: unixtract-${{ matrix.label }}-auto
+        path: |
+          target/release/unixtract
+          target/release/unixtract.exe
+          
+
+    
         
 
