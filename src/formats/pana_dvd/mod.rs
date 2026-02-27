@@ -7,7 +7,7 @@ use crate::AppContext;
 
 use std::path::{Path, PathBuf};
 use std::fs::{self, OpenOptions};
-use std::io::{Write, Read, Cursor, Seek, SeekFrom};
+use std::io::{Write, Cursor, Seek, SeekFrom};
 use binrw::BinReaderExt;
 
 use crate::keys;
@@ -64,76 +64,80 @@ pub fn extract_pana_dvd(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), B
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
     let context = ctx.downcast::<PanaDvdContext>().expect("Missing context");
 
-    let mut data = Vec::new();  // we need to load the entire file into memory so we can swap it with AES decrypted data if its AES encrypted
-    file.read_to_end(&mut data)?;
-    let mut file_reader = Cursor::new(data);
-
     let matching_key = context.matching_key;
     let mut file_entries: Vec<FileEntry> = Vec::new();
 
+    //AES files can contain multiple firmwares inside of itself
     if context.is_aes {
         let (aes_key, aes_iv) = (context.aes_key.unwrap(), context.aes_iv.unwrap());
         println!("Using key: {} + AES key: {}, IV: {}", hex::encode_upper(matching_key), hex::encode_upper(aes_key), hex::encode_upper(aes_iv));
-        println!("Decrypting AES...\n");
-        let aes_decrypted = decrypt_aes128_cbc_nopad(&file_reader.get_ref(), &aes_key, &aes_iv)?;
-        file_reader = Cursor::new(aes_decrypted); //set the file reader to use AES decrypted stream
 
-        //read file entries in extra header
-        let file_table = common::read_exact(&mut file_reader, 48)?;
-        let mut file_table_reader = Cursor::new(decrypt_data(&file_table, &matching_key));
+        //read inner file table
+        let file_table = common::read_exact(&mut file, 48)?;
+        let file_table_dec_aes = decrypt_aes128_cbc_nopad(&file_table, &aes_key, &aes_iv)?;
+        let mut file_table_reader = Cursor::new(decrypt_data(&file_table_dec_aes, &matching_key));
+        
         for _i in 0..4 {
             let file_entry: AesHeaderFileEntry = file_table_reader.read_le()?;
             if file_entry.size == 0 && file_entry.offset == 0 {
                 break
             }
+            //ignore duplicate entries
             if !file_entries.iter().any(|f| f.offset == file_entry.offset ){
-                file_entries.push(FileEntry { offset: file_entry.offset, base_offset: context.base_hdr_size });
+                file_entries.push(FileEntry { offset: file_entry.offset, size: file_entry.size, header_size: context.base_hdr_size });
             } 
         }
 
     } else {
         println!("Using key: {}", hex::encode_upper(matching_key));
-        file_entries.push(FileEntry { offset: 0, base_offset: context.base_hdr_size });
+        file_entries.push(FileEntry { offset: 0, size: file.metadata()?.len() as u32, header_size: context.base_hdr_size });
     }
 
-    if file_entries.len() == 1 {
-        //only one file, standard extraction
-        println!("File contains no extra sub-files...\n");
-        extract_file(app_ctx, &mut file_reader, file_entries[0].offset as u64, file_entries[0].base_offset as u64, matching_key, &app_ctx.output_dir)?;
-    } else {
-        println!("File contains {} sub-files...", file_entries.len());
-        for (i, file_entry ) in file_entries.iter().enumerate() {
-            println!("\nExtracting file {}/{} - Offset: {}, base: {}", i + 1, file_entries.len(), file_entry.offset, file_entry.base_offset);
-            extract_file(app_ctx, &mut file_reader, file_entry.offset as u64, file_entry.base_offset as u64, matching_key, &app_ctx.output_dir.join(format!("file_{}", i + 1)))?;
-        }
+    println!("File contains {} sub-files...", file_entries.len());
+    for (i, file_entry ) in file_entries.iter().enumerate() {
+        let data = common::read_file(&mut file, file_entries[0].offset as u64, file_entries[0].size as usize)?;
+        let dec_data = if context.is_aes {
+            let (aes_key, aes_iv) = (context.aes_key.unwrap(), context.aes_iv.unwrap());
+            decrypt_aes128_cbc_nopad(&data, &aes_key, &aes_iv)?
+        } else {
+            data
+        };
+
+        let mut file_reader = Cursor::new(dec_data);
+
+        let output_dir = if file_entries.len() == 1 {
+            &app_ctx.output_dir
+        } else {
+            &app_ctx.output_dir.join(format!("file_{}", i + 1))
+        };
+
+        println!("\nExtracting file {}/{} - Offset: {}, Size: {}, Header size: {}", 
+                i + 1, file_entries.len(), file_entry.offset, file_entry.size, file_entry.header_size);
+        
+        extract_file(app_ctx, &mut file_reader, file_entry.header_size as u64, matching_key, output_dir)?;
     }
 
     Ok(())
 }
 
-fn extract_file(app_ctx: &AppContext, file_reader: &mut Cursor<Vec<u8>>, offset: u64, base_offset: u64, key: [u8; 8], output_folder: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    file_reader.seek(SeekFrom::Start(offset + base_offset))?;
- 
-    let enc_header = common::read_exact(file_reader, MAX_HEADER_SIZE)?;
-    let dec_header = decrypt_data(&enc_header, &key);
-    opt_dump_dec_hdr(app_ctx, &dec_header, "header")?;
+fn extract_file(app_ctx: &AppContext, file_reader: &mut Cursor<Vec<u8>>, header_size: u64, key: [u8; 8], output_folder: &PathBuf) -> Result<(), Box<dyn std::error::Error>> { 
+    let enc_list = common::read_exact(file_reader, LIST_SIZE)?;
+    let dec_list = decrypt_data(&enc_list, &key);
+    opt_dump_dec_hdr(app_ctx, &dec_list, "module_list")?;
 
-    let mut hdr_reader = Cursor::new(dec_header);
+    let mut list_reader = Cursor::new(dec_list);
+    list_reader.seek(SeekFrom::Start(header_size))?;
+
     let mut modules: Vec<ModuleEntry> = Vec::new();
 
     for i in 0..100 {
-        let mut entry: ModuleEntry = hdr_reader.read_le()?;
+        let entry: ModuleEntry = list_reader.read_le()?;
         if !entry.is_valid() {break};
-        println!("Module {} - Name: {}, Version: {}, Platform: {}, ID: {}, Offset: {}, Size: {}",
-                i + 1, entry.name(), entry.version(), entry.platform(), entry.id(), entry.offset, entry.size);
+        println!("Module {} - Name: {}, Version: {}, Model ID: {}, ID: {}, Offset: {}, Size: {}",
+                i + 1, entry.name(), entry.version(), entry.model_id(), entry.id(), entry.offset, entry.size);
         if modules.iter().any(|m| m.offset == entry.offset ){
             println!("- Duplicate module, skipping!");
             continue
-        }
-
-        //prevent collision of modules with the same name
-        if modules.iter().any(|m| m.name() == entry.name() ){
-            entry.name_bytes = format!("{}({})", entry.name(), i + 1).as_bytes().to_vec();
         }
 
         modules.push(entry);
@@ -145,10 +149,14 @@ fn extract_file(app_ctx: &AppContext, file_reader: &mut Cursor<Vec<u8>>, offset:
         println!("\n({}/{}) - {}, Offset: {}, Size: {}, Checksum: {:#010x}",
                 mod_i, modules.len(), module.name(), module.offset, module.size, module.data_checksum);
 
-        let output_path = Path::new(&output_folder).join(format!("{}.bin", module.name()));
-
-        let rel_offset: u64 = offset + module.offset as u64;
-        file_reader.seek(SeekFrom::Start(rel_offset))?;
+        //if there is multiple modules with the same name, add the module ID to the outptut file to prevent collision
+        let output_path = if modules.iter().filter(|m| m.name() == module.name()).nth(1).is_some() {
+            Path::new(&output_folder).join(format!("{}_{}.bin", mod_i, module.name()))
+        } else {
+            Path::new(&output_folder).join(format!("{}.bin", module.name()))
+        };
+        
+        file_reader.seek(SeekFrom::Start(module.offset as u64))?;
 
         if module.name() == "MAIN" {
             println!("- Extracting MAIN...");
@@ -228,36 +236,41 @@ fn extract_main(file_reader: &mut Cursor<Vec<u8>>, key: [u8; 8], output_path: &P
 fn decompress_data(data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut data_reader = Cursor::new(data);
     let header: CompressedFileHeader = data_reader.read_le()?;
-    println!("Compressed size: {}, Decompressed size: {}, Compression type: {}({})", 
-            header.src_size, header.dest_size, header.compression_type, header.compression_type_str());
+    let compression_type = CompressionType::from(header.compression_type);
+
+    println!("Compressed size: {}, Decompressed size: {}, Compression type: {:?}({})", 
+            header.src_size, header.dest_size, compression_type, header.compression_type);
 
     let compressed_data = common::read_exact(&mut data_reader, header.src_size as usize)?;
-    let decompressed_data;
+    let mut decompressed_data;
 
-    if header.compression_type == 1 { //gzip + optionally lzss
+    if compression_type == CompressionType::Gzip {
         println!("- Decompressing GZIP...");
         let (decompressed_gzip, gzip_filename) = decompress_gzip_get_filename(&compressed_data)?;
         if let Some(gzip_filename) = gzip_filename {
             println!("- GZIP filename: {}", gzip_filename);
-        }
-        // the decompressed data can have another header
-        if decompressed_gzip.starts_with(COMPRESSED_FILE_MAGIC) {
-            decompressed_data = decompress_data(&decompressed_gzip)?;
-        } else {
-            decompressed_data = decompressed_gzip;
-        }
-    } else if header.compression_type == 2 { //only lzss
+        }    
+        decompressed_data = decompressed_gzip;
+    
+    } else if compression_type == CompressionType::Lzss {
         println!("- Decompressing LZSS...");
         decompressed_data = decompress_lzss(&compressed_data);
         if decompressed_data.len() != header.dest_size as usize {
             return Err("Decompressed size does not match size in header, decompression failed!".into());
         }
-    } else if header.compression_type == 0 { //no compression. havent encountered one yet
+
+    } else if compression_type == CompressionType::None {
         decompressed_data = compressed_data;
             
+    //GzipAndLzss is not used in this context.
     } else {
         println!("- Unknown compression method!");
         decompressed_data = compressed_data;
+    }
+
+    // the decompressed data can have another header
+    if decompressed_data.starts_with(COMPRESSED_FILE_MAGIC) {
+        decompressed_data = decompress_data(&decompressed_data)?;
     }
 
     Ok(decompressed_data)
@@ -275,12 +288,16 @@ fn extract_drv(mut data: Vec<u8>, key: &[u8; 8]) -> Result<Vec<u8>, Box<dyn std:
     let last_decrypted = decrypt_data(&data[data_size as usize - decrypt_size - 48..data_size - 48], &key);
     data[data_size as usize - decrypt_size - 48..data_size - 48].copy_from_slice(&last_decrypted);
 
+    let mut reader = Cursor::new(&data);
+    let header: DriveHeader = reader.read_le()?;
+    println!("- DRIVE info:\n-- Manufacturer ID: {}\n-- Model: {}\n-- Version: {}", header.manufacturer(), header.model(), header.version());
+
     //can be compressed
-    if data[header_size..].starts_with(COMPRESSED_FILE_MAGIC) {
-        let decompressed = decompress_data(&data[header_size..])?;
-        data.truncate(header_size);
-        data.extend_from_slice(&decompressed);
-    }
+    let out_data = if data[header_size..].starts_with(COMPRESSED_FILE_MAGIC) {
+        decompress_data(&data[header_size..])?
+    } else {
+        data[header_size..].to_vec()
+    };
     
-    Ok(data)
+    Ok(out_data)
 }
