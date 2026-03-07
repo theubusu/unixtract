@@ -95,7 +95,7 @@ pub fn extract_pana_dvd(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), B
 
     println!("File contains {} sub-files...", file_entries.len());
     for (i, file_entry ) in file_entries.iter().enumerate() {
-        let data = common::read_file(&mut file, file_entries[0].offset as u64, file_entries[0].size as usize)?;
+        let data = common::read_file(&mut file, file_entry.offset as u64, file_entry.size as usize)?;
         let dec_data = if context.is_aes {
             let (aes_key, aes_iv) = (context.aes_key.unwrap(), context.aes_iv.unwrap());
             decrypt_aes128_cbc_nopad(&data, &aes_key, &aes_iv)?
