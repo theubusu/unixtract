@@ -169,8 +169,13 @@ fn extract_file(app_ctx: &AppContext, file_reader: &mut Cursor<Vec<u8>>, header_
         }
 
         let data = common::read_exact(file_reader, module.size as usize)?;
-        println!("- Decrypting...");
-        let mut dec_data = decrypt_data(&data, &key);
+        
+        let mut dec_data =if module.name() != "VGD " { //VGD is not encrypted?
+            println!("- Decrypting...");
+            decrypt_data(&data, &key)
+        } else {
+            data
+        };
 
         if module.name().starts_with("DRV") {
             println!("- Extracting DRIVE firmware...");
