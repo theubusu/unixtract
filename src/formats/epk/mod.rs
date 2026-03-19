@@ -22,13 +22,16 @@ pub fn is_epk_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn
 
 fn check_epk_version(versions: &[u8]) -> Option<u8> {
     //                      _ - 0x00     X - a number    . - a dot
-    let epk2_pattern =     "____XXXX.XXXX.XXXX__XX.XX.XXX_______";
-    let epk3_pattern =     "____X.X.X___________X.X.X___________";
-    let epk3_new_pattern = "____XX.X.X__________XX.X.X__________";
+    let epk2_pattern =              "____XXXX.XXXX.XXXX__XX.XX.XXX_______";
+    let epk3_pattern =              "____X.X.X___________X.X.X___________";
+    let epk3_another_pattern =      "____X.XX.X__________X.XX.X__________";
+    let epk3_new_pattern =          "____XX.X.X__________XX.X.X__________";
 
     if match_with_pattern(&versions, epk2_pattern) {
         Some(2)
     } else if match_with_pattern(&versions, epk3_pattern) {     
+        Some(3)
+    } else if match_with_pattern(&versions, epk3_another_pattern) {     
         Some(3)
     } else if match_with_pattern(&versions, epk3_new_pattern) {     
         Some(3)
