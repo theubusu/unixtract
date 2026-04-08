@@ -162,13 +162,23 @@ Options:
 **Notes:** **Depends on keys** - see keys.rs  
 **Thanks to:** https://github.com/george-hopkins/samygo-patcher
 
+## SDBoot
+**Used in:** Panasonic TVs SD boot   
+**Notes:** There is only one known sample, so support may vary.  
+**Base:** https://github.com/theubusu/sddl_dec
+
 ## SDDL.SEC
 **Used in:** Panasonic TVs  
-**Notes:** Pre-2011 files are not supported.  
+**Notes:** None, all files should be supported.  
 **Options:**   
 `sddl_sec:save_extra` - Save SDIT.FDI and .TXT files that are not extracted by default.   
 `sddl_sec:split_peaks` - Split PEAKS module into partitions (only on older files). This will also automatically decompress compressed partitions.   
-`sddl_sec:no_decomp_peaks` - Do not automatically decompress partitions when splitting PEAKS with above option.
+`sddl_sec:no_decomp_peaks` - Do not automatically decompress partitions when splitting PEAKS with above option.  
+**Base:** https://github.com/theubusu/sddl_dec
+
+## SDImage (SDImage.bin)
+**Used in:** Some 2010 USA Panasonic TVs  
+**Notes:** Decryption is not yet supported.  
 
 ## SLP
 **Used in:** Samsung Tizen-based NX series cameras  

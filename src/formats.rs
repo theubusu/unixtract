@@ -27,6 +27,7 @@ pub mod android_ota_payload;
 pub mod bdl;
 pub mod amlogic;
 pub mod sdboot;
+pub mod sdimage;
 
 pub mod pup;
 
@@ -77,6 +78,11 @@ pub fn get_registry() -> Vec<Format> {
             name: "sdboot",
             detector_func: crate::formats::sdboot::is_sdboot_file,
             extractor_func: crate::formats::sdboot::extract_sdboot,
+        },
+        Format {
+            name: "sdimage",
+            detector_func: crate::formats::sdimage::is_sdimage_file,
+            extractor_func: crate::formats::sdimage::extract_sdimage,
         },
         Format {
             name: "novatek",
