@@ -1,5 +1,5 @@
-//sddl_dec 6.0 https://github.com/theubusu/sddl_dec
-mod include;
+//base: sddl_dec 7.0 https://github.com/theubusu/sddl_dec
+pub mod include;
 mod util;
 use std::any::Any;
 use crate::AppContext;
@@ -10,7 +10,8 @@ use std::io::{Cursor, Seek, SeekFrom, Write};
 use binrw::BinReaderExt;
 
 use crate::utils::common;
-use crate::utils::aes::{decrypt_aes128_cbc_pcks7};
+use crate::utils::common::{string_from_bytes, read_exact};
+use crate::utils::aes::{decrypt_aes128_cbc_nopad, decrypt_aes128_cbc_pcks7};
 use crate::utils::compression::{decompress_zlib};
 use include::*;
 use util::split_peaks_file;
@@ -26,10 +27,42 @@ pub fn is_sddl_sec_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Bo
     }
 }
 
-fn get_sec_file(mut file: &File) -> Result<(FileHeader, Vec<u8>), Box<dyn std::error::Error>> {
-    let mut hdr_reader = Cursor::new(decrypt_aes128_cbc_pcks7(&common::read_exact(&mut file, 32)?, &DEC_KEY, &DEC_IV)?);
+fn get_sec_file(mut file: &File, key_entry: &KeyEntry) -> Result<(FileHeader, Vec<u8>), Box<dyn std::error::Error>> {
+    //new type check because only new is Pcks7.. i know
+    let new_type = match key_entry {
+        KeyEntry::AESPcks7(_) => true,
+        _ => false
+    };
+
+    let dec_header = KeyEntry::decrypt(key_entry, &read_exact(&mut file, 32)?)?;
+    let mut hdr_reader = Cursor::new(dec_header);
     let file_header: FileHeader = hdr_reader.read_be()?;
-    let file_data = decrypt_aes128_cbc_pcks7(&common::read_exact(&mut file, file_header.size() as usize)?, &DEC_KEY, &DEC_IV)?;
+
+    let enc_size= if new_type {
+        file_header.size() as usize
+    } else {
+        //extra ciphered data before encrypted data, prefixed by size, like "0021XXXXXX PEAKS.T00/12900002"
+        //this counts into file size but not decrypt size
+        let extra_size: usize = string_from_bytes(&read_exact(&mut file, 4)?).parse().unwrap();
+        let _extra_data = read_exact(&mut file, extra_size)?;
+
+        file_header.size() as usize - (extra_size + 4)
+    };
+
+    let dec_data = KeyEntry::decrypt(key_entry, &read_exact(&mut file, enc_size)?)?;
+    let file_data = if new_type {
+        dec_data
+    } else {
+        let mut data_rdr = Cursor::new(dec_data);
+
+        //extra info in enc data, like "0021XXXXXX PEAKS.T00/12900002000000571800"
+        //part before size looks to be a duplicate of previous extra data, probably for signing purpose, size used for unpad
+        let extra_size: usize = string_from_bytes(&read_exact(&mut data_rdr, 4)?).parse().unwrap();
+        let _extra_data = read_exact(&mut data_rdr, extra_size + 4)?;
+
+        let data_size: usize = string_from_bytes(&read_exact(&mut data_rdr, 12)?).parse().unwrap();
+        read_exact(&mut data_rdr, data_size)?
+    };
 
     Ok((file_header, file_data))
 }
@@ -70,13 +103,57 @@ pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
     let save_extra = app_ctx.has_option("sddl_sec:save_extra");
 
-    let mut secfile_hdr_reader = Cursor::new(decipher(&common::read_exact(&mut file, 32)?));
+    let mut secfile_hdr_reader = Cursor::new(decipher(&read_exact(&mut file, 32)?));
     let secfile_header: SecHeader = secfile_hdr_reader.read_be()?;
 
-    println!("File info -\nKey ID: {}\nGroup count: {}\nModule file count: {}\n", secfile_header.key_id(), secfile_header.grp_num(), secfile_header.prg_num());
-    fs::create_dir_all(&app_ctx.output_dir)?;
+    println!("File info -\nKey ID: {}\nGroup count: {}\nModule file count: {}", secfile_header.key_id(), secfile_header.grp_num(), secfile_header.prg_num());
 
-    let (tdi_file, tdi_data) = get_sec_file(&file)?;
+    //by knowing that the first file is always SDIT.FDI, find key(and mode)
+    let try_hdr = read_exact(&mut file, 0x20)?;
+
+    let mut key: Option<KeyEntry> = None;
+
+    //for new, key will always be the same
+    if let Ok(dec) = decrypt_aes128_cbc_pcks7(&try_hdr, &NEW_KEY.key, &NEW_KEY.iv) {
+        if dec.starts_with(TDI_FILENAME.as_bytes()) {
+            println!("- New type detected\n");
+            key = Some(KeyEntry::AESPcks7(NEW_KEY));
+        }
+    }
+    //new did not match, try all old AES keys
+    if key.is_none() {
+        for key_entry in OLD_KEYS_AES {
+            let dec = decrypt_aes128_cbc_nopad(&try_hdr, &key_entry.key, &key_entry.iv)?;
+            if dec.starts_with(TDI_FILENAME.as_bytes()) {
+                println!("- Old type detected with AES key={}, iv={}\n", hex::encode(key_entry.key) ,hex::encode(key_entry.iv));
+                key = Some(KeyEntry::AES(key_entry));
+                break
+            }
+        }        
+    }
+    //...old DES keys
+    if key.is_none() {
+        for key_entry in OLD_KEYS_DES {
+            let dec = decrypt_3des(&try_hdr, &key_entry)?;
+            if dec.starts_with(TDI_FILENAME.as_bytes()) {
+                println!("- Old type detected with DES key={}, iv={}\n", hex::encode(key_entry.key) ,hex::encode(key_entry.iv));
+                key = Some(KeyEntry::DES(key_entry));
+                break
+            }
+        }        
+    }
+    //nothing matched, quit
+    if key.is_none() {
+        return Err("No matching key found!".into());
+    }
+
+    // -- key search end
+
+    let key = key.unwrap();
+    fs::create_dir_all(&app_ctx.output_dir)?;
+    file.seek(SeekFrom::Start(0x20))?;
+
+    let (tdi_file, tdi_data) = get_sec_file(&file, &key)?;
     println!("[TDI] Name: {}, Size: {}", tdi_file.name(), tdi_file.size());
     if save_extra { //Save SDIT
         let mut out_file = OpenOptions::new().write(true).create(true).open(Path::new(&app_ctx.output_dir).join(tdi_file.name()))?;
@@ -90,7 +167,7 @@ pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
 
     //get info files, each info file belongs to its respecitve group in the TDI
     for i in 0..secfile_header.grp_num() {
-        let (info_file, info_data) = get_sec_file(&file)?;
+        let (info_file, info_data) = get_sec_file(&file, &key)?;
         println!("\n[INFO] ID: {}, Name: {}, Size: {}", i, info_file.name(), info_file.size());
         if !info_file.name().ends_with(INFO_FILE_EXTENSION) {
             return Err(format!("Info file {} does not have the expected extension {}!", info_file.name(), INFO_FILE_EXTENSION).into());
@@ -111,20 +188,20 @@ pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
         let mut final_out_path: Option<PathBuf> = None;
 
         for i in 0..module.num_of_txx {
-            let (module_file, module_data) = get_sec_file(&file)?;
+            let (module_file, module_data) = get_sec_file(&file, &key)?;
             if !module_file.name().starts_with(&module.module_name()) {
                 return Err(format!("Module file {} does not start with the module's name: {}!", module_file.name(), module.module_name()).into());
             }    
             println!("  Segment #{}/{} - Name: {}, Size: {}", i+1, module.num_of_txx, module_file.name(), module_file.size());
 
             let mut module_reader = Cursor::new(module_data);
-            let com_header: ModuleComHeader = module_reader.read_be()?;
-            if com_header.download_id != DOWNLOAD_ID {
-                return Err("Invalid module com_header!".into());
-            }
+            let _com_header: ModuleComHeader = module_reader.read_be()?;
+            //if com_header.download_id != DOWNLOAD_ID {            it seems this can differ in some files
+            //    return Err("Invalid module com_header!".into());
+            //}
 
             let module_header: ModuleHeader = module_reader.read_be()?;
-            let mut module_data = common::read_exact(&mut module_reader, module_header.cmp_size as usize)?;
+            let mut module_data = read_exact(&mut module_reader, module_header.cmp_size as usize)?;
             if module_header.is_ciphered() {
                 println!("      - Deciphering...");
                 module_data = decipher(&module_data);
@@ -140,7 +217,7 @@ pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
             
             let output_path: PathBuf;
             if content_header.has_subfile() {
-                let sub_filename_bytes = common::read_exact(&mut content_reader, 0x100)?;
+                let sub_filename_bytes = read_exact(&mut content_reader, 0x100)?;
                 let sub_filename = common::string_from_bytes(&sub_filename_bytes);
                 println!("      --> {}", sub_filename);
 
@@ -153,8 +230,8 @@ pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
             }
             final_out_path = Some(output_path.clone());
 
-            let data = common::read_exact(&mut content_reader, content_header.size as usize)?;
-            let mut out_file = OpenOptions::new().read(true).write(true).create(true).open(&output_path)?;
+            let data = read_exact(&mut content_reader, content_header.size as usize)?;
+            let mut out_file = OpenOptions::new().read(true).write(true).create(true).open(output_path)?;
             out_file.seek(SeekFrom::Start(content_header.dest_offset() as u64))?;
             out_file.write_all(&data)?;
 

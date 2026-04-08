@@ -26,6 +26,7 @@ pub mod pana_dvd;
 pub mod android_ota_payload;
 pub mod bdl;
 pub mod amlogic;
+pub mod sdboot;
 
 pub mod pup;
 
@@ -71,6 +72,11 @@ pub fn get_registry() -> Vec<Format> {
             name: "sddl_sec",
             detector_func: crate::formats::sddl_sec::is_sddl_sec_file,
             extractor_func: crate::formats::sddl_sec::extract_sddl_sec,
+        },
+        Format {
+            name: "sdboot",
+            detector_func: crate::formats::sdboot::is_sdboot_file,
+            extractor_func: crate::formats::sdboot::extract_sdboot,
         },
         Format {
             name: "novatek",
