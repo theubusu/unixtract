@@ -28,6 +28,7 @@ pub mod bdl;
 pub mod amlogic;
 pub mod sdboot;
 pub mod sdimage;
+pub mod cd5;
 
 pub mod pup;
 
@@ -213,6 +214,11 @@ pub fn get_registry() -> Vec<Format> {
             name: "mtk_bdp",
             detector_func: crate::formats::mtk_bdp::is_mtk_bdp_file,
             extractor_func: crate::formats::mtk_bdp::extract_mtk_bdp,
+        },
+        Format {
+            name: "cd5",
+            detector_func: crate::formats::cd5::is_cd5_file,
+            extractor_func: crate::formats::cd5::extract_cd5,
         },
 
     ]

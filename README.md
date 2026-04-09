@@ -36,6 +36,10 @@ Options:
 **Used in:** Enterprise HP Printers  
 **Notes:** None, all files should be supported
 
+## CD5  
+**Used in:** Some Samsung TV tuners, and possibly other Irdeto(?)-based tuners  
+**Notes:** Decryption is not supported.
+
 ## EPK v1  
 **Used in:** LG TVs before ~2010  
 **Notes:** None, all files should be supported  
