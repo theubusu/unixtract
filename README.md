@@ -129,8 +129,8 @@ Options:
 **Notes:** None, all files should be supported.
 
 ## Novatek TIMG
-**Used in:** Newer Novatek-based TVs (Philips TitanOS, Hisense)  
-**Notes:** There is an older type of this format that is not yet supported, but for newer type all files should work. 
+**Used in:** Newer Novatek-based TVs (Philips(TPVision), Hisense, TCL...)  
+**Notes:** None, all files should be supported. 
 
 ## Panasonic Blu-Ray (PANA_DVD.FRM, PANA_ESD.FRM, PANAEUSB.FRM)
 **Used in:** Panasonic Blu-Ray Players and Recorders  
