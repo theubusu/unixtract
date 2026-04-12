@@ -4,7 +4,7 @@ use crate::AppContext;
 
 use std::fs::{self, OpenOptions};
 use std::path::Path;
-use std::io::{Write, Seek, Read, Cursor};
+use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use tar::Archive;
 use binrw::BinReaderExt;
 
@@ -38,6 +38,7 @@ pub fn extract_roku(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
 
     for entry_result in tar_archive.entries_with_seek()? {
         let mut entry = entry_result?;
+        
         let path = entry.path()?.to_path_buf();
 
         if path == std::path::Path::new("manifest") {
@@ -58,26 +59,29 @@ pub fn extract_roku(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
                 let mut i = 1;
 
                 while image_reader.stream_position()? < size as u64 {
-                    let image: ImageHeader = image_reader.read_le()?;
-                    println!("\nImage {} - Type: {:x}({}), Size: {}, Flags: {:x}{}, Data offset: {}", 
-                            i ,image.image_type, image.type_string(), image.size1, image.flags, if image.is_encrypted(){"(Encrypted)"}else{" "}, image.data_start_offset);
+                    let image: AImageHeader = image_reader.read_le()?;
+                    println!("  #{} - Type: {}(0x{:x}), Lenght: {}, encmode: {}", 
+                           i, image.image_type_str(), image.image_type, image.lenght, image.encmode_str());
+                    //println!("{:?}", image);
                     
                     let data = 
-                    if image.data_start_offset == 0 {
-                        common::read_exact(&mut image_reader, image.size1 as usize - 256)?
+                    if image.data_start_offset == 0 { // "0 if header is part of data"
+                        image_reader.seek(SeekFrom::Current(-256))?;    //rewind header
+                        common::read_exact(&mut image_reader, image.lenght as usize)?
+
                     } else {
-                        let _extra_data = common::read_exact(&mut image_reader, image.data_start_offset as usize - 256)?;
-                        common::read_exact(&mut image_reader, image.size1 as usize - image.data_start_offset as usize)?
+                        let _skip_data = common::read_exact(&mut image_reader, image.data_start_offset as usize - 256)?;
+                        common::read_exact(&mut image_reader, image.lenght as usize - image.data_start_offset as usize)?
                     };
 
                     let folder_path = Path::new(&app_ctx.output_dir).join(&path);
-                    let output_path = Path::new(&folder_path).join(format!("{}_{}.bin", i, image.type_string()));
+                    let output_path = Path::new(&folder_path).join(format!("{}_{}.bin", i, image.image_type_str()));
 
                     fs::create_dir_all(&folder_path)?;
                     let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
                     out_file.write_all(&data)?;
 
-                    println!("- Saved file!");
+                    println!("  - Saved file!\n");
 
                     i += 1;
                 }

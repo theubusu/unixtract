@@ -36,9 +36,10 @@ pub fn extract_sony_bdp(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
 
     let mut last_file_path: Option<PathBuf> = None;
     let mut first_entry_offset = 0;
-    let mut i = 1;
+    let mut i = 0;
     loop {
-        if (i != 1) && (hdr_reader.position() >= first_entry_offset) {
+        
+        if (i != 0) && (hdr_reader.position() >= first_entry_offset) {
             break
         }
 
@@ -48,14 +49,14 @@ pub fn extract_sony_bdp(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
         }
 
         println!("\n#{} - Offset: {}, Size: {}", i, entry.offset, entry.size);
-        if i == 1 {
+        if i == 0 {
             first_entry_offset = entry.offset as u64;
         }
 
         let obf_data = common::read_file(&file, entry.offset as u64, entry.size as usize)?;
         let data = hex_substitute(&obf_data);
 
-        let output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", i));
+        let output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", i+1));
         last_file_path = Some(output_path.clone());
 
         fs::create_dir_all(&app_ctx.output_dir)?;
@@ -71,7 +72,7 @@ pub fn extract_sony_bdp(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
         println!("\nChecking if it's also MTK BDP...");
 
         let last_file = File::open(last_file_path.unwrap())?;
-        let mtk_extraction_path = app_ctx.output_dir.join(format!("{}", i + 1));
+        let mtk_extraction_path = app_ctx.output_dir.join(format!("{}", i));
 
         //this is getting stupid...
         let ctx: AppContext = AppContext { input: InputTarget::File(last_file), output_dir: mtk_extraction_path, options: app_ctx.options.clone() };
