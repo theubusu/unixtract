@@ -71,6 +71,10 @@ Options:
 **Used in:** Funai & Funai-made Philips TVs (USA market)  
 **Notes:** **Depends on keys** - see keys.rs (most common keys should be included).    
 
+## GX DVB
+**Used in:** Cheap NationalChip GX-based DVB tuners    
+**Notes:** None, all files should be supported
+
 ## INVINCIBLE_IMAGE   
 **Used in:** LG Broadcom-based Blu-Ray players  
 **Notes:** Only version 3 is supported (2011+)    

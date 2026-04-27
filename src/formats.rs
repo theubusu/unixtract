@@ -29,6 +29,7 @@ pub mod amlogic;
 pub mod sdboot;
 pub mod sdimage;
 pub mod cd5;
+pub mod gx_dvb;
 
 pub mod pup;
 
@@ -219,6 +220,11 @@ pub fn get_registry() -> Vec<Format> {
             name: "cd5",
             detector_func: crate::formats::cd5::is_cd5_file,
             extractor_func: crate::formats::cd5::extract_cd5,
+        },
+        Format {
+            name: "gx_dvb",
+            detector_func: crate::formats::gx_dvb::is_gx_dvb_file,
+            extractor_func: crate::formats::gx_dvb::extract_gx_dvb,
         },
 
     ]
