@@ -26,7 +26,7 @@ pub fn extract_invincible_image(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Res
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
 
     let header: Header = file.read_le()?;
-    println!("File info -\nFile Version: {}\nVersion(1): {}\nVersion(2): {}\nVersion(3): {}\nVersion(4): {}\nData size: {}\nChunk count: {}\nChunk size: {}\n\nPayload Count: {}",
+    println!("File info -\nKey ID: {}\nVersion(1): {}\nVersion(2): {}\nVersion(3): {}\nVersion(4): {}\nData size: {}\nChunk count: {}\nChunk size: {}\n\nPayload Count: {}",
             header.file_infos[0], header.ver1(), header.ver2(), header.ver3(), header.ver4(), header.data_size, header.chunk_count, header.chunk_size, header.payload_count);
 
     let mut entries: Vec<Entry> = Vec::new();
@@ -40,7 +40,8 @@ pub fn extract_invincible_image(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Res
 
     let (aes_key, aes_iv) = match header.file_infos[0] {
         3 => (V3_KEY, V3_IV),
-        _ => return Err("Unsupported format version! (Unknown key)".into())
+        2 => (V2_KEY, V2_IV),
+        _ => return Err("Unsupported Key ID!".into())
     };
 
     file.seek(SeekFrom::Start(header.data_start_offset.into()))?;

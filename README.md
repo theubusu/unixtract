@@ -77,7 +77,8 @@ Options:
 
 ## INVINCIBLE_IMAGE   
 **Used in:** LG Broadcom-based Blu-Ray players  
-**Notes:** Only version 3 is supported (2011+)    
+**Notes:** Key ID 1 (>2010) is not supported.   
+Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same folder so they get combined.       
 
 ## MSD 1.0
 **Used in:** Samsung TVs 2013-2015  
