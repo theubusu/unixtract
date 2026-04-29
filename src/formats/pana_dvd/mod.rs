@@ -158,6 +158,7 @@ fn extract_file(app_ctx: &AppContext, file_reader: &mut Cursor<Vec<u8>>, header_
         
         file_reader.seek(SeekFrom::Start(module.offset as u64))?;
 
+        //special treatment of MAIN
         if module.name() == "MAIN" {
             println!("- Extracting MAIN...");
             extract_main(file_reader, key, &output_path)?;
@@ -168,14 +169,11 @@ fn extract_file(app_ctx: &AppContext, file_reader: &mut Cursor<Vec<u8>>, header_
             continue
         }
 
-        let data = common::read_exact(file_reader, module.size as usize)?;
+        let data = common::read_exact(file_reader, (module.size as usize + 7) & !7)?;  //read to the nearest multiple of 8 (needed for unalinged data decryption)
         
-        let mut dec_data =if module.name() != "VGD " { //VGD is not encrypted?
-            println!("- Decrypting...");
-            decrypt_data(&data, &key)
-        } else {
-            data
-        };
+        println!("- Decrypting...");
+        let mut dec_data = decrypt_data(&data, &key);
+        dec_data.truncate(module.size as usize); //discard padding
 
         if module.name().starts_with("DRV") {
             println!("- Extracting DRIVE firmware...");
