@@ -135,7 +135,14 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 
 ## Novatek TIMG
 **Used in:** Newer Novatek-based TVs (Philips(TPVision), Hisense, TCL...)  
-**Notes:** None, all files should be supported. 
+**Notes:** None, all files should be supported.   
+
+## Onkyo
+**Used in:** Onkyo AVRs and other AV devices  
+**Notes:** Newer files seem to use a different encryption and are not (yet) supported.   
+**Thanks to:** http://divideoverflow.com/2014/04/decrypting-onkyo-firmware-files/   
+**Options:**   
+※ Support `dump_dec_hdrs` option
 
 ## Panasonic Blu-Ray (PANA_DVD.FRM, PANA_ESD.FRM, PANAEUSB.FRM)
 **Used in:** Panasonic Blu-Ray Players and Recorders  

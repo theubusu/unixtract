@@ -30,6 +30,7 @@ pub mod sdboot;
 pub mod sdimage;
 pub mod cd5;
 pub mod gx_dvb;
+pub mod onkyo;
 
 pub mod pup;
 
@@ -225,6 +226,11 @@ pub fn get_registry() -> Vec<Format> {
             name: "gx_dvb",
             detector_func: crate::formats::gx_dvb::is_gx_dvb_file,
             extractor_func: crate::formats::gx_dvb::extract_gx_dvb,
+        },
+        Format {
+            name: "onkyo",
+            detector_func: crate::formats::onkyo::is_onkyo_file,
+            extractor_func: crate::formats::onkyo::extract_onkyo,
         },
 
     ]
