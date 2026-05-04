@@ -156,6 +156,12 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 **Notes:** **Depends on keys** - see keys.rs  
 **Thanks to:** https://github.com/frederic/pflupg-tool
 
+## Philips BDP   
+**Used in:** Philips MediaTek-based Blu-ray players/Home theatre systems     
+**Notes:** The main partition (ID 0) can be sometimes encrypted, and there is no good way to detect that. So if MTK BDP extraction fails, try running with `philips_bdp:decrypt` option.     
+**Options:**   
+`philips_bdp:decrypt` - Decrypt main partition   
+
 ## PUP
 **Used in:** Sony PlayStation 4/5  
 **Notes:** File has to be decrypted.  
@@ -201,7 +207,7 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 **Notes:** None, all files should be supported. 
 
 ## Sony BDP
-**Used in:** Sony Blu-Ray players  
+**Used in:** Sony MediaTek-based Blu-Ray players  
 **Notes:** Only platforms up to MSB18 are supported.  
 **Thanks to:** http://malcolmstagg.com/bdp/s390-firmware.html  
 

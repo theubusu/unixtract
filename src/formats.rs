@@ -31,6 +31,7 @@ pub mod sdimage;
 pub mod cd5;
 pub mod gx_dvb;
 pub mod onkyo;
+pub mod philips_bdp;
 
 pub mod pup;
 
@@ -213,6 +214,11 @@ pub fn get_registry() -> Vec<Format> {
             extractor_func: crate::formats::mtk_pkg_new::extract_mtk_pkg_new,
         },
         Format {
+            name: "philips_bdp",
+            detector_func: crate::formats::philips_bdp::is_philips_bdp_file,
+            extractor_func: crate::formats::philips_bdp::extract_philips_bdp,
+        },
+        Format {
             name: "mtk_bdp",
             detector_func: crate::formats::mtk_bdp::is_mtk_bdp_file,
             extractor_func: crate::formats::mtk_bdp::extract_mtk_bdp,
@@ -232,6 +238,5 @@ pub fn get_registry() -> Vec<Format> {
             detector_func: crate::formats::onkyo::is_onkyo_file,
             extractor_func: crate::formats::onkyo::extract_onkyo,
         },
-
     ]
 }
