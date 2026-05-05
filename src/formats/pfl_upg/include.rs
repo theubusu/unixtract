@@ -26,7 +26,7 @@ pub fn try_find_key(sig: &[u8], ciphertext: &[u8]) -> Result<Option<(String, [u8
             None => continue,       //there is no 0, continue
         };
         let fname = &dec_ciphertext[..end];
-        if fname.is_ascii() {       //is ascii filename
+        if fname.len() > 1 && fname.is_ascii() {       //is ascii filename
             result = Some((name.to_string(), aes_key.try_into().unwrap()));
             break
         }
