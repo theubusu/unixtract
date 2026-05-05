@@ -1,16 +1,13 @@
 mod include;
 use std::any::Any;
-use crate::AppContext;
+use crate::{AppContext, InputTarget};
 
-use rsa::{RsaPublicKey, BigUint};
-use hex::decode;
 use std::path::Path;
-use std::io::{Read, Cursor, Write};
-use std::fs::{self, OpenOptions};
+use std::io::{Cursor, Write};
+use std::fs::{self, File, OpenOptions};
 use binrw::BinReaderExt;
 
 use crate::utils::common;
-use crate::keys;
 use include::*;
 
 pub fn is_pfl_upg_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
@@ -31,66 +28,42 @@ pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), B
     let signature = common::read_exact(&mut file, 128)?;
     let _ = common::read_exact(&mut file, 32)?; //unknown
 
-    let version_bytes = common::read_exact(&mut file, header.header_size as usize - 704)?;
+    let version_bytes = common::read_exact(&mut file, header.header_size as usize - 704)?;  //704 is base header size
     let version = common::string_from_bytes(&version_bytes);
 
     println!("\nVersion: {}", version);
-    println!("Description: \n{}", header.description());
+    if header.description() != "" { //look ugly when empty
+        println!("--- Description --- \n{}", header.description());
+        println!("-------------------");
+    }
     println!("Data size: {}", header.data_size);
 
-    let mut decrypted_data;
+    let mut data;
     if header.is_encrypted() {
-        println!("File is encrypted.");
-        let mut key = None;
-        let mut n_hex = None;
-
-        //find key
-        for (firmware, value) in AUTO_FWS {
-            if version.starts_with(firmware) {
-                key = Some(value);
-                break;
-            }
-        }
-        if key.is_none() {
-            return Err("This firmware is not supported!".into());
+        println!("\nFile is encrypted.");
+        
+        //get some data as test ciphertext for key finding
+        let ciphertext = common::read_file(&mut file, header.header_size as u64, 64)?;
+        let aes_key;
+        if let Some((key_name, key)) = try_find_key(&signature, &ciphertext)? {
+            println!("Matched pubkey: {}, AES key: {}", key_name, hex::encode(key));
+            aes_key = key;
+        } else {
+            return Err("Matching key not found, cannot decrypt data".into());
         }
 
-        //get key
-        for (prefix, value) in keys::PFLUPG {
-            if key == Some(prefix) {
-                n_hex = Some(value);
-                break;
-            }
-        }
-
-        let e_hex = "010001";
-
-        let n = BigUint::from_bytes_be(&decode(n_hex.unwrap())?);
-        let e = BigUint::from_bytes_be(&decode(e_hex)?);
-        let pubkey = RsaPublicKey::new(n, e)?;
-
-        let signature_int = BigUint::from_bytes_le(&signature);
-
-        let decrypted_int = rsa::hazmat::rsa_encrypt(&pubkey, &signature_int)?;
-        let decrypted = decrypted_int.to_bytes_le();
-
-        let aes_key = &decrypted[20..52];
-        println!("AES key: {}\n", hex::encode(aes_key));
-
-        //for encrypted data we need to read file to end
-        let mut encrypted_data = Vec::new();
-        file.read_to_end(&mut encrypted_data)?;
+        //need to align to 16 bytes for AES blocksize
+        let encrypted_data = common::read_exact(&mut file, (header.data_size as usize + 0xf) & !0xf)?;
 
         println!("Decrypting data...");
-        decrypted_data = decrypt_aes256_ecb(aes_key, &encrypted_data)?;
-        decrypted_data.truncate(header.data_size as usize);
+        data = decrypt_aes256_ecb(aes_key, &encrypted_data)?;
+        data.truncate(header.data_size as usize);   //discard padding 
         
     } else {
-        println!("File is not encrypted.");
-        decrypted_data = common::read_exact(&mut file, header.data_size as usize)?;
+        data = common::read_exact(&mut file, header.data_size as usize)?;
     }
 
-    let mut data_reader = Cursor::new(decrypted_data);
+    let mut data_reader = Cursor::new(data);
 
     while (data_reader.position() as usize) < data_reader.get_ref().len() {
         let file_header: FileHeader = data_reader.read_le()?; 
@@ -104,7 +77,6 @@ pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), B
 
         let file_name = if file_header.has_extended_name() {
             let ex_name_size = file_header.header_size - 76; //76 is base file header size
-            //println!("extended name {}, org name: {}", ex_name_size, file_header.file_name());
             let ex_name_bytes = common::read_exact(&mut data_reader, ex_name_size as usize)?;
             common::string_from_bytes(&ex_name_bytes)
         } else {
@@ -115,23 +87,44 @@ pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), B
         let data = common::read_exact(&mut data_reader, file_header.stored_size as usize)?;
 
         let output_path = Path::new(&app_ctx.output_dir).join(file_name.trim_start_matches('/'));
-        let output_path_parent = output_path.parent().expect("Failed to get parent of the output path!");
 
-        //prevent collisions
-        if output_path_parent.exists() && output_path_parent.is_file() {
-            println!("[!] Warning: File collision detected, Skipping this file!");
-            continue
-        }
-
+        fs::create_dir_all(&app_ctx.output_dir)?;
         if let Some(parent) = output_path.parent() {
             fs::create_dir_all(parent)?;
         }
 
-        fs::create_dir_all(&app_ctx.output_dir)?;
+        //pfl upg inside pfl upg! DUMB code!
+        if file_header.is_package() && !app_ctx.has_option("pfl_upg:no_extract_inner_upg"){
+            println!("- Extracting inner UPG...");
+
+            //save this as temp file
+            let temp_path = Path::new(&app_ctx.output_dir).join("inner_upg_temp");
+            let mut temp_file = OpenOptions::new().write(true).create(true).open(&temp_path)?;
+            temp_file.write_all(&data[..file_header.real_size as usize])?;
+
+            //REOPEN temp file and make ctx
+            let r_temp_file = File::open(&temp_path)?;
+            let in_ctx: AppContext = AppContext { 
+                input: InputTarget::File(r_temp_file), 
+                output_dir: output_path, 
+                options: app_ctx.options.clone() 
+            };
+
+            //do check just in case and extract
+            if let Some(result) = is_pfl_upg_file(&in_ctx)? {
+                extract_pfl_upg(&in_ctx, result)?;
+            } else {
+                return Err("detection on inner UPG failed!".into());                 
+            }
+
+            //delete temp file
+            fs::remove_file(&temp_path)?;
+
+            continue
+        }
+        
         let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
-
         out_file.write_all(&data[..file_header.real_size as usize])?;
-
         println!("- Saved file!");
     }
     

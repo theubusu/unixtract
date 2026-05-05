@@ -152,9 +152,11 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 ※ Support `dump_dec_hdrs` option
 
 ## Philips UPG (Autorun.upg, 2SWU3TXV)
-**Used in:** Philips pre-TPVision TVs 200?-2013  
+**Used in:** Philips pre-TPVision TVs 200?-2013 and some Sony TVs 
 **Notes:** **Depends on keys** - see keys.rs  
-**Thanks to:** https://github.com/frederic/pflupg-tool
+**Thanks to:** https://github.com/frederic/pflupg-tool   
+**Options:**   
+`pfl_upg:no_extract_inner_upg` - Do not automatically extract inner UPGs. (Warning: this can cause file collisions sometimes!)   
 
 ## Philips BDP   
 **Used in:** Philips MediaTek-based Blu-ray players/Home theatre systems     
