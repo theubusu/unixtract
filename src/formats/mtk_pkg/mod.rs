@@ -13,7 +13,7 @@ use crate::utils::common;
 use crate::utils::global::opt_dump_dec_hdr;
 use crate::utils::aes::{decrypt_aes128_cbc_nopad};
 use crate::keys;
-use lzhs::{decompress_lzhs_fs_file2file};
+use lzhs::{decompress_mtk_to_file};
 use include::*;
 
 pub struct MtkPkgContext {
@@ -140,31 +140,27 @@ pub fn extract_mtk_pkg(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Bo
         } else {
             0
         };
+        let fin_data = &out_data[CRYPTED_HEADER_SIZE + extra_header_len as usize..];
         
-        //for compressed part create temp file
-        let output_path = Path::new(&app_ctx.output_dir).join(part_entry.name() + if part_entry.is_compressed() {".lzhs"} else {".bin"});
+        let output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", part_entry.name()));
         fs::create_dir_all(&app_ctx.output_dir)?;
-        let mut out_file = OpenOptions::new().write(true).read(true)/* for lzhs */.create(true).open(&output_path)?;
-        out_file.write_all(&out_data[CRYPTED_HEADER_SIZE + extra_header_len as usize..])?;
 
         if part_entry.is_compressed() {
-            let lzhs_out_path = Path::new(&app_ctx.output_dir).join(part_entry.name() + ".bin");
-            match decompress_lzhs_fs_file2file(&out_file, lzhs_out_path) {
+            match decompress_mtk_to_file(&fin_data, &output_path) {
                 Ok(()) => {
-                    println!("- Decompressed Successfully!");     
-                    if !app_ctx.has_option("mtk_pkg:no_del_comp") {
-                        //after successfull decompression remove the temporary .lzhs file
-                        fs::remove_file(&output_path)?;
-                    } 
+                    println!("-- Decompressed Successfully, Saved file!");
+                    continue
                 },
                 Err(e) => {
                     eprintln!("Failed to decompress partition!, Error: {}. Saving compressed data...", e);
-                    //if the decompression is not successfull leave out compressed data.
                 }
-            }   
+            }
         }
 
+        let mut out_file = OpenOptions::new().write(true).create(true).open(&output_path)?;
+        out_file.write_all(&fin_data)?;
         println!("-- Saved file!");
+
     }
 
     Ok(())

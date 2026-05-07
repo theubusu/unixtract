@@ -6,6 +6,7 @@ use lzma_rs::lzma_decompress;
 use lz4::block::decompress;
 use bzip2::read::BzDecoder;
 use liblzma::read::XzDecoder;
+use zstd::stream::read::Decoder;
 
 use crate::utils::common;
 
@@ -65,4 +66,11 @@ pub fn decompress_xz(compressed: &[u8]) -> std::io::Result<Vec<u8>> {
     let mut decompressed = Vec::new();
     decoder.read_to_end(&mut decompressed)?;
     Ok(decompressed)
+}
+
+pub fn decompress_zstd(compressed: &[u8]) -> io::Result<Vec<u8>> {
+    let mut decoder = Decoder::new(compressed)?;
+    let mut output = Vec::new();
+    decoder.read_to_end(&mut output)?;
+    Ok(output)
 }

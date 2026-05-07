@@ -1,17 +1,25 @@
-use std::fs::{File, OpenOptions};
+use std::fs::OpenOptions;
 use std::io::{Write, Cursor, Seek, SeekFrom, Read};
 use binrw::{BinRead, BinReaderExt};
 use std::path::{PathBuf};
 
 use super::huffman_tables::{CHARLEN, POS};
-use crate::utils::compression::{decompress_lz4};
+use crate::utils::common;
+use crate::utils::compression::{decompress_lz4, decompress_zstd};
+
+#[derive(PartialEq, Debug)]
+enum CompressionType {
+    LZHS,
+    LZ4,
+    ZSTD,
+}
 
 #[derive(BinRead)]
 struct LzhsHeader {
     uncompressed_size: u32,
     compressed_size: u32,
-    checksum_or_seg_idx: u16, //as checksum in normal lzhs header, as index in lzhs_fs header
-    padding: [u8; 6],
+    checksum_or_seg_idx: u32, //as checksum in normal lzhs header, as index in lzhs_fs header
+    _padding: [u8; 4],
 }
 
 #[derive(BinRead)]
@@ -20,36 +28,42 @@ struct LzhsOldSegmentHdr {
     _compressed_size: u32,
 }
 
-pub fn decompress_lzhs_fs_file2file(mut file: &File, output_file: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    let file_size = file.metadata()?.len();
+pub fn decompress_mtk_to_file(data: &[u8], output_file: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let mut out_file = OpenOptions::new().append(true).create(true).open(&output_file)?;
-    file.seek(SeekFrom::Start(0))?;
+    let mut data_reader = Cursor::new(data);
 
-    let mut uncompressed_heading = vec![0u8; 0x100000]; //first 1mb is uncompressed
-    file.read_exact(&mut uncompressed_heading)?;
+    let uncompressed_heading = common::read_exact(&mut data_reader, 0x100000)?; //first 1mb is uncompressed
     out_file.write_all(&uncompressed_heading)?;
 
-    while file.stream_position().unwrap() < file_size {
-        let segment_header: LzhsHeader = file.read_le()?;
-        let lzhs_header: LzhsHeader = file.read_le()?;
+    while data_reader.stream_position().unwrap() < data_reader.get_ref().len() as u64{
+        let segment_header: LzhsHeader = data_reader.read_le()?;
+        let comp_header: LzhsHeader = data_reader.read_le()?;
 
-        //lz4 type uses a 4 byte checksum instead of 1(2) byte , so the padding is not 0 anymore
-        //maybe this method will be changed
-        let is_lz4 = if &lzhs_header.padding != b"\x00\x00\x00\x00\x00\x00" {true} else {false};
+        println!("[cmp] Segment {} - Compressed size: {}, Decompressed size: {}",
+                segment_header.checksum_or_seg_idx, comp_header.compressed_size, comp_header.uncompressed_size);
 
-        println!("[{}] Segment {} - Compressed size: {}, Decompressed size: {}, Expected Checksum: 0x{:02x?}",
-                if is_lz4 {"LZ4"} else {"LZHS"}, segment_header.checksum_or_seg_idx, lzhs_header.compressed_size, lzhs_header.uncompressed_size, lzhs_header.checksum_or_seg_idx);
+        let compressed_data = common::read_exact(&mut data_reader, comp_header.compressed_size as usize)?;
 
-        let mut compressed_data = vec![0u8; lzhs_header.compressed_size as usize];
-        file.read_exact(&mut compressed_data)?;
+        //set comp method
+        let compression_type: CompressionType;
+        if comp_header.checksum_or_seg_idx & 0xFFFFFF00 != 0 {    //LZHS uses only a 8 bit checksum, and other use 32 bit(although the type is unknown).
+            if compressed_data.starts_with(b"\x28\xB5\x2F\xFD") {   //ZSTD magic
+                compression_type = CompressionType::ZSTD;
+            } else {
+                compression_type = CompressionType::LZ4;
+            }
+        } else {
+            compression_type = CompressionType::LZHS;
+        }
+
         let mut out_data;
-        if lzhs_header.compressed_size == 0 {
+        if comp_header.compressed_size == 0 {
             //odd variant no.1: if the compressed size is 0 , the output is just zeros with the uncompressed size.
-            out_data = vec![0; lzhs_header.uncompressed_size as usize];
+            out_data = vec![0; comp_header.uncompressed_size as usize];
 
-        } else if (lzhs_header.uncompressed_size > segment_header.uncompressed_size) && 
-                  (lzhs_header.compressed_size == lzhs_header.uncompressed_size) &&
-                  lzhs_header.checksum_or_seg_idx == 0x00 
+        } else if (comp_header.uncompressed_size > segment_header.uncompressed_size) && 
+                  (comp_header.compressed_size == comp_header.uncompressed_size) &&
+                  comp_header.checksum_or_seg_idx == 0x00 
         {
             //odd variant no.2: the lzhs header compressed size is for some reason bigger by 8 bytes (and those 8 bytes are zeros), the data is stored UNCOMPRESSED in these
             //the compressed and uncompressed size are the same and the checksum is 0.
@@ -57,56 +71,58 @@ pub fn decompress_lzhs_fs_file2file(mut file: &File, output_file: PathBuf) -> Re
 
         } else {
             //normal variant
-            println!("- Decompressing...");
-            if is_lz4 {
-                out_data = decompress_lz4(&compressed_data, lzhs_header.uncompressed_size as i32)?;
-            } else {
-                //lzhs
+            println!("- Decompressing {:?}...", compression_type);
+            if compression_type == CompressionType::LZ4 {
+                out_data = decompress_lz4(&compressed_data, comp_header.uncompressed_size as i32)?;
+            }
+            else if compression_type == CompressionType::ZSTD {
+                out_data = decompress_zstd(&compressed_data)?;
+            }
+            else if compression_type == CompressionType::LZHS {
                 let out_huff = unhuff(&compressed_data);
-                out_data = unlzss(&out_huff, lzhs_header.uncompressed_size as usize);
+                out_data = unlzss(&out_huff, comp_header.uncompressed_size as usize);
                 arm_thumb_convert(&mut out_data, 0, false);
 
                 let checksum = calc_checksum(&out_data);
                 println!("-- Calculated checksum: 0x{:02x?}", checksum);
-                if u16::from(checksum) != lzhs_header.checksum_or_seg_idx {
-                    println!("--- Checksum mismatch! Expected: 0x{:02x?}, Got: 0x{:02x?}!", lzhs_header.checksum_or_seg_idx, checksum);
-                    return Err("Checksum mismatch!".into());
+                if u32::from(checksum) != comp_header.checksum_or_seg_idx {
+                    println!("--- Checksum mismatch! Expected: 0x{:02x?}, Got: 0x{:02x?}!", comp_header.checksum_or_seg_idx, checksum);
+                    return Err("LZHS checksum mismatch".into());
                 } else {
                     println!("--- Checksum OK!")
                 }
             }
-            
+            else {
+                return Err("undefined compression type".into());
+            }      
         }
 
         out_file.write_all(&out_data)?;
         
         //padded to 16 bytes
-        let pad_pos = (file.stream_position().unwrap() + 15) & !15;
-        file.seek(SeekFrom::Start(pad_pos))?;
+        let pad_pos = (data_reader.stream_position().unwrap() + 15) & !15;
+        data_reader.seek(SeekFrom::Start(pad_pos))?;
     }
 
     Ok(())
 }
 
 // OLD VARIANT use in old mtk pkg
-pub fn decompress_lzhs_fs_file2file_old(mut file: &File, output_file: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    let file_size = file.metadata()?.len();
+pub fn decompress_mtk_to_file_old(data: &[u8], output_file: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let mut out_file = OpenOptions::new().append(true).create(true).open(&output_file)?;
-    file.seek(SeekFrom::Start(0))?;
+    let mut data_reader = Cursor::new(data);
 
-    let mut uncompressed_heading = vec![0u8; 0x200]; //first 512b is uncompressed
-    file.read_exact(&mut uncompressed_heading)?;
+    let uncompressed_heading = common::read_exact(&mut data_reader, 0x200)?; //first 1mb is uncompressed
     out_file.write_all(&uncompressed_heading)?;
 
-    while file.stream_position().unwrap() < file_size {
-        let _segment_header: LzhsOldSegmentHdr = file.read_le()?;
-        let lzhs_header: LzhsHeader = file.read_le()?;
+    while data_reader.stream_position().unwrap() < data_reader.get_ref().len() as u64{
+        let _segment_header: LzhsOldSegmentHdr = data_reader.read_le()?;
+        let lzhs_header: LzhsHeader = data_reader.read_le()?;
 
         println!("[LZHS] Segment - Compressed size: {}, Decompressed size: {}, Expected Checksum: 0x{:02x?}",
                 lzhs_header.compressed_size, lzhs_header.uncompressed_size, lzhs_header.checksum_or_seg_idx);
 
-        let mut compressed_data = vec![0u8; lzhs_header.compressed_size as usize];
-        file.read_exact(&mut compressed_data)?;
+        let compressed_data = common::read_exact(&mut data_reader, lzhs_header.compressed_size as usize)?;
         let mut out_data;
         let out_huff = unhuff(&compressed_data);
         out_data = unlzss(&out_huff, lzhs_header.uncompressed_size as usize);
@@ -114,9 +130,9 @@ pub fn decompress_lzhs_fs_file2file_old(mut file: &File, output_file: PathBuf) -
 
         let checksum = calc_checksum(&out_data);
         println!("-- Calculated checksum: 0x{:02x?}", checksum);
-        if u16::from(checksum) != lzhs_header.checksum_or_seg_idx {
+        if u32::from(checksum) != lzhs_header.checksum_or_seg_idx {
             println!("--- Checksum mismatch! Expected: 0x{:02x?}, Got: 0x{:02x?}!", lzhs_header.checksum_or_seg_idx, checksum);
-            return Err("Checksum mismatch!".into());
+            return Err("LZHS checksum mismatch".into());
         } else {
             println!("--- Checksum OK!")
         }

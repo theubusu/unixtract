@@ -3,7 +3,7 @@ use std::any::Any;
 use crate::{AppContext, InputTarget};
 
 use std::path::Path;
-use std::io::{Cursor, Write};
+use std::io::{Cursor, Seek, SeekFrom, Write};
 use std::fs::{self, File, OpenOptions};
 use binrw::BinReaderExt;
 
@@ -28,7 +28,7 @@ pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), B
     let signature = common::read_exact(&mut file, 128)?;
     let _ = common::read_exact(&mut file, 32)?; //unknown
 
-    let version_bytes = common::read_exact(&mut file, header.header_size as usize - 704)?;  //704 is base header size
+    let version_bytes = common::read_exact(&mut file, 28)?;
     let version = common::string_from_bytes(&version_bytes);
 
     println!("\nVersion: {}", version);
@@ -37,6 +37,8 @@ pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), B
         println!("-------------------");
     }
     println!("Data size: {}", header.data_size);
+
+    file.seek(SeekFrom::Start(header.header_size as u64))?;
 
     let mut data;
     if header.is_encrypted() {

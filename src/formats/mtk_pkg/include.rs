@@ -25,7 +25,7 @@ pub struct Header {
     _mtk_magic: [u8; 8], //#DH@FiRm
     version_bytes: [u8; 60],
 	pub file_size: u32,
-    _flags: u32,
+    _flags: [u8; 4],        // 3rd is possibly the compression type in new mtk pkg
     product_name_bytes: [u8; 32],
 }
 impl Header {
@@ -57,7 +57,7 @@ impl PartEntry {
     pub fn is_encrypted(&self) -> bool {
         (self.flags & 1 << 0) != 0
     }
-    pub fn is_compressed(&self) -> bool { //lzhs fs
+    pub fn is_compressed(&self) -> bool {
         (self.flags & 1 << 8) != 0
     }
 }
