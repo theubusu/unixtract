@@ -70,6 +70,10 @@ pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), B
     while (data_reader.position() as usize) < data_reader.get_ref().len() {
         let file_header: FileHeader = data_reader.read_le()?; 
 
+        //sometimes has extra header data
+        let ex_header_size = file_header.header_size - 76; //76 is base file header size
+        let ex_header_bytes = common::read_exact(&mut data_reader, ex_header_size as usize)?;
+
         if file_header.is_folder() {
             println!("\nFolder - {}", file_header.file_name());
             let output_path = Path::new(&app_ctx.output_dir).join(file_header.file_name().trim_start_matches('/'));
@@ -78,9 +82,7 @@ pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), B
         }
 
         let file_name = if file_header.has_extended_name() {
-            let ex_name_size = file_header.header_size - 76; //76 is base file header size
-            let ex_name_bytes = common::read_exact(&mut data_reader, ex_name_size as usize)?;
-            common::string_from_bytes(&ex_name_bytes)
+            common::string_from_bytes(&ex_header_bytes) //extra header data used as name
         } else {
             file_header.file_name()
         };
