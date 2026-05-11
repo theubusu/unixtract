@@ -23,6 +23,7 @@ pub mod rvp;
 pub mod funai_upg;
 pub mod funai_upg_phl;
 pub mod funai_bdp;
+pub mod funai_mstar;
 pub mod pana_dvd;
 pub mod android_ota_payload;
 pub mod bdl;
@@ -58,11 +59,6 @@ pub fn get_registry() -> Vec<Format> {
             name: "mstar",
             detector_func: crate::formats::mstar::is_mstar_file,
             extractor_func: crate::formats::mstar::extract_mstar,
-        },
-        Format {
-            name: "mstar_secure_old",
-            detector_func: crate::formats::mstar_secure_old::is_mstar_secure_old_file,
-            extractor_func: crate::formats::mstar_secure_old::extract_mstar_secure_old,
         },
         Format {
             name: "samsung_old",
@@ -145,6 +141,11 @@ pub fn get_registry() -> Vec<Format> {
             extractor_func: crate::formats::funai_bdp::extract_funai_bdp,
         },
         Format {
+            name: "funai_mstar",                                               // ORDER: needs to be placed BELOW mstar_secure_old
+            detector_func: crate::formats::funai_mstar::is_funai_mstar_file,   //because, it can end with mstar_secure_old payload, but because it is not aligned to the start of the file, extraction will fail
+            extractor_func: crate::formats::funai_mstar::extract_funai_mstar,
+        },
+        Format {
             name: "pana_dvd",
             detector_func: crate::formats::pana_dvd::is_pana_dvd_file,
             extractor_func: crate::formats::pana_dvd::extract_pana_dvd,
@@ -221,8 +222,8 @@ pub fn get_registry() -> Vec<Format> {
         },
         Format {
             name: "philips_bdp",
-            detector_func: crate::formats::philips_bdp::is_philips_bdp_file,
-            extractor_func: crate::formats::philips_bdp::extract_philips_bdp,
+            detector_func: crate::formats::philips_bdp::is_philips_bdp_file,        //ORDER: needs to be placed below mtk_bdp
+            extractor_func: crate::formats::philips_bdp::extract_philips_bdp,       //because, it can end with mtk_bdp payload, but because it is not aligned to the start of the file, extraction will fail
         },
         Format {
             name: "mtk_bdp",
@@ -243,6 +244,11 @@ pub fn get_registry() -> Vec<Format> {
             name: "onkyo",
             detector_func: crate::formats::onkyo::is_onkyo_file,
             extractor_func: crate::formats::onkyo::extract_onkyo,
+        },
+        Format {
+            name: "mstar_secure_old",
+            detector_func: crate::formats::mstar_secure_old::is_mstar_secure_old_file,
+            extractor_func: crate::formats::mstar_secure_old::extract_mstar_secure_old,
         },
     ]
 }

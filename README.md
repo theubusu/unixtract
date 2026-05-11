@@ -63,6 +63,10 @@ Options:
 **Used in:** Funai & Funai-made Philips Blu-Ray player/HTS (USA market)  
 **Notes:** N/A   
 
+## Funai MStar   
+**Used in:** MStar-based Funai & Funai-made Philips TVs (USA market)  
+**Notes:** Inner SoC part is extracted with mstar_secure_old    
+
 ## Funai UPG   
 **Used in:** Some Funai TVs  
 **Notes:** **Depends on keys** - see keys.rs.    
@@ -107,6 +111,8 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 ## MStar upgrade bin (Secure, old)
 **Used in:** Older MStar-based TVs with Secure upgrade mode (encrypted+signed)  
 **Notes:** Only default upgrade key is supported. This use the extractor above after decrypting.  
+**Options:**  
+`mstar_secure_old:keep_decrypted` - Keep decrypted file (it will be deleted by default).  
 
 ## MediaTek BDP
 **Used in:** Many MediaTek-based Blu-Ray players (LG, Samsung, Philips, Panasonic...)  

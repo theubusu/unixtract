@@ -41,15 +41,13 @@ pub fn extract_mstar_secure_old(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Resu
 
     let enc_data = common::read_file(&mut file, hdr.file_data_offset as u64, hdr.file_data_len as usize)?;
     
-    println!("Decrypting...");
+    println!("- Decrypting...");
     let dec_data = decrypt_aes128_ecb(&MSTAR_DEFAULT_UPGRADE_KEY, &enc_data)?;
 
     let output_path = Path::new(&app_ctx.output_dir).join("_decrypted.bin");
     fs::create_dir_all(&app_ctx.output_dir)?;
     let mut out_file = OpenOptions::new().write(true).create(true).open(&output_path)?;       
     out_file.write_all(&dec_data)?;
-
-    println!("- Saved decrypted file!");
 
     //run standard mstar ext into same directory
     let r_out_file = File::open(&output_path)?;
@@ -65,6 +63,11 @@ pub fn extract_mstar_secure_old(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Resu
     } else {
         return Err("detection failed on decrypted data".into());                 
     }
+
+    //delete decrypted file unless asked not to
+    if !app_ctx.has_option("mstar_secure_old:keep_decrypted") {
+        fs::remove_file(&output_path)?;
+    }            
 
     Ok(())
 }

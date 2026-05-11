@@ -134,6 +134,7 @@ pub fn extract_mstar(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
                     Path::new(&app_ctx.output_dir).join(format!("_unknown_{}.bin", offset))
                 } else {
                     println!("- Warning, unknown destination - skipping...");
+                    i += 1;
                     continue;
                 }
             } else {
