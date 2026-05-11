@@ -126,45 +126,51 @@ pub fn extract_mstar(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
 
             println!("\nPart - Offset: {}, Size: {} --> {}", offset, size, partname);
 
-            if partname == "unknown" {
-                println!("- Unknown destination, skipping!");
-            } else {
-                let data = common::read_file(&file, offset, size.try_into().unwrap())?;
-                let out_data; 
-                let output_path = Path::new(&app_ctx.output_dir).join(format!("{}.bin", partname));
-
-                if compression == CompressionType::Lzma {
-                    println!("- Decompressing LZMA...");
-                    out_data = decompress_lzma(&data)?;
-                } else if compression == CompressionType::DoubleLzma {
-                    println!("- Decompressing LZMA (Pass 1)...");
-                    let pass_1 = decompress_lzma(&data)?;
-                    println!("- Decompressing LZMA (Pass 2)...");
-                    out_data = decompress_lzma(&pass_1)?;
-                } else if compression == CompressionType::Lz4 {
-                    println!("- Decompressing lz4, expected size: {}", lz4_expect_size);
-                    out_data = decompress_lz4(&data, lz4_expect_size.try_into().unwrap())?;
-                } else if compression == CompressionType::Lzo {
-                    println!("- Decompessing LZO..");
-                    unlzop_to_file(&data, output_path)?;
-                    println!("-- Saved file!");
-                    i += 1;
-                    continue
-                } else if compression == CompressionType::Sparse {
-                    println!("- Unsparsing...");
-                    unsparse_to_file(&data, output_path)?;
-                    println!("-- Saved file!");
-                    i += 1;
-                    continue
+            let data = common::read_file(&file, offset, size.try_into().unwrap())?;
+            let out_data; 
+            let output_path = if partname == "unknown" {
+                if app_ctx.has_option("mstar:keep_unknown") {
+                    println!("- Warning, unknown destination - saving to _unknown_{}.bin", offset);
+                    Path::new(&app_ctx.output_dir).join(format!("_unknown_{}.bin", offset))
                 } else {
-                    out_data = data;
+                    println!("- Warning, unknown destination - skipping...");
+                    continue;
                 }
+            } else {
+                Path::new(&app_ctx.output_dir).join(format!("{}.bin", partname))
+            };
 
-                fs::create_dir_all(&app_ctx.output_dir)?;
-                let mut out_file = OpenOptions::new().append(true).create(true).open(output_path)?;
-                out_file.write_all(&out_data)?;
+            if compression == CompressionType::Lzma {
+                println!("- Decompressing LZMA...");
+                out_data = decompress_lzma(&data)?;
+            } else if compression == CompressionType::DoubleLzma {
+                println!("- Decompressing LZMA (Pass 1)...");
+                let pass_1 = decompress_lzma(&data)?;
+                println!("- Decompressing LZMA (Pass 2)...");
+                out_data = decompress_lzma(&pass_1)?;
+            } else if compression == CompressionType::Lz4 {
+                println!("- Decompressing lz4, expected size: {}", lz4_expect_size);
+                out_data = decompress_lz4(&data, lz4_expect_size.try_into().unwrap())?;
+            } else if compression == CompressionType::Lzo {
+                println!("- Decompessing LZO..");
+                unlzop_to_file(&data, output_path)?;
                 println!("-- Saved file!");
+                i += 1;
+                continue
+            } else if compression == CompressionType::Sparse {
+                println!("- Unsparsing...");
+                unsparse_to_file(&data, output_path)?;
+                println!("-- Saved file!");
+                i += 1;
+                continue
+            } else {
+                out_data = data;
             }
+
+            fs::create_dir_all(&app_ctx.output_dir)?;
+            let mut out_file = OpenOptions::new().append(true).create(true).open(output_path)?;
+            out_file.write_all(&out_data)?;
+            println!("-- Saved file!");
         }
 
         i += 1;

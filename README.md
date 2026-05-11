@@ -101,7 +101,12 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 **Used in:** Many MStar-based TVs (Hisense, Toshiba...)  
 **Notes:** All files should be supported, includes lzop, lz4, lzma, sparse_write support  
 **Options:**  
+`mstar:keep_unknown` - Save data with unknown destination.  
 ※ Support `dump_dec_hdrs` option (will save the script)   
+
+## MStar upgrade bin (Secure, old)
+**Used in:** Older MStar-based TVs with Secure upgrade mode (encrypted+signed)  
+**Notes:** Only default upgrade key is supported. This use the extractor above after decrypting.  
 
 ## MediaTek BDP
 **Used in:** Many MediaTek-based Blu-Ray players (LG, Samsung, Philips, Panasonic...)  

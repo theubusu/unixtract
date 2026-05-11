@@ -8,6 +8,7 @@ pub struct Format {
 }
 
 pub mod mstar;
+pub mod mstar_secure_old;
 pub mod samsung_old;
 pub mod nvt_timg;
 pub mod pfl_upg;
@@ -57,6 +58,11 @@ pub fn get_registry() -> Vec<Format> {
             name: "mstar",
             detector_func: crate::formats::mstar::is_mstar_file,
             extractor_func: crate::formats::mstar::extract_mstar,
+        },
+        Format {
+            name: "mstar_secure_old",
+            detector_func: crate::formats::mstar_secure_old::is_mstar_secure_old_file,
+            extractor_func: crate::formats::mstar_secure_old::extract_mstar_secure_old,
         },
         Format {
             name: "samsung_old",
