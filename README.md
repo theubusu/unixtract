@@ -221,7 +221,7 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 
 ## Sony BDP
 **Used in:** Sony MediaTek-based Blu-Ray players  
-**Notes:** Only platforms up to MSB18 are supported.  
+**Notes:** **Depends on keys** - see keys.rs (Platforms up to MSB29 are supported)  
 **Thanks to:** http://malcolmstagg.com/bdp/s390-firmware.html  
 
 # License

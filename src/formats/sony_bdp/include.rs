@@ -1,7 +1,12 @@
 use crate::utils::common;
 use binrw::BinRead;
 
-//thx sony
+pub enum EncryptionType {
+    HexSubst,
+    AesOfb(([u8; 16], [u8; 16], String)),   //key, iv, key name
+}
+
+//for hex subst (old enc)
 static HEX_SUBSTITUTION: [u8; 256] = [
 	0xE8, 0x4D, 0x63, 0xF4, 0xF8, 0xA9, 0x21, 0x9C, 0xC7, 0x82, 0xCD, 0xE3, 0xC1, 0xCE, 0xC0, 0xFA, 0xE7, 0xD6, 0x96, 0x46, 0x12, 0x03, 0x14, 0x33, 0xED, 0x10, 0xEC, 0x69, 0x16, 0xE0, 0x28, 0x30, 
 	0x77, 0x0E, 0x3D, 0xEF, 0x36, 0x4C, 0x18, 0xEB, 0x41, 0x89, 0x64, 0x8A, 0x70, 0x0C, 0x23, 0xA3, 0x79, 0x6D, 0x75, 0x7E, 0x1A, 0x2D, 0x01, 0x91, 0x88, 0xCB, 0xFC, 0x8B, 0xFD, 0x94, 0x0A, 0x39, 
@@ -15,6 +20,31 @@ static HEX_SUBSTITUTION: [u8; 256] = [
 
 pub fn hex_substitute(data: &[u8]) -> Vec<u8> {
     data.iter().map(|&b| HEX_SUBSTITUTION[b as usize]).collect()
+}
+
+
+//for aes (new enc)
+use aes::Aes128;
+use aes::cipher::{BlockEncrypt, KeyInit};
+use aes::cipher::generic_array::GenericArray;
+
+pub fn ver_up_decrypt_aes128ofb(key: &[u8], iv: &[u8], data: &[u8]) -> Vec<u8> {
+    let cipher = Aes128::new(GenericArray::from_slice(key));
+
+    let mut output = Vec::with_capacity(data.len());
+    let mut feedback = GenericArray::clone_from_slice(iv);
+    for chunk in data.chunks(16) {
+        cipher.encrypt_block(&mut feedback);
+        for (b, k) in chunk.iter().zip(feedback.iter()) {
+            output.push(b ^ k);
+        }
+    }
+    output
+}
+
+pub fn is_valid_header_magic(data: &[u8]) -> bool {
+    matches!(data, [b'M', b'S', b'B', d1, d2, ..] if d1.is_ascii_digit() && d2.is_ascii_digit()) ||
+    matches!(data, [b'B', b'D', b'P', b'P', d1, d2, ..] if d1.is_ascii_digit() && d2.is_ascii_digit())
 }
 
 #[derive(BinRead)]

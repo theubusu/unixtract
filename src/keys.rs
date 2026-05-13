@@ -131,6 +131,13 @@ pub static FUNAI_BDP: &[&str] = &[
     ("09E87783"),
 ];
 
+//Sony BDP AES keys
+//key, iv(der), desc
+pub static SONY_BDP_AES: &[(&str, &str, &str)] = &[
+    ("2EC0855737CADA76E1D82F9D5526B46E", "8F5E39A2A36AD9B0A9D2E3041AA03867", "MSB19-23"),
+    ("0D8B87A8CE27702197155B8AC057E13A", "C280F2F534B1E53421D31AC4BE56CA43", "MSB24-29"),
+];
+
 //EPK keys
 //github.com/openlgtv/epk2extract
 pub static EPK: &[(&str, &str)] = &[
