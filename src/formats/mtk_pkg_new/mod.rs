@@ -100,7 +100,7 @@ pub fn extract_mtk_pkg_new(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<()
         //strip iMtK thing and get version
         let extra_header_len = if &out_data[48..52] == MTK_META_MAGIC {
             let imtk_len = u32::from_le_bytes(out_data[52..56].try_into().unwrap());
-            if &out_data[56..60] != MTK_META_PAD_MAGIC {
+            if imtk_len != 0 && &out_data[56..60] != MTK_META_PAD_MAGIC {
                 let version_len = u32::from_le_bytes(out_data[56..60].try_into().unwrap());
                 let version = common::string_from_bytes(&out_data[60..60 + version_len as usize]);
                 println!("- Version: {}", version);
