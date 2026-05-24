@@ -224,5 +224,11 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 **Notes:** **Depends on keys** - see keys.rs (Platforms up to MSB29 are supported)  
 **Thanks to:** http://malcolmstagg.com/bdp/s390-firmware.html  
 
+## TSB Bin
+**Used in:** Older Toshiba TVs  
+**Notes:** None, all files should be supported.   
+**Options:**   
+※ Support `dump_dec_hdrs` option
+
 # License
 Licensed under GNU GPL v3.  

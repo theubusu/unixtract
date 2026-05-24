@@ -34,6 +34,7 @@ pub mod cd5;
 pub mod gx_dvb;
 pub mod onkyo;
 pub mod philips_bdp;
+pub mod tsb_bin;
 
 pub mod pup;
 
@@ -250,5 +251,10 @@ pub fn get_registry() -> Vec<Format> {
             detector_func: crate::formats::mstar_secure_old::is_mstar_secure_old_file,
             extractor_func: crate::formats::mstar_secure_old::extract_mstar_secure_old,
         },
+        Format {
+            name: "tsb_bin",
+            detector_func: crate::formats::tsb_bin::is_tsb_bin_file,
+            extractor_func: crate::formats::tsb_bin::extract_tsb_bin,
+        },   
     ]
 }
