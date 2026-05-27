@@ -65,5 +65,5 @@ pub fn is_valid_header_checksum(header_data: &[u8]) -> bool {
     //expected checksum at end
     let exp = u32::from_be_bytes(header_data[252..256].try_into().unwrap());
 
-    calc == exp
+    calc == exp &&  exp != 0 /* for false positive (SHOULD BE IMPROVED) */
 }
