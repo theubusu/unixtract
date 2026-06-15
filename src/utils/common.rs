@@ -1,17 +1,16 @@
-use std::fs::{File};
-use std::io::{self, Read, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom};
 
-pub fn read_file(mut file: &File, offset: u64, size: usize) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    file.seek(SeekFrom::Start(offset))?;
-    let mut buffer = vec![0u8; size];
-    let _bytes_read = file.read(&mut buffer)?;
+pub fn read_at<T: Read + Seek + ?Sized>(reader: &mut T, offset: u64, size: usize) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    reader.seek(SeekFrom::Start(offset))?;
+    let mut buf = vec![0u8; size];
+    reader.read(&mut buf)?;
 
-    // reset seek (!
-    file.seek(SeekFrom::Start(offset))?;
-    Ok(buffer)
+    //reset seek
+    reader.seek(SeekFrom::Start(offset))?;
+    Ok(buf)
 }
 
-pub fn read_exact<R: Read>(reader: &mut R, size: usize) -> io::Result<Vec<u8>> {
+pub fn read_exact<R: Read>(reader: &mut R, size: usize) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut buf = vec![0u8; size];
     reader.read_exact(&mut buf)?;
     Ok(buf)

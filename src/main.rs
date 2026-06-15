@@ -1,119 +1,109 @@
-mod formats;
-mod keys;
+use std::{fs::{self, File, OpenOptions}, path::Path};
+
 mod utils;
+mod formats;
+use log::{debug, error, info, warn};
+use formats::{ItemProperty, FileProperty};
 
 use clap::Parser;
-use std::path::{PathBuf};
-use std::io::{self, Seek, SeekFrom};
-use std::fs::{self, File};
-use crate::formats::{Format, get_registry};
-
 #[derive(Parser, Debug)]
 struct Args {
-    input_target: String,
-    output_directory: Option<String>,
+    input_file: String,
+    output_dir: String,
+
+    ///debug log
+    #[arg(short, long)]
+    debug: bool,
 
     ///format specific options
     #[arg(short, long)]
     options: Vec<String>,
 }
 
-pub enum InputTarget {
-    File(File),
-    Directory(PathBuf),
-}
-
-pub struct AppContext {
-    pub input: InputTarget,
-    pub output_dir: PathBuf,
-    pub options: Vec<String>,
-}
-impl AppContext {
-    pub fn file(&self) -> Option<&File> {
-        match &self.input {
-            InputTarget::File(f) => Some(f),
-            _ => None,
-        }
-    }
-
-    pub fn dir(&self) -> Option<&PathBuf> {
-        match &self.input {
-            InputTarget::Directory(p) => Some(p),
-            _ => None,
-        }
-    }
-
-    pub fn has_option(&self, option: &'static str) -> bool {
-        self.options.iter().any(|o| o == option)
-    }
-}
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("unixtract Firmware extractor");
+    println!("unixtract ng2");
+
     let args = Args::parse();
 
-    let target_path_str = args.input_target;
-    println!("Input target: {}", target_path_str);
-    let target_path = PathBuf::from(&target_path_str);
-    
-    let output_path_str = if args.output_directory.is_some() {
-        args.output_directory.unwrap()
+    //log builder
+    let mut log_builder = env_logger::Builder::new();
+    if args.debug {       
+        log_builder.filter_level(log::LevelFilter::Debug);
+        log_builder.format_target(true);
+        log_builder.format_level(true);
+        //log_builder.format_timestamp_millis();    annoying
+        log_builder.format_timestamp(None);
     } else {
-        format!("_{}", target_path.file_name().and_then(|s| s.to_str()).unwrap())
-    };
-    println!("Output directory: {}", output_path_str);
-    let output_directory_path = PathBuf::from(&output_path_str);
-
-    if output_directory_path.exists() {
-        if output_directory_path.is_dir() {
-            let is_empty = fs::read_dir(&output_directory_path)?.next().is_none();
-            if !is_empty {
-                println!("\nWarning: Output folder already exists and is NOT empty! Files may be overwritten!");
-                println!("Press Enter if you want to continue...");
-                io::stdin().read_line(&mut String::new())?;
-            }
-        }
+        log_builder.filter_level(log::LevelFilter::Info);
+        log_builder.format_target(false);
+        log_builder.format_level(false);
+        log_builder.format_timestamp(None);
     }
+    log_builder.init();
+       
+    let in_file = args.input_file;
+    info!("Input file: {}", in_file);
+    let mut file = File::open(in_file)?;
 
-    let app_ctx;
+    let out_dir = args.output_dir;
+    info!("Output dir: {}", out_dir);
 
-    if target_path.is_file() {
-        let file = File::open(&target_path)?;
-        app_ctx = AppContext {
-            input: InputTarget::File(file),
-            output_dir: output_directory_path,
-            options: args.options,
-        };
-    } else if target_path.is_dir() {
-        app_ctx = AppContext {
-            input: InputTarget::Directory(target_path),
-            output_dir: output_directory_path,
-            options: args.options,
-        };
-    } else {
-        return Err("Invalid input path!".into());
-    }
-
-    let formats: Vec<Format> = get_registry();
-    println!("Loaded {} formats!", formats.len());
+    let formats = formats::get_formats();
+    info!("Loaded {} formats!", formats.len());
 
     for format in formats {
-        if let Some(ctx) = (format.detector_func)(&app_ctx)? {
-            println!("\n{} detected!", format.name);
+        match format.open(&mut file) {
+            Ok(open_f) => {
+                info!("Opened as {}", format.name());
 
-            //reset seek of the file if present
-            if let Some(mut file) = app_ctx.file() {
-                file.seek(SeekFrom::Start(0))?;
+                let f_props = open_f.get_file_properties();
+
+                if let Some(file_name) = get_prop!(f_props, FileProperty::Name) {
+                    info!("File name: {}", file_name);
+                }
+
+                let item_count = if let Some(&item_count) = get_prop!(f_props, FileProperty::ItemCount) {
+                    item_count
+                } else {
+                    return Err("Did not get item count from opened file".into());
+                };
+
+                debug!("item count = {}", item_count);
+
+                for i in 0..item_count {
+                    let i_props = open_f.get_item_properties(i);
+
+                    let path = if let Some(name) = get_prop!(i_props, ItemProperty::Name) {
+                        format!("{}.bin", name)
+                    } else if let Some(path) = get_prop!(i_props, ItemProperty::Path) {
+                        path.to_string()
+                    } else {
+                        warn!("Item has no name or path, using index as placeholder");
+                        format!("{}.bin", i)
+                    };
+
+                    info!("item ({}/{}) - {}", i+1, item_count, path);
+
+                    fs::create_dir_all(&out_dir)?;
+                    let output_path = Path::new(&out_dir).join(path);
+                    let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
+
+                    open_f.extract_item(&mut file, i, &mut out_file)?;
+                    info!("- Saved item!");
+
+                }
+
+                info!("Done.");
+                return Ok(());
             }
 
-            (format.extractor_func)(&app_ctx, ctx)?;
-
-            //extractor returned with no error
-            println!("\nExtraction finished! Saved extracted files to {}", output_path_str);
-            return Ok(());
+            Err(e) => {
+                debug!("Failed to open as {}: {}", format.name(), e);
+            }
         }
-    }
 
-    println!("\nInput format not recognized!");
+    }
+    error!("Input format not recogized!");
+
     Ok(())
 }

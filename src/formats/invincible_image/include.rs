@@ -27,6 +27,8 @@ pub struct Header {
     ver4_bytes: [u8; 16],           // LG SDK version
     _unk2: [u8; 11],
     pub payload_count: u8,          // if 0, entire data is a single payload
+    
+    #[br(count=payload_count)] pub payload_entries: Vec<Entry>,
 }
 impl Header {
     pub fn ver1(&self) -> String {

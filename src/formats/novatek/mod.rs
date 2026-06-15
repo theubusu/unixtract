@@ -1,54 +1,52 @@
 mod include;
-use std::any::Any;
-use crate::AppContext;
 
-use std::path::Path;
-use std::fs::{self, OpenOptions};
-use std::io::Write;
 use binrw::BinReaderExt;
+use log::info;
 
-use crate::utils::common;
 use include::*;
+use crate::utils::common;
+use crate::formats::{Format, FormatInstance, ReadSeek, WriteSeek, FileProperty, ItemProperty};
 
-pub fn is_novatek_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
-    let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
-
-    let header = common::read_file(&file, 0, 4)?;
-    if header == b"NFWB" {
-        Ok(Some(Box::new(())))
-    } else {
-        Ok(None)
+pub struct NfwbFormat;
+impl Format for NfwbFormat {
+    fn name(&self) -> &str {
+        "nfwb"
+    }
+    fn open(&self, mut reader: &mut dyn ReadSeek) -> Result<Box<dyn FormatInstance>, Box<dyn std::error::Error>> {
+        let magic = common::read_at(reader, 0, 4)?;
+        if magic != b"NFWB" {
+            return Err("invalid magic".into());
+        }
+        let header: NfwbHeader = reader.read_le()?;
+        Ok(Box::new(NfwbFile { header }))
     }
 }
 
-pub fn extract_novatek(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = app_ctx.file().ok_or("Extractor expected file")?;
+struct NfwbFile {
+    header: NfwbHeader,
+}
+impl FormatInstance for NfwbFile {
+    fn extract_item(&self, reader: &mut dyn ReadSeek, idx: usize, buf: &mut dyn WriteSeek) -> Result<(), Box<dyn std::error::Error>> {
+        let item = &self.header.part_entries[idx];
+        info!("ID: {}, offset: {}, size: {}", item.id, item.offset, item.size);
 
-    let header: Header = file.read_le()?;
-    println!("File info:\nFirmware name: {}\nVersion: {}.{}\nData size: {}\nPart count: {}",
-            header.firmware_name(), header.version_major, header.version_minor, header.data_size, header.part_count);
+        let data = common::read_at(reader, item.offset as u64, item.size as usize)?;
+        buf.write_all(&data)?;
 
-    let mut entries: Vec<PartEntry> = Vec::new();
-    for _i in 0..header.part_count {
-        let part: PartEntry = file.read_le()?;
-        entries.push(part);
+        Ok(())
     }
-
-    let mut e_i = 0;
-    for entry in &entries {
-        e_i += 1;
-        println!("\n({}/{}) - ID: {}, Offset: {}, Size: {}", e_i, entries.len(), entry.id, entry.offset, entry.size);
-
-        let data = common::read_file(&file, entry.offset as u64, entry.size as usize)?;
-
-        let output_path = Path::new(&app_ctx.output_dir).join(format!("{}_{}.bin", e_i, entry.id));
-
-        fs::create_dir_all(&app_ctx.output_dir)?;
-        let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;       
-        out_file.write_all(&data)?;
-
-        println!("- Saved file!");
+    fn get_file_properties(&self) -> Vec<FileProperty> {
+        vec! [
+            FileProperty::Name(format!("{} {}.{}", self.header.firmware_name(), self.header.version_major, self.header.version_minor)),
+            FileProperty::DataSize(self.header.data_size as usize),
+            FileProperty::ItemCount(self.header.part_count as usize),
+        ]
     }
-
-    Ok(())
+    fn get_item_properties(&self, idx: usize) -> Vec<ItemProperty> {
+        let item = &self.header.part_entries[idx];
+        vec![
+            ItemProperty::Name(format!("{}", item.id)),
+            ItemProperty::Size(item.size as usize)
+        ]
+    }
 }

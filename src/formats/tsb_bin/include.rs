@@ -13,7 +13,7 @@ pub struct Header {
     _model_id: u32,
     _group_id: u32,
     _target_version: u32,       
-    pub entry_addr: u32,
+    _entry_addr: u32,
     _pad3: [u8; 12],
     _tsb_bin_ver: u32,              //known is 3
     _pad4: [u8; 12],
