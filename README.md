@@ -121,23 +121,20 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 ## MediaTek PKG (New)
 **Used in:** Newer MediaTek-based TVs (TCL, Hisense, Sony, Philips, CVT...)  
 **Notes:** **Depends on keys** - see keys.rs (Keys for Philips and Sony included)  
-**Options:**   
-`mtk_pkg:no_del_comp` - Don't delete LZHS compressed partition file after decompressing.      
+**Options:**        
 ※ Support `dump_dec_hdrs` option
 
 ## MediaTek PKG (Old)
 **Used in:** Older MediaTek-based TVs (Philips, Sony, Hisense...)  
 **Notes:** All files should be supported, decryption + decompression   
-**Options:**   
-`mtk_pkg:no_del_comp` - Don't delete LZHS compressed partition file after decompressing.      
+**Options:**       
 ※ Support `dump_dec_hdrs` option
 
 ## MediaTek PKG
 **Used in:** MediaTek-based TVs (Sony, Philips, Panasonic, Sharp...)  
 **Notes:** All files should be supported, decryption + decompression, however some Philips files use custom keys - most are included some could be missing  
 **Thanks to:** https://github.com/openlgtv/epk2extract   
-**Options:**   
-`mtk_pkg:no_del_comp` - Don't delete LZHS compressed partition file after decompressing.      
+**Options:**     
 ※ Support `dump_dec_hdrs` option
 
 ## Novatek PKG (NFWB)
