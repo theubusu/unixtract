@@ -141,6 +141,10 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 **Used in:** Some older Novatek-based TVs (LG, Philips)  
 **Notes:** None, all files should be supported.
 
+## Novatek BIN
+**Used in:** Some Vestel(?) Novatek-based TVs. Usually accompanied by a .scr file, but it is not needed for extraction.  
+**Notes:** None, all files should be supported.
+
 ## Novatek TIMG
 **Used in:** Newer Novatek-based TVs (Philips(TPVision), Hisense, TCL...)  
 **Notes:** None, all files should be supported.   

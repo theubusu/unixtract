@@ -35,6 +35,7 @@ pub mod gx_dvb;
 pub mod onkyo;
 pub mod philips_bdp;
 pub mod tsb_bin;
+pub mod novatek_bin;
 
 pub mod pup;
 
@@ -256,5 +257,10 @@ pub fn get_registry() -> Vec<Format> {
             detector_func: crate::formats::tsb_bin::is_tsb_bin_file,
             extractor_func: crate::formats::tsb_bin::extract_tsb_bin,
         },   
+        Format {
+            name: "novatek_bin",
+            detector_func: crate::formats::novatek_bin::is_novatek_bin_file,
+            extractor_func: crate::formats::novatek_bin::extract_novatek_bin,
+        }, 
     ]
 }
