@@ -36,6 +36,10 @@ Options:
 **Used in:** Enterprise HP Printers  
 **Notes:** None, all files should be supported
 
+## BEM
+**Used in:** Samsung Signage(LFD)/Hospitality displays  
+**Notes:** **Depends on keys** - see keys.rs (uses MSD11 keys)  
+
 ## CD5  
 **Used in:** Some Samsung TV tuners, and possibly other Irdeto(?)-based tuners  
 **Notes:** Decryption is not supported.

@@ -42,6 +42,7 @@ pub mod pup;
 pub mod msd;
 pub mod msd10;
 pub mod msd11;
+pub mod bem;
 
 pub mod epk;
 pub mod epk1;
@@ -181,6 +182,11 @@ pub fn get_registry() -> Vec<Format> {
             name: "msd11",
             detector_func: crate::formats::msd11::is_msd11_file,
             extractor_func: crate::formats::msd11::extract_msd11,
+        },
+        Format {
+            name: "bem",
+            detector_func: crate::formats::bem::is_bem_file,
+            extractor_func: crate::formats::bem::extract_bem,
         },
         Format {
             name: "epk",
