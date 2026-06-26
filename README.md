@@ -63,6 +63,13 @@ Options:
 **Options:**   
 ※ Support `dump_dec_hdrs` option
 
+## FDAT  
+**Used in:** Sony Digital cameras and camcorders  
+**Notes:** Supports: CXD4105/MB8AC102, CXD4115, CXD4120, CXD4132, CXD90014, CXD90045  
+**Thanks to:** https://github.com/ma1co/fwtool.py   
+**Options:**   
+※ Support `dump_dec_hdrs` option
+
 ## Funai BDP   
 **Used in:** Funai & Funai-made Philips Blu-Ray player/HTS (USA market)  
 **Notes:** N/A   

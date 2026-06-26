@@ -36,6 +36,7 @@ pub mod onkyo;
 pub mod philips_bdp;
 pub mod tsb_bin;
 pub mod novatek_bin;
+pub mod fdat;
 
 pub mod pup;
 
@@ -267,6 +268,11 @@ pub fn get_registry() -> Vec<Format> {
             name: "novatek_bin",
             detector_func: crate::formats::novatek_bin::is_novatek_bin_file,
             extractor_func: crate::formats::novatek_bin::extract_novatek_bin,
+        }, 
+        Format {
+            name: "fdat",
+            detector_func: crate::formats::fdat::is_fdat_file,
+            extractor_func: crate::formats::fdat::extract_fdat,
         }, 
     ]
 }
