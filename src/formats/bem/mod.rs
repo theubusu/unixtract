@@ -10,7 +10,7 @@ use binrw::BinReaderExt;
 use crate::utils::common;
 use include::*;
 use crate::keys;
-use crate::utils::aes::decrypt_aes128_cbc_pcks7;
+use crate::formats::msd::decrypt_aes_tizen;
 
 struct BemCtx {
     format_version: BemFormatVersion,
@@ -42,23 +42,20 @@ pub fn extract_bem(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<dy
         BemFormatVersion::Bem20 => Box::new(file.read_le::<CSWUpgradeFileHeader20>()?),
     };
 
-    //global iv = md5 of salt
-    let iv = md5::compute(&bem_header.salt()).0;
-
     //read encrypted version block
     let encrypted_data = common::read_exact(&mut file, bem_header.encrypted_data_lenght() as usize)?;
     let _signature = common::read_exact(&mut file, bem_header.signature_lenght() as usize)?;
 
     //find passphrase
-    let mut passphrase_bytes: Option<[u8; 16]> = None;
+    let mut passphrase_bytes: Option<Vec<u8>> = None;
     let mut passphrase_name: &str = "";
     let mut decrypted_data: Vec<u8> = vec![];
     for (key_hex, name) in keys::MSD11 {
-        let key_bytes: [u8; 16] = hex::decode(key_hex)?.try_into().unwrap();
-        match decrypt_aes128_cbc_pcks7(&encrypted_data, &key_bytes, &iv) {
+        let passphrase = hex::decode(key_hex)?;
+        match decrypt_aes_tizen(&encrypted_data, &passphrase, &bem_header.salt()) {
             Ok(result) => {
                 if result.len() == bem_header.original_data_lenght() as usize { //verify padding was correct
-                    passphrase_bytes = Some(key_bytes);
+                    passphrase_bytes = Some(passphrase);
                     passphrase_name = name;
                     decrypted_data = result;
                     break
@@ -111,7 +108,7 @@ pub fn extract_bem(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<dy
             let encrypted_data = common::read_exact(&mut file, block_header.encrypted_data_lenght as usize)?;
             let _signature = common::read_exact(&mut file, block_header.signature_lenght as usize)?;
 
-            let decrypted_data = decrypt_aes128_cbc_pcks7(&encrypted_data, &passphrase_bytes, &iv)?;
+            let decrypted_data = decrypt_aes_tizen(&encrypted_data, &passphrase_bytes, &bem_header.salt())?;
             out_file.write_all(&decrypted_data)?;
 
             println!("-- Saved to file!");
