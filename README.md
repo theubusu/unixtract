@@ -106,7 +106,7 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 
 ## MSD 1.1
 **Used in:** Samsung TVs 2016+  
-**Notes:** **Depends on keys** - see keys.rs (keys 2015-2018, 2020 included)  
+**Notes:** **Depends on keys** - see keys.rs  
 **Thanks to:** https://github.com/bugficks/msddecrypt  
 **Options:**   
 `msd:print_ouith` - Prints the entire parsed OUITH header.  

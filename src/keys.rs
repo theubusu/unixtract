@@ -23,22 +23,31 @@ pub static MSD10: &[(&str, &str)] = &[
     ("95d01e0bae861a05695bc8a6edb2ea835a09accd", "NT14M"),  //T-NT14M*/T-N14MJ* - 2014 Novatek (low-end)
 
     //github.com/bugficks/msddecrypt
-    ("1ac8989ff57db5e75ea67b033050871c", "HawkM"), //T-HKM* - 2015 Samsung
-    ("cce8a3ef92f3e94895999e928f4dd6c3", "HawkP"), //T-HKP* - 2015 Samsung
+    ("1ac8989ff57db5e75ea67b033050871c", "HawkM"), //T-HKM* - 2015
+    ("cce8a3ef92f3e94895999e928f4dd6c3", "HawkP"), //T-HKP* - 2015
 ];
 
 //MSD11 keys
-//github.com/bugficks/msddecrypt
+
 //key, key desc
 pub static MSD11: &[(&str, &str)] = &[
-    ("c7097975e8ab994beb5eaae57e0ba77c", "HawkM"),   //T-HKM* - 2015 Samsung (for 2016 models)
-    ("9b1d077c0d137d406c79ddacb6b159fe", "JazzM"),   //T-JZM* - 2016 Samsung
-    ("46b04f5e794ca4377a20951c9ea00427", "KantM2L"), //T-KTM2L* - 2018 Samsung
-    ("29110e0ce940b3a9b67d3e158f3f1342", "KantM2"),  //T-KTM2* - 2018 Samsung
-    ("d0d49d5f36f5c0da50062fbf32168f5b", "KantM"),   //T-KTM* - 2017 Samsung
-    ("19e1ba41163f03735e692d9daa2cbb47", "KantSU"),  //T-KTSU* - 2018 Samsung
-    ("39332605ff47a0aea999b10ce9087389", "KantSD?"), //T-KTSD* - ???? Samsung
-    ("5bab1098dab48792619ebd63650d929f", "NikeL"),   //T-NKL* - 2020 Samsung
+    //github.com/bugficks/msddecrypt
+    ("c7097975e8ab994beb5eaae57e0ba77c", "HawkM"),   //T-HKM*  - 2015 (for 2016 models)
+    ("9b1d077c0d137d406c79ddacb6b159fe", "JazzM"),   //T-JZM*  - 2016
+    ("46b04f5e794ca4377a20951c9ea00427", "KantM2L"), //T-KTM2L*- 2018
+    ("29110e0ce940b3a9b67d3e158f3f1342", "KantM2"),  //T-KTM2* - 2018
+    ("d0d49d5f36f5c0da50062fbf32168f5b", "KantM"),   //T-KTM*  - 2017
+    ("19e1ba41163f03735e692d9daa2cbb47", "KantSU"),  //T-KTSU* - 2018
+    ("39332605ff47a0aea999b10ce9087389", "KantSD?"), //T-KTSD* - ????
+    ("5bab1098dab48792619ebd63650d929f", "NikeL"),   //T-NKL*  - 2020
+
+    ("282e70fd55e2ad741c4df96138d62980", "MuseM"),   //T-MSM* - 2019
+    ("dd18df36fdbbd957bcdf1a69aa5c06d6", "NikeM"),   //T-NKM* - 2020
+    ("1c7b83f91c03b7cb942e18a7ad90b0bfa7cafef83637129188c12931af145f46", "NikeM2"),   //T-NKM2* - 2021
+    ("9fb9856acb02348553fce0250379568f1f41c5fd995c284f5836717f3ca04fac", "PontusM"),  //T-PTM*  - 2022
+    ("e67b632b431e5ea32c36ea2f0d705db38e0816a3ea54642cc7cc5c9701395173", "PontusMC"), //T-PTMC* - 2023
+    ("b8e0869e1be4b2dfe4f96f73734cd67ce6df80cc3df5052f3e0bb2112b55ee87", "PontusMD"), //T-PTMD* - 2024
+    ("3b912671e8af15aaef5a6cb2a3d97cdef2e777707c0067e7a593a968f0de570d", "PontusMF"), //T-PTMF* - 2025
 ];
 
 //RUF keys

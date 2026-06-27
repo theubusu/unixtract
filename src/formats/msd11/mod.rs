@@ -10,7 +10,7 @@ use binrw::BinReaderExt;
 use crate::utils::common;
 use crate::utils::global::opt_dump_dec_hdr;
 use crate::keys;
-use crate::formats::msd::{decrypt_aes_salted_tizen, decrypt_aes_tizen};
+use crate::formats::msd::{decrypt_aes_salted_tizen, decrypt_aes_tizen, is_valid_ouith};
 use crate::formats::msd::msd_ouith_parser_tizen_1_9::{parse_blob_1_9};
 use include::*;
 
@@ -62,10 +62,12 @@ pub fn extract_msd11(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
     for (key_hex, name) in keys::MSD11 {
         let key_bytes = hex::decode(key_hex)?;
         match decrypt_aes_salted_tizen(&toc_data, &key_bytes) {
-            Ok(_) => {
-                passphrase_bytes = Some(key_bytes);
-                passphrase_name = name;
-                break
+            Ok(decrypted) => {
+                if is_valid_ouith(&decrypted) {
+                    passphrase_bytes = Some(key_bytes);
+                    passphrase_name = name;
+                    break
+                }  
             },
             Err(_) => continue,
         };

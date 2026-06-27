@@ -96,6 +96,42 @@ struct OUSecureDowngradeDesc {
     _unk2: u32,
 }
 
+#[derive(BinRead)]
+struct OUMetadataDesc {
+    _flag: u8,
+    _name_len: u8,
+    #[br(count = _name_len)] name_bytes: Vec<u8>,
+    _value_len: u8,
+    #[br(count = _value_len)] value_bytes: Vec<u8>,
+}
+impl OUMetadataDesc {
+    pub fn name(&self) -> String {
+        common::string_from_bytes(&self.name_bytes)
+    }
+    pub fn value(&self) -> String {
+        common::string_from_bytes(&self.value_bytes)
+    }
+}
+
+#[derive(BinRead)]
+struct OUOSUpgradeBaseVersionDesc {
+    _flag: u8,
+    major_ver: u16,
+    minor_ver: u16,
+}
+
+#[derive(BinRead)]
+struct OUSWDeviceTypeDesc {
+    _flag: u8,
+    _value_len: u8,
+    #[br(count = _value_len)] value_bytes: Vec<u8>,
+}
+impl OUSWDeviceTypeDesc {
+    pub fn value(&self) -> String {
+        common::string_from_bytes(&self.value_bytes)
+    }
+}
+
 //this is a struct that will communicate all values important when parsing the MSD file.
 pub struct MSDItem {
     pub item_id: u32,
@@ -238,7 +274,25 @@ pub fn parse_blob_1_9(blob: &[u8], print_tree: bool) -> Result<(Vec<MSDItem>, Op
                 let sub_descriptor: DescriptorHeader = reader.read_le()?;
                 if sub_descriptor.tag == 0x19 {
                     if print_tree { println!("      OUSWImageVersionDesc(0x19) - Size: {}", sub_descriptor.size); };
-                    let sw_image_version_desc: OUSWImageVersionDesc = reader.read_le()?;
+
+                    let _flag: u8 = reader.read_le()?;
+                    let name_len: u8 = reader.read_le()?;
+                    let name_bytes = common::read_exact(&mut reader, name_len as usize)?;
+                    //newer variant has addditional byte here?? god knows why
+                    if (sub_descriptor.size as usize - name_len as usize - 4) == 7 {
+                        let _pad: u8 = reader.read_le()?;
+                    }
+                    let major_ver: u16 = reader.read_le()?;
+                    let minor_ver: u16 = reader.read_le()?;
+
+                    let sw_image_version_desc = OUSWImageVersionDesc {
+                        _flag,
+                        name_len,
+                        name_bytes,
+                        major_ver,
+                        minor_ver,
+                    };
+
                     if print_tree { 
                         println!("          Name lenght: {}", sw_image_version_desc.name_len);
                         println!("          Name: {}", sw_image_version_desc.name());
@@ -247,6 +301,10 @@ pub fn parse_blob_1_9(blob: &[u8], print_tree: bool) -> Result<(Vec<MSDItem>, Op
                     };
 
                     info = Some(sw_image_version_desc);
+                } else if sub_descriptor.tag == 0x3d {
+                    if print_tree { println!("      OUSWDeviceTypeDesc(0x3d) - Size: {}", sub_descriptor.size); };
+                    let device_type_desc: OUSWDeviceTypeDesc = reader.read_le()?;
+                    if print_tree { println!("  Device type: {}", device_type_desc.value()); };
                 } else {
                     if print_tree { println!("      Unimplemented Descriptor (0x{:02x}) - Size: {}", sub_descriptor.tag, sub_descriptor.size); };
                     let _ = common::read_exact(&mut reader, sub_descriptor.size as usize - 4)?;
@@ -257,6 +315,17 @@ pub fn parse_blob_1_9(blob: &[u8], print_tree: bool) -> Result<(Vec<MSDItem>, Op
             if print_tree { println!("OUSecureDowngradeDesc(0x37) - Size: {}", top_descriptor.size); };
             let secure_downgrade_desc: OUSecureDowngradeDesc = reader.read_le()?;
             if print_tree { println!("  Image generation timestamp: {}", secure_downgrade_desc.image_generation_date); };
+        }
+        else if top_descriptor.tag == 0x3A {
+            if print_tree { println!("OUOSUpgradeBaseVersionDesc(0x3A) - Size: {}", top_descriptor.size); };
+            let base_version_desc: OUOSUpgradeBaseVersionDesc = reader.read_le()?;
+            if print_tree { println!("  Base version: {}.{}", base_version_desc.major_ver, base_version_desc.minor_ver); };
+        }
+        else if top_descriptor.tag == 0x23 {
+            if print_tree { println!("OUMetadataDesc(0x23) - Size: {}", top_descriptor.size); };
+            let metadata_desc: OUMetadataDesc = reader.read_le()?;
+            if print_tree { println!("  Name: {}", metadata_desc.name()); };
+            if print_tree { println!("  Value: {}", metadata_desc.value()); };
         }
         else {
             return Err(format!("Unexpected top level descriptor type 0x{:02x}!", top_descriptor.tag).into()); 

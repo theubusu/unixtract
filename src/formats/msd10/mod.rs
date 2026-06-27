@@ -10,7 +10,7 @@ use binrw::BinReaderExt;
 use crate::utils::common;
 use crate::utils::global::opt_dump_dec_hdr;
 use crate::keys;
-use crate::formats::msd::{decrypt_aes_salted_old, decrypt_aes_salted_tizen, decrypt_aes_tizen};
+use crate::formats::msd::{decrypt_aes_salted_old, decrypt_aes_salted_tizen, decrypt_aes_tizen, is_valid_ouith};
 use crate::formats::msd::msd_ouith_parser_old::{parse_ouith_blob};
 use crate::formats::msd::msd_ouith_parser_tizen_1_8::{parse_blob_1_8};
 use include::*;
@@ -66,7 +66,7 @@ pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
         let key_bytes = hex::decode(key_hex)?;
         if key_bytes.len() == 20 {
             match decrypt_aes_salted_old(&toc_data, &key_bytes) {
-                Ok(_) => {
+                Ok(_) => {  //TODO: figure out how to verify pre-tizen OUITH
                     passphrase_bytes = Some(key_bytes);
                     passphrase_name = name;
                     firmware_type = Some(FirmwareType::Old);
@@ -77,11 +77,13 @@ pub fn extract_msd10(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
         }
         else if key_bytes.len() == 16 {
             match decrypt_aes_salted_tizen(&toc_data, &key_bytes) {
-                Ok(_) => {
-                    passphrase_bytes = Some(key_bytes);
-                    passphrase_name = name;
-                    firmware_type = Some(FirmwareType::Tizen);
-                    break
+                Ok(decrypted) => {
+                    if is_valid_ouith(&decrypted) {
+                        passphrase_bytes = Some(key_bytes);
+                        passphrase_name = name;
+                        firmware_type = Some(FirmwareType::Tizen);
+                        break
+                    }
                 },
                 Err(_) => continue,
             };
