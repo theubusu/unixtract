@@ -55,24 +55,23 @@ collection "MSD10": {
 
 # MSD11 keys/passphrases
 # 16 bytes = aes128(md5), 32 bytes = aes256(sha256) 
+# some keys from github.com/bugficks/msddecrypt
 collection "MSD11": {
-    # github.com/bugficks/msddecrypt
-    "HawkM":	{x"c7097975e8ab994beb5eaae57e0ba77c"}, #T-HKM*  - 2015 (for 2016 models)
-    "JazzM":	{x"9b1d077c0d137d406c79ddacb6b159fe"}, #T-JZM*  - 2016
-    "KantM2L":	{x"46b04f5e794ca4377a20951c9ea00427"}, #T-KTM2L*- 2018
-    "KantM2":	{x"29110e0ce940b3a9b67d3e158f3f1342"}, #T-KTM2* - 2018
-    "KantM":	{x"d0d49d5f36f5c0da50062fbf32168f5b"}, #T-KTM*  - 2017
-    "KantSU":	{x"19e1ba41163f03735e692d9daa2cbb47"}, #T-KTSU* - 2018
-    "KantSD?":	{x"39332605ff47a0aea999b10ce9087389"}, #T-KTSD* - ????
-    "NikeL":	{x"5bab1098dab48792619ebd63650d929f"}, #T-NKL*  - 2020
-
-    "MuseM":	{x"282e70fd55e2ad741c4df96138d62980"}, #T-MSM* - 2019
-    "NikeM":	{x"dd18df36fdbbd957bcdf1a69aa5c06d6"}, #T-NKM* - 2020
-    "NikeM2":	{x"1c7b83f91c03b7cb942e18a7ad90b0bfa7cafef83637129188c12931af145f46"}, #T-NKM2* - 2021
-    "PontusM":	{x"9fb9856acb02348553fce0250379568f1f41c5fd995c284f5836717f3ca04fac"}, #T-PTM*  - 2022
-    "PontusMC":	{x"e67b632b431e5ea32c36ea2f0d705db38e0816a3ea54642cc7cc5c9701395173"}, #T-PTMC* - 2023
-    "PontusMD":	{x"b8e0869e1be4b2dfe4f96f73734cd67ce6df80cc3df5052f3e0bb2112b55ee87"}, #T-PTMD* - 2024
-    "PontusMF":	{x"3b912671e8af15aaef5a6cb2a3d97cdef2e777707c0067e7a593a968f0de570d"}, #T-PTMF* - 2025
+    "HawkM":		{x"c7097975e8ab994beb5eaae57e0ba77c"}, #T-HKM*  - 2015 (for 2016 models)
+    "JazzM":		{x"9b1d077c0d137d406c79ddacb6b159fe"}, #T-JZM*  - 2016
+	"KantS":		{x"39332605ff47a0aea999b10ce9087389"}, #T-KTS*  - 2017
+	"KantM":		{x"d0d49d5f36f5c0da50062fbf32168f5b"}, #T-KTM*  - 2017
+	"KantM2":		{x"29110e0ce940b3a9b67d3e158f3f1342"}, #T-KTM2* - 2018
+    "KantM2L":		{x"46b04f5e794ca4377a20951c9ea00427"}, #T-KTM2L*- 2018
+    "KantSU":		{x"19e1ba41163f03735e692d9daa2cbb47"}, #T-KTSU* - 2018
+	"MuseM":		{x"282e70fd55e2ad741c4df96138d62980"}, #T-MSM*  - 2019
+    "NikeM":		{x"dd18df36fdbbd957bcdf1a69aa5c06d6"}, #T-NKM*  - 2020
+    "NikeL":		{x"5bab1098dab48792619ebd63650d929f"}, #T-NKL*  - 2020
+    "NikeM2":		{x"1c7b83f91c03b7cb942e18a7ad90b0bfa7cafef83637129188c12931af145f46"}, #T-NKM2* - 2021
+    "PontusM 2022":	{x"9fb9856acb02348553fce0250379568f1f41c5fd995c284f5836717f3ca04fac"}, #T-PTM*  - 2022
+    "PontusM 2023":	{x"e67b632b431e5ea32c36ea2f0d705db38e0816a3ea54642cc7cc5c9701395173"}, #T-PTMC* - 2023
+    "PontusM 2024":	{x"b8e0869e1be4b2dfe4f96f73734cd67ce6df80cc3df5052f3e0bb2112b55ee87"}, #T-PTMD* - 2024
+    "PontusM 2025":	{x"3b912671e8af15aaef5a6cb2a3d97cdef2e777707c0067e7a593a968f0de570d"}, #T-PTMF* - 2025
 }
 
 # mstar
