@@ -8,7 +8,6 @@ use std::io::Write;
 use binrw::BinReaderExt;
 
 use crate::utils::common;
-use crate::keys;
 use crate::formats::funai_upg::funai_des::funai_des_decrypt;
 use crate::formats::funai_upg::include::is_valid_ver_string;
 use include::*;
@@ -40,14 +39,14 @@ pub fn extract_funai_upg_phl(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result
 
         //find key using descriptor entry
         if entry.body_type == 0 && key.is_none() {
-            for key_hex in keys::FUNAI_UPG {
-                let key_bytes = hex::decode(key_hex)?;
+            for (name, keys) in app_ctx.keys.get_collection("FUNAI_UPG")? {
+                let key_bytes = keys.first().unwrap();
                 let key_u32 = u32::from_le_bytes(key_bytes.as_slice().try_into()?);
                 let decrypted = funai_des_decrypt(&data, key_u32);
 
                 if is_valid_ver_string(&decrypted[..16]) {
                     println!("Matched key: {}\nFirmware info: {}\nFirmware date: {}", 
-                            key_hex, common::string_from_bytes(&decrypted[..16]), common::string_from_bytes(&decrypted[16..]));
+                            name, common::string_from_bytes(&decrypted[..16]), common::string_from_bytes(&decrypted[16..]));
                     key = Some(key_u32);
                     break
                 }

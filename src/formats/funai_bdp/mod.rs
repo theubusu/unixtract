@@ -10,7 +10,6 @@ use binrw::BinReaderExt;
 use crate::utils::common::{self, read_exact};
 use crate::formats::funai_upg::funai_des::funai_des_decrypt;
 use include::*;
-use crate::keys;
 use crate::utils::compression::decompress_zlib;
 
 pub struct FunaiBdpContext {
@@ -21,8 +20,8 @@ pub fn is_funai_bdp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, B
     let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
     let header = common::read_file(&file, 0, 16)?;
 
-    for key_hex in keys::FUNAI_BDP {
-        let key_bytes = hex::decode(key_hex)?;
+    for (_, keys) in app_ctx.keys.get_collection("FUNAI_BDP")? {
+        let key_bytes = keys.first().unwrap();
         let key_u32 = u32::from_le_bytes(key_bytes.as_slice().try_into()?);
         let decrypted = funai_des_decrypt(&header, key_u32);
 

@@ -114,15 +114,18 @@ pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
     let mut key: Option<KeyEntry> = None;
 
     //for new, key will always be the same
-    if let Ok(dec) = decrypt_aes128_cbc_pcks7(&try_hdr, &NEW_KEY.key, &NEW_KEY.iv) {
+    let (new_key, new_iv) = app_ctx.keys.get_double_key_as_arr::<16, 16>("SDDL_SEC_NEW_KEY")?;
+    let new_entry = AesKeyEntry {key: new_key, iv: new_iv};
+    if let Ok(dec) = decrypt_aes128_cbc_pcks7(&try_hdr, &new_entry.key, &new_entry.iv) {
         if dec.starts_with(TDI_FILENAME.as_bytes()) {
             println!("- New type detected\n");
-            key = Some(KeyEntry::AESPcks7(NEW_KEY));
+            key = Some(KeyEntry::AESPcks7(new_entry));
         }
     }
     //new did not match, try all old AES keys
     if key.is_none() {
-        for key_entry in OLD_KEYS_AES {
+        for (_, keys) in app_ctx.keys.get_collection("SDDL_SEC_OLD_KEYS_AES")? {
+            let key_entry = AesKeyEntry {key: keys[0].as_slice().try_into().unwrap(), iv: keys[1].as_slice().try_into().unwrap()};
             let dec = decrypt_aes128_cbc_nopad(&try_hdr, &key_entry.key, &key_entry.iv)?;
             if dec.starts_with(TDI_FILENAME.as_bytes()) {
                 println!("- Old type detected with AES key={}, iv={}\n", hex::encode(key_entry.key) ,hex::encode(key_entry.iv));
@@ -133,7 +136,8 @@ pub fn extract_sddl_sec(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), 
     }
     //...old DES keys
     if key.is_none() {
-        for key_entry in OLD_KEYS_DES {
+        for (_, keys) in app_ctx.keys.get_collection("SDDL_SEC_OLD_KEYS_DES")? {
+            let key_entry = DesKeyEntry {key: keys[0].as_slice().try_into().unwrap(), iv: keys[1].as_slice().try_into().unwrap()};
             let dec = decrypt_3des(&try_hdr, &key_entry)?;
             if dec.starts_with(TDI_FILENAME.as_bytes()) {
                 println!("- Old type detected with DES key={}, iv={}\n", hex::encode(key_entry.key) ,hex::encode(key_entry.iv));

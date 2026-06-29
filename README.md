@@ -14,10 +14,10 @@ Or, build from source, by downloading the code or cloning the respository and ru
 `unixtract [OPTIONS] <INPUT_TARGET> [OUTPUT_FOLDER]`  
 Arguments:   
 `<INPUT_TARGET>` - The target to analyze/extract.  
-`[OUTPUT_FOLDER]` - Folder to save extracted files to.  
-If an output folder is not provided, extracted files will be saved in folder `_<INPUT_TARGET>`.   
+`[OUTPUT_FOLDER]` - Folder to save extracted files to. If not provided, extracted files will be saved in folder `_<INPUT_TARGET>`.   
 Options:  
 `-o, --options <OPTIONS>` - Format specific or global(for all formats that implement it) options, see the list below for format specific options. You can use this multiple times to activate multiple options.    
+`-k, --key-file [KEY_FILE]` - Path to the ukf key file. If not provided, the built in file will be used.  
 ## Global options
 `dump_dec_hdrs` - For formats with an encrypted header - dump the decrypted header(s).    
 

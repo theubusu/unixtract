@@ -39,8 +39,8 @@ pub fn extract_invincible_image(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Res
     }
 
     let (aes_key, aes_iv) = match header.file_infos[0] {
-        3 => (V3_KEY, V3_IV),
-        2 => (V2_KEY, V2_IV),
+        3 => app_ctx.keys.get_double_key_as_arr::<16, 16>("INVINCIBLE_IMAGE_V3")?,
+        2 => app_ctx.keys.get_double_key_as_arr::<16, 16>("INVINCIBLE_IMAGE_V2")?,
         _ => return Err("Unsupported Key ID!".into())
     };
 

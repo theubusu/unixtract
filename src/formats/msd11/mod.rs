@@ -9,7 +9,6 @@ use binrw::BinReaderExt;
 
 use crate::utils::common;
 use crate::utils::global::opt_dump_dec_hdr;
-use crate::keys;
 use crate::formats::msd::{decrypt_aes_salted_tizen, decrypt_aes_tizen, is_valid_ouith};
 use crate::formats::msd::msd_ouith_parser_tizen_1_9::{parse_blob_1_9};
 use include::*;
@@ -57,10 +56,10 @@ pub fn extract_msd11(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
     let toc_data = common::read_file(&file, toc_offset as u64, toc_size as usize)?;
 
     //find passphrase
-    let mut passphrase_bytes: Option<Vec<u8>> = None;
+    let mut passphrase_bytes: Option<&Vec<u8>> = None;
     let mut passphrase_name: &str = "";
-    for (key_hex, name) in keys::MSD11 {
-        let key_bytes = hex::decode(key_hex)?;
+    for (name, keys) in app_ctx.keys.get_collection("MSD11")? {
+        let key_bytes= keys.first().unwrap();
         match decrypt_aes_salted_tizen(&toc_data, &key_bytes) {
             Ok(decrypted) => {
                 if is_valid_ouith(&decrypted) {

@@ -5,7 +5,7 @@ use binrw::BinRead;
 pub struct RufHeader {
     _magic_bytes: [u8; 6],
     _upgrade_type_bytes: [u8; 2],
-	_unk1: u32,
+	pub data_start_offset: u32,
     date_time_bytes: [u8; 32],
     buyer_bytes: [u8; 8],
     model_bytes: [u8; 32],

@@ -10,11 +10,10 @@ use std::fs::{self, OpenOptions};
 use std::io::{Write, Cursor, Seek, SeekFrom};
 use binrw::BinReaderExt;
 
-use crate::keys;
 use crate::utils::common;
 use crate::utils::global::opt_dump_dec_hdr;
 use crate::utils::aes::{decrypt_aes128_cbc_nopad};
-use crate::utils::compression::{decompress_gzip_get_filename};
+use crate::utils::compression::{decompress_gzip};
 use pana_dvd_crypto::{decrypt_data};
 use lzss::{decompress_lzss};
 use include::*;
@@ -31,7 +30,7 @@ pub struct PanaDvdContext {
 pub fn is_pana_dvd_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
     let header = common::read_file(&file, 0, 64)?;
-    if let Some(matching_key) = find_key(&keys::PANA_DVD_KEYONLY, &header, b"PROG", 0)? {
+    if let Some(matching_key) = find_key(app_ctx.keys.get_collection("PANA_DVD_KEYONLY")?, &header, b"PROG", 0)? {
         Ok(Some(Box::new(PanaDvdContext {
             matching_key: matching_key,
             base_hdr_size: 0,
@@ -39,7 +38,7 @@ pub fn is_pana_dvd_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Bo
             aes_key: None, 
             aes_iv: None,
         })))
-    } else if header.starts_with(b"PANASONIC\x00\x00\x00") && let Some(matching_key) = find_key(&keys::PANA_DVD_KEYONLY, &header, b"PROG", 48)? {
+    } else if header.starts_with(b"PANASONIC\x00\x00\x00") && let Some(matching_key) = find_key(app_ctx.keys.get_collection("PANA_DVD_KEYONLY")?, &header, b"PROG", 48)? {
         Ok(Some(Box::new(PanaDvdContext {
             matching_key: matching_key,
             base_hdr_size: 48,
@@ -47,7 +46,7 @@ pub fn is_pana_dvd_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Bo
             aes_key: None, 
             aes_iv: None,
         })))
-    } else if let Some((aes_key, aes_iv, matching_key)) = find_aes_key_pair(&keys::PANA_DVD_AESPAIR, &header, b"PANASONIC", 32)? {
+    } else if let Some((aes_key, aes_iv, matching_key)) = find_aes_key_pair(app_ctx.keys.get_collection("PANA_DVD_AESPAIR")?, &header, b"PANASONIC", 32)? {
         Ok(Some(Box::new(PanaDvdContext {
             matching_key: matching_key,
             base_hdr_size: 48,
@@ -249,10 +248,7 @@ fn decompress_data(data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 
     if compression_type == CompressionType::Gzip {
         println!("- Decompressing GZIP...");
-        let (decompressed_gzip, gzip_filename) = decompress_gzip_get_filename(&compressed_data)?;
-        if let Some(gzip_filename) = gzip_filename {
-            println!("- GZIP filename: {}", gzip_filename);
-        }    
+        let decompressed_gzip = decompress_gzip(&compressed_data)?;
         decompressed_data = decompressed_gzip;
     
     } else if compression_type == CompressionType::Lzss {

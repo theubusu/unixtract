@@ -5,9 +5,9 @@ use crate::utils::aes::{decrypt_aes128_cbc_nopad};
 
 //find key
 
-pub fn find_key<'a>(key_array: &'a [&'a str], data: &[u8], expected_magic: &[u8], magic_offset: usize) -> Result<Option<[u8; 8]>, Box<dyn std::error::Error>> {
-    for key_hex in key_array {
-        let key_bytes = hex::decode(key_hex)?;
+pub fn find_key(key_array: &Vec<(String, Vec<Vec<u8>>)>, data: &[u8], expected_magic: &[u8], magic_offset: usize) -> Result<Option<[u8; 8]>, Box<dyn std::error::Error>> {
+    for (_, keys) in key_array {
+        let key_bytes = keys.first().unwrap();
         let key_array: [u8; 8] = key_bytes.as_slice().try_into()?;
         let decrypted = decrypt_data(data, &key_array);
      
@@ -18,13 +18,13 @@ pub fn find_key<'a>(key_array: &'a [&'a str], data: &[u8], expected_magic: &[u8]
     Ok(None)
 }
 
-pub fn find_aes_key_pair<'a>(key_array: &'a [(&'a str, &'a str, &'a str)], data: &[u8], expected_magic: &[u8], magic_offset: usize) -> Result<Option<([u8; 16], [u8; 16], [u8; 8])>, Box<dyn std::error::Error>> {
-    for (aes_key_hex, aes_iv_hex, cust_key_hex) in key_array {
-        let aes_key: [u8; 16] = hex::decode(aes_key_hex)?.as_slice().try_into()?;
-        let aes_iv: [u8; 16] = hex::decode(aes_iv_hex)?.as_slice().try_into()?;
+pub fn find_aes_key_pair(key_array: &Vec<(String, Vec<Vec<u8>>)>, data: &[u8], expected_magic: &[u8], magic_offset: usize) -> Result<Option<([u8; 16], [u8; 16], [u8; 8])>, Box<dyn std::error::Error>> {
+    for (_, keys) in key_array {
+        let aes_key: [u8; 16] = keys[0].as_slice().try_into()?;
+        let aes_iv: [u8; 16] = keys[1].as_slice().try_into()?;
         let aes_decrypted = decrypt_aes128_cbc_nopad(data, &aes_key, &aes_iv)?;
 
-        let key_bytes = hex::decode(cust_key_hex)?;
+        let key_bytes = &keys[2];
         let key_array: [u8; 8] = key_bytes.as_slice().try_into()?;
         let decrypted = decrypt_data(&aes_decrypted, &key_array);
      

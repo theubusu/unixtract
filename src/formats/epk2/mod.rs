@@ -9,7 +9,6 @@ use binrw::BinReaderExt;
 
 use crate::utils::common;
 use crate::utils::global::opt_dump_dec_hdr;
-use crate::keys;
 use crate::formats::epk::{decrypt_aes_ecb_auto, find_key};
 use include::*;
 
@@ -42,7 +41,7 @@ pub fn extract_epk2(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
         println!("Header is encrypted...");
         println!("\nFinding key...");
         //find the key, knowing that the header should start with "epak"
-        if let Some((key_name, key_bytes)) = find_key(&keys::EPK, &stored_header, b"epak")? {
+        if let Some((key_name, key_bytes)) = find_key(app_ctx.keys.get_collection("EPK")?, &stored_header, b"epak")? {
             println!("Found valid key: {}", key_name);
             matching_key = Some(key_bytes);
             header = decrypt_aes_ecb_auto(matching_key.as_ref().unwrap(), &stored_header)?;
@@ -83,7 +82,7 @@ pub fn extract_epk2(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
         if matching_key.is_none() {
             println!("\nFinding key...");
             //find the key, knowing that the header should start with with the paks name
-            if let Some((key_name, key_bytes)) = find_key(&keys::EPK, &encrypted_header, pak.name.as_bytes())? {
+            if let Some((key_name, key_bytes)) = find_key(app_ctx.keys.get_collection("EPK")?, &encrypted_header, pak.name.as_bytes())? {
                 println!("Found correct key: {}", key_name);
                 matching_key = Some(key_bytes);
             } else {

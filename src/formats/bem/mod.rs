@@ -9,7 +9,6 @@ use binrw::BinReaderExt;
 
 use crate::utils::common;
 use include::*;
-use crate::keys;
 use crate::formats::msd::decrypt_aes_tizen;
 
 struct BemCtx {
@@ -47,11 +46,11 @@ pub fn extract_bem(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<dy
     let _signature = common::read_exact(&mut file, bem_header.signature_lenght() as usize)?;
 
     //find passphrase
-    let mut passphrase_bytes: Option<Vec<u8>> = None;
+    let mut passphrase_bytes: Option<&Vec<u8>> = None;
     let mut passphrase_name: &str = "";
     let mut decrypted_data: Vec<u8> = vec![];
-    for (key_hex, name) in keys::MSD11 {
-        let passphrase = hex::decode(key_hex)?;
+    for (name, keys) in app_ctx.keys.get_collection("MSD11")? {
+        let passphrase = keys.first().unwrap();
         match decrypt_aes_tizen(&encrypted_data, &passphrase, &bem_header.salt()) {
             Ok(result) => {
                 if result.len() == bem_header.original_data_lenght() as usize { //verify padding was correct

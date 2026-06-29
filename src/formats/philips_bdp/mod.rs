@@ -56,7 +56,8 @@ pub fn extract_philips_bdp(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<()
         let out_data;
         if entry.id == 0 && app_ctx.has_option("philips_bdp:decrypt") {
             println!("- Decrypting...");
-            out_data = bebin_decrypt_aes256cfb(&data, &KEY1, &IV1);
+            let (key, iv) = app_ctx.keys.get_double_key_as_arr::<32, 16>("PHILIPS_BDP_KEY_1")?;
+            out_data = bebin_decrypt_aes256cfb(&data, &key, &iv);
         } else {
             out_data = data;
         }
@@ -75,7 +76,12 @@ pub fn extract_philips_bdp(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<()
 
             let new_file = File::open(&output_path)?;
             //DUMB
-            let mtk_ctx: AppContext = AppContext { input: InputTarget::File(new_file), output_dir: app_ctx.output_dir.join("0"), options: app_ctx.options.clone() };
+            let mtk_ctx: AppContext = AppContext {
+                input: InputTarget::File(new_file),
+                output_dir: app_ctx.output_dir.join("0"),
+                options: app_ctx.options,
+                keys: app_ctx.keys,
+            };
 
             if let Some(result) = formats::mtk_bdp::is_mtk_bdp_file(&mtk_ctx)? {
                 println!("- MTK BDP file detected!\n");

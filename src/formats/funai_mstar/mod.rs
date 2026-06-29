@@ -70,7 +70,8 @@ pub fn extract_funai_mstar(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<()
             let in_ctx: AppContext = AppContext { 
                 input: InputTarget::File(r_out_file), 
                 output_dir: app_ctx.output_dir.join("SoC"), 
-                options: app_ctx.options.clone() 
+                options: app_ctx.options,
+                keys: app_ctx.keys,
             };
 
             //do check and extarct

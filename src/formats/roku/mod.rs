@@ -16,7 +16,8 @@ pub fn is_roku_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dy
     let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
 
     let header = common::read_file(&file, 0, 32)?;
-    let try_decrypt_header = decrypt_aes128_cbc_nopad(&header, &FILE_KEY, &FILE_IV)?;
+    let file_key= app_ctx.keys.get_key_as_arr::<16>("ROKU_FILE_KEY", 0)?;
+    let try_decrypt_header = decrypt_aes128_cbc_nopad(&header, &file_key, &[0x00; 16])?;
 
     if try_decrypt_header.starts_with(b"manifest\x00\x00\x00\x00\x00\x00\x00\x00") {
         Ok(Some(Box::new(())))
@@ -32,7 +33,8 @@ pub fn extract_roku(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
     file.read_to_end(&mut encrypted_data)?;
 
     println!("\nDecrypting...\n");
-    let tar_data = decrypt_aes128_cbc_pcks7(&encrypted_data, &FILE_KEY, &FILE_IV)?;
+    let file_key= app_ctx.keys.get_key_as_arr::<16>("ROKU_FILE_KEY", 0)?;
+    let tar_data = decrypt_aes128_cbc_pcks7(&encrypted_data, &file_key, &[0x00; 16])?;
     let tar_reader = Cursor::new(tar_data);
     let mut tar_archive = Archive::new(tar_reader);
 

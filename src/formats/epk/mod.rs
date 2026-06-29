@@ -76,16 +76,16 @@ pub fn extract_epk(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<dy
 }
 
 //COMMON EPK FUNCTIONS
-pub fn find_key<'a>(key_array: &'a [(&'a str, &'a str)], data: &[u8], expected_magic: &[u8]) -> Result<Option<(&'a str, Vec<u8>)>, Box<dyn std::error::Error>> {
-    for (key_hex, name) in key_array {
-        let key_bytes = hex::decode(key_hex)?;
+pub fn find_key(key_array: &Vec<(String, Vec<Vec<u8>>)>, data: &[u8], expected_magic: &[u8]) -> Result<Option<(String, Vec<u8>)>, Box<dyn std::error::Error>> {
+    for (name, keys) in key_array {
+        let key_bytes = keys.first().unwrap();
         let decrypted = match decrypt_aes_ecb_auto(&key_bytes, data) {
             Ok(d) => d,
             Err(_) => continue,
         };
      
         if decrypted.starts_with(expected_magic) {
-            return Ok(Some((name, key_bytes)));
+            return Ok(Some((name.to_string(), key_bytes.to_vec())));
         }
     }
     Ok(None)

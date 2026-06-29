@@ -6,6 +6,7 @@ use std::path::Path;
 use std::io::{Cursor, Seek, SeekFrom, Write};
 use std::fs::{self, File, OpenOptions};
 use binrw::BinReaderExt;
+use rsa::{RsaPublicKey, BigUint};
 
 use crate::utils::common;
 use include::*;
@@ -46,8 +47,35 @@ pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), B
         
         //get some data as test ciphertext for key finding
         let ciphertext = common::read_file(&mut file, header.header_size as u64, 64)?;
+
+        //try find key
+        let mut key: Option<(String, [u8; 32])> = None;
+        for (name, keys) in app_ctx.keys.get_collection("PFL_UPG")? {     
+            let n = BigUint::from_bytes_be(keys.first().unwrap());
+            let e = BigUint::from_bytes_be(b"\x01\x00\x01");
+            let pubkey = RsaPublicKey::new(n, e)?;
+
+            let sig_int = BigUint::from_bytes_le(&signature);
+            let dec_int = rsa::hazmat::rsa_encrypt(&pubkey, &sig_int)?;
+            let dec_sig = dec_int.to_bytes_le();
+
+            let aes_key = &dec_sig[20..52];
+            let dec_ciphertext = decrypt_aes256_ecb(aes_key.try_into().unwrap(), &ciphertext)?;
+        
+            //needs to start with null-termninated filename string
+            let end = match dec_ciphertext.iter().position(|&b| b == 0) {
+                Some(pos) => pos,
+                None => continue,       //there is no 0, continue
+            };
+            let fname = &dec_ciphertext[..end];
+            if fname.len() > 1 && fname.is_ascii() {       //is ascii filename
+                key = Some((name.to_string(), aes_key.try_into().unwrap()));
+                break
+            }
+        }
+
         let aes_key;
-        if let Some((key_name, key)) = try_find_key(&signature, &ciphertext)? {
+        if let Some((key_name, key)) = key {
             println!("Matched pubkey: {}, AES key: {}", key_name, hex::encode(key));
             aes_key = key;
         } else {
@@ -111,7 +139,8 @@ pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), B
             let in_ctx: AppContext = AppContext { 
                 input: InputTarget::File(r_temp_file), 
                 output_dir: output_path, 
-                options: app_ctx.options.clone() 
+                options: app_ctx.options,
+                keys: app_ctx.keys,
             };
 
             //do check just in case and extract

@@ -21,7 +21,8 @@ pub fn is_onkyo_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<d
     let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
 
     let enc_inihdr = common::read_file(&file, 0, 20)?;
-    let dec_inihdr= ub_encrypte_block(&enc_inihdr, &HEADER_KEY);
+    let hdr_key = app_ctx.keys.get_key_as_arr::<8>("ONKYO_HEADER_KEY", 0)?;
+    let dec_inihdr= ub_encrypte_block(&enc_inihdr, &hdr_key);
 
     if dec_inihdr.starts_with(ONKYO_MAGIC) {
         let header_size = u32::from_le_bytes(dec_inihdr[16..20].try_into().unwrap());
@@ -38,7 +39,8 @@ pub fn extract_onkyo(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<
     println!("Header size: {}", ctx.header_size);
 
     let enc_hdr = common::read_exact(&mut file, ctx.header_size as usize)?;
-    let dec_hdr = ub_encrypte_block(&enc_hdr, &HEADER_KEY);
+    let hdr_key = app_ctx.keys.get_key_as_arr::<8>("ONKYO_HEADER_KEY", 0)?;
+    let dec_hdr = ub_encrypte_block(&enc_hdr, &hdr_key);
     opt_dump_dec_hdr(app_ctx, &dec_hdr, "header")?;
     let mut hdr_rdr = Cursor::new(dec_hdr);
 
@@ -91,11 +93,12 @@ pub fn extract_onkyo(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<
         let mut is_pack = false;
 
         //try using standard data key
-        if ub_encrypte_block(&data[..16], &DATA_KEY).starts_with(ONKYO_MAGIC) {
-            dec_key = Some(DATA_KEY);
+        let data_key = app_ctx.keys.get_key_as_arr::<8>("ONKYO_DATA_KEY", 0)?;
+        if ub_encrypte_block(&data[..16], &data_key).starts_with(ONKYO_MAGIC) {
+            dec_key = Some(data_key);
 
         //try header key, if success it means this is a package inside a package, and it should not be decrypted
-        } else if ub_encrypte_block(&data[..16], &HEADER_KEY).starts_with(ONKYO_MAGIC) { 
+        } else if ub_encrypte_block(&data[..16], &hdr_key).starts_with(ONKYO_MAGIC) { 
             is_pack = true;
 
         //if not matched with data key, try to calc key

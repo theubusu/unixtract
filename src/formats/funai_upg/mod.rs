@@ -10,7 +10,6 @@ use binrw::BinReaderExt;
 
 use crate::utils::common;
 use include::*;
-use crate::keys;
 use funai_des::funai_des_decrypt;
 
 pub fn is_funai_upg_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
@@ -41,14 +40,14 @@ pub fn extract_funai_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(),
 
         //find key using descriptor entry
         if entry.entry_type == 0 && entry.encryption_flag == 1 && key.is_none() {
-            for key_hex in keys::FUNAI_UPG {
-                let key_bytes = hex::decode(key_hex)?;
+            for (name, keys) in app_ctx.keys.get_collection("FUNAI_UPG")? {
+                let key_bytes = keys.first().unwrap();
                 let key_u32 = u32::from_le_bytes(key_bytes.as_slice().try_into()?);
                 let decrypted = funai_des_decrypt(&data, key_u32);
 
                 if is_valid_ver_string(&decrypted) {
                     println!("Matched key: {}\nFirmware info: {}", 
-                            key_hex, common::string_from_bytes(&decrypted));
+                            name, common::string_from_bytes(&decrypted));
                     key = Some(key_u32);
                     break
                 }

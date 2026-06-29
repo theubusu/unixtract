@@ -6,12 +6,10 @@ use std::fs;
 use std::path::{Path};
 use std::fs::{File, OpenOptions};
 use std::io::{Write};
-use hex::decode;
 use sha1::{Digest, Sha1};
 use md5;
 
 use crate::utils::common;
-use crate::keys;
 use crate::utils::aes::{decrypt_aes128_cbc_pcks7};
 use include::decrypt_xor;
 
@@ -33,19 +31,19 @@ pub fn extract_samsung_old(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(
 
     let image_path = Path::new(&path).join("image");
 
-    let mut secret: Option<&str> = None;
+    let mut secret: Option<&Vec<u8>> = None;
 
     //find secret
-    for (prefix, value) in keys::SAMSUNG {
-        if fw_info.starts_with(prefix) {
-            secret = Some(value);
+    for (name, keys) in app_ctx.keys.get_collection("SAMSUNG_OLD")? {
+        if fw_info.starts_with(name) {
+            secret = Some(keys.first().unwrap());
             break;
         }
     }
-    if let Some(p) = secret {
-        println!("Secret: {}", p);
+    if secret.is_some() {
+        println!("Found matching secret");
     } else {
-        return Err("This firmware is not supported!".into());
+        return Err("no key found for this firmware".into());
     }
     
     for entry in fs::read_dir(image_path)? {
@@ -74,7 +72,7 @@ pub fn extract_samsung_old(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(
 
                     if fw_info.starts_with("T-ECP") {
                         let mut key = Vec::new();
-                        key.extend_from_slice(&decode(secret.unwrap())?);
+                        key.extend_from_slice(secret.unwrap());
                         key.extend_from_slice(salt);
                         key_md5 = md5::compute(&key);
 

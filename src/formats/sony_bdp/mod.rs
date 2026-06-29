@@ -10,7 +10,6 @@ use binrw::BinReaderExt;
 
 use crate::utils::common;
 use crate::formats;
-use crate::keys;
 use include::*;
 
 struct SonyBdpCtx {
@@ -22,7 +21,8 @@ pub fn is_sony_bdp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Bo
     let header_magic = common::read_file(&file, 0, 16)?;
 
     //try old encryption (hex subst)
-    if is_valid_header_magic(&hex_substitute(&header_magic)) {
+    let subst_map = app_ctx.keys.get_key_as_arr::<256>("SONY_BDP_HEX_SUBST", 0)?;
+    if is_valid_header_magic(&hex_substitute(&header_magic, &subst_map)) {
         return Ok(Some(Box::new(
             SonyBdpCtx {encryption_type: 
                 EncryptionType::HexSubst
@@ -31,9 +31,9 @@ pub fn is_sony_bdp_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Bo
     }
 
     //try new encryption (aes)
-    for (key_hex, iv_hex, name) in keys::SONY_BDP_AES {
-        let key_array: [u8; 16] = hex::decode(key_hex)?.as_slice().try_into()?;
-        let iv_array: [u8; 16] = hex::decode(iv_hex)?.as_slice().try_into()?;
+    for (name, keys) in app_ctx.keys.get_collection("SONY_BDP_AES")? {
+        let key_array: [u8; 16] = keys[0].as_slice().try_into()?;
+        let iv_array: [u8; 16] = keys[1].as_slice().try_into()?;
         let try_decrypt = ver_up_decrypt_aes128ofb(&key_array, &iv_array, &header_magic);
 
         if is_valid_header_magic(&try_decrypt) {
@@ -59,7 +59,8 @@ pub fn extract_sony_bdp(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), B
     let dec_data = match ctx.encryption_type {
         EncryptionType::HexSubst => {
             println!("Decrypting with hex substitution...");
-            hex_substitute(&enc_data)
+            let subst_map = app_ctx.keys.get_key_as_arr::<256>("SONY_BDP_HEX_SUBST", 0)?;
+            hex_substitute(&enc_data, &subst_map)
         },
         EncryptionType::AesOfb((key, iv, key_name)) => {
             println!("Decrypting with AES key: {}...", key_name);
@@ -116,7 +117,8 @@ pub fn extract_sony_bdp(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), B
         let ctx: AppContext = AppContext { 
             input: InputTarget::File(last_file), 
             output_dir: mtk_extraction_path,
-            options: app_ctx.options.clone() 
+            options: app_ctx.options,
+            keys: app_ctx.keys,
         };
 
         if let Some(result) = formats::mtk_bdp::is_mtk_bdp_file(&ctx)? {

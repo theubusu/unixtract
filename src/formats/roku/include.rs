@@ -1,12 +1,5 @@
 use binrw::BinRead;
 
-pub static FILE_KEY: [u8; 16] = [
-        0x2A, 0x54, 0xA5, 0x30, 0xE0, 0x09, 0xA3, 0xDC,
-        0x03, 0xFB, 0xC3, 0x5E, 0x23, 0xA2, 0xC1, 0x0D,
-];
-
-pub static FILE_IV: [u8; 16] = [0x00; 16];
-
 // u-boot-2011.06/include/aimage.h
 // (C) Copyright 2004-2008 Andre McCurdy, NXP Semiconductors
 

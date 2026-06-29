@@ -11,7 +11,6 @@ use crate::utils::common;
 use crate::utils::aes::{decrypt_aes128_ecb, decrypt_aes256_cbc_nopad};
 use crate::utils::global::opt_dump_dec_hdr;
 use include::*;
-use crate::keys;
 
 pub fn is_fdat_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
@@ -59,8 +58,8 @@ pub fn extract_fdat(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
     
     //1st gen (custom sha derived cipher)
     let first_block_encrypted = common::read_exact(&mut file, 1000 /* sha block size is 1000 */)?;
-    for (name, key_hex) in keys::SONY_FDAT_SHA {
-        let key_bytes = hex::decode(key_hex)?;
+    for (name, keys) in app_ctx.keys.get_collection("FDAT_SHA_KEYS")? {
+        let key_bytes = keys.first().unwrap().as_slice();
         let mut crypter = ShaCrypter::new(key_bytes.try_into().unwrap());
         let decrypted = crypter.decrypt_block(&first_block_encrypted);
         //block starts with checksum, check to see if decryption was correct
@@ -75,35 +74,38 @@ pub fn extract_fdat(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
     //try aes types
     if encryption_mode.is_none() {
         file.seek(SeekFrom::Start(fdat_offset))?;
+        let common_aes_key = app_ctx.keys.get_key_as_arr::<16>("FDAT_COMMON_AES_KEY", 0)?;
         let first_block_encrypted = common::read_exact(&mut file, 1024 /* aes block size is 1024 */)?;
-        let mut cmn_decrypted = decrypt_aes128_ecb(&COMMON_AES_KEY, &first_block_encrypted)?;
+        let mut cmn_decrypted = decrypt_aes128_ecb(&common_aes_key, &first_block_encrypted)?;
         let expected_checksum = u16::from_le_bytes([cmn_decrypted[0], cmn_decrypted[1]]);
    
         if expected_checksum == calc_sum(&cmn_decrypted[2..]) {
             //2nd gen (1 pass aes128ecb)
             println!("- 2nd gen firmware (CXD4132) detected!");
-            encryption_mode = Some(EncryptionMode::AesEcb(COMMON_AES_KEY));
+            encryption_mode = Some(EncryptionMode::AesEcb(common_aes_key));
             first_block_decrypted = cmn_decrypted[4..].to_vec();
         } else {
             //3rd gen (2 passes of aes128ecb, but first 512 bytes of 1st block use only the first pass' key)
-            let decrypted_2nd_part = decrypt_aes128_ecb(&CXD90014_AES_KEY, &cmn_decrypted[512..])?;
+            let cxd90014_aes_key = app_ctx.keys.get_key_as_arr::<16>("FDAT_CXD90014_AES_KEY", 0)?;
+            let decrypted_2nd_part = decrypt_aes128_ecb(&cxd90014_aes_key, &cmn_decrypted[512..])?;
             cmn_decrypted[512..].copy_from_slice(&decrypted_2nd_part);
             if expected_checksum == calc_sum(&cmn_decrypted[2..]) {
                 println!("- 3rd gen firmware (CXD90014) detected!");
-                encryption_mode = Some(EncryptionMode::DoubleAesEcb((COMMON_AES_KEY, CXD90014_AES_KEY)));
+                encryption_mode = Some(EncryptionMode::DoubleAesEcb((common_aes_key, cxd90014_aes_key)));
                 first_block_decrypted = cmn_decrypted[4..].to_vec();
             } else {
                 //4rd gen (aes256cbc, but first 512 bytes of 1st block use the common aes128ecb key)
                 //iv is at -0x110 from FDAT end
+                let cxd90045_aes_key = app_ctx.keys.get_key_as_arr::<32>("FDAT_CXD90045_AES_KEY", 0)?;
                 let iv: [u8; 16] = common::read_file(&mut file, (fdat_offset + fdat_size as u64) - 0x110, 16)?.try_into().unwrap();
                 file.seek(SeekFrom::Start(fdat_offset + 1024))?;
-                let decrypted_2nd_part = decrypt_aes256_cbc_nopad(&first_block_encrypted[512..], &CXD90045_AES_KEY, &iv)?;
+                let decrypted_2nd_part = decrypt_aes256_cbc_nopad(&first_block_encrypted[512..], &cxd90045_aes_key, &iv)?;
                 cmn_decrypted[512..].copy_from_slice(&decrypted_2nd_part);
                 if expected_checksum == calc_sum(&cmn_decrypted[2..]) {
                     println!("- 4th gen firmware (CXD90045) detected!");
                     //UPDATE iv, the CBC state is kept between blocks. 
                     let new_iv: [u8; 16] = first_block_encrypted[1008..1024].try_into().unwrap();
-                    encryption_mode = Some(EncryptionMode::AesCbc((CXD90045_AES_KEY, new_iv)));
+                    encryption_mode = Some(EncryptionMode::AesCbc((cxd90045_aes_key, new_iv)));
                     first_block_decrypted = cmn_decrypted[4..].to_vec();
                 }
             }

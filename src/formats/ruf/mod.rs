@@ -2,13 +2,12 @@ mod include;
 use std::any::Any;
 use crate::AppContext;
 
-use std::path::{Path, PathBuf};
-use std::fs::{self, File, OpenOptions};
+use std::path::Path;
+use std::fs::{self, OpenOptions};
 use binrw::BinReaderExt;
 use std::io::{Write, Seek, SeekFrom, Cursor};
 
 use crate::utils::common;
-use crate::keys;
 use crate::utils::aes::{decrypt_aes128_cbc_pcks7};
 use include::*;
 
@@ -25,29 +24,13 @@ pub fn is_ruf_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn
 
 pub fn extract_ruf(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
-
-    let header: RufHeader = file.read_be()?;
-    if header.is_dual_ruf() {
-        println!("\nDual RUF detected! Extracting 1st RUF...\n");
-        actually_extract_ruf(file, &app_ctx.output_dir.join("RUF_1"), 0)?;
-        println!("\nExtracting 2nd RUF...\n");
-        actually_extract_ruf(file, &app_ctx.output_dir.join("RUF_2"), 41943088)?;
-    } else {
-        actually_extract_ruf(file, &app_ctx.output_dir, 0)?;
-    }
-
-    Ok(())
-}
-
-fn actually_extract_ruf(mut file: &File, output_folder: &PathBuf, start_offset: u64) -> Result<(), Box<dyn std::error::Error>> {
-    file.seek(SeekFrom::Start(start_offset))?;
     let header: RufHeader = file.read_be()?;
 
     println!("File info:\nBuyer: {} \nModel: {} \nRegion Info: {} \nDateTime: {}\nVersion:{:02x?} \nData Size: {} \nDual RUF: {}",
             header.buyer(), header.model(), header.region_info(), header.date_time(), header.version_bytes, header.data_size, header.is_dual_ruf());
     
     println!("\nPayload count: {}", header.payload_count);
-    file.seek(SeekFrom::Start(start_offset + header.payloads_start_offset as u64))?;
+    file.seek(SeekFrom::Start(header.payloads_start_offset as u64))?;
 
     let mut entries: Vec<RufEntry> = Vec::new();
 
@@ -70,25 +53,24 @@ fn actually_extract_ruf(mut file: &File, output_folder: &PathBuf, start_offset: 
         entries.push(entry);
     }
 
-    let mut key: Option<&str> = None;
+    let mut key: Option<&Vec<u8>> = None;
     let key_bytes;
     let iv_bytes: [u8; 16] = [0x00; 16];
 
     //find key
-    for (prefix, value) in keys::RUF {
-        if header.model().starts_with(prefix) {
-            key = Some(value);
+    for (name, keys) in app_ctx.keys.get_collection("RUF")? {
+        if header.model().starts_with(name) {
+            key = Some(keys.first().unwrap());
             break;
         }
     }
     if let Some(k) = key {
-        println!("\nKey: {}", k);
-        key_bytes = hex::decode(k)?.as_slice().try_into()?;
+        key_bytes = k.as_slice().try_into()?;
     } else {
-        return Err("This firmware is not supported!".into());
+        return Err("no key found for this firmware".into());
     }
 
-    file.seek(SeekFrom::Start(start_offset + 2048))?;
+    file.seek(SeekFrom::Start(header.data_start_offset.into()))?;
     let encrypted_data = common::read_exact(&mut file, header.data_size as usize)?;
     println!("Decrypting data...");
     let decrypted_data = decrypt_aes128_cbc_pcks7(&encrypted_data, &key_bytes, &iv_bytes)?;
@@ -102,8 +84,8 @@ fn actually_extract_ruf(mut file: &File, output_folder: &PathBuf, start_offset: 
 
         let data = common::read_exact(&mut data_reader, entry.size as usize)?;
 
-        let output_path = Path::new(&output_folder).join(format!("{}_{}.bin", entry.payload_type_bytes, entry.payload_type()));
-        fs::create_dir_all(&output_folder)?;
+        let output_path = Path::new(&app_ctx.output_dir).join(format!("{}_{}.bin", entry.payload_type_bytes, entry.payload_type()));
+        fs::create_dir_all(&app_ctx.output_dir)?;
         let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;
             
         out_file.write_all(&data)?;

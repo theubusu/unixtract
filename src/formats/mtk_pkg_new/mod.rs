@@ -10,7 +10,6 @@ use binrw::BinReaderExt;
 use crate::utils::common;
 use crate::utils::global::opt_dump_dec_hdr;
 use crate::utils::aes::{decrypt_aes128_cbc_nopad};
-use crate::keys;
 use crate::formats::mtk_pkg::lzhs::{decompress_mtk_to_file};
 use crate::formats::mtk_pkg::include::{Header, PartEntry, MTK_HEADER_MAGIC, MTK_META_MAGIC, MTK_META_PAD_MAGIC};
 use include::*;
@@ -26,9 +25,9 @@ pub fn is_mtk_pkg_new_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>,
     let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
 
     let encrypted_header = common::read_file(&file, 0, HEADER_SIZE)?;
-    for (key_hex, iv_hex, name) in keys::MTK_PKG_CUST {
-        let key_array: [u8; 16] = hex::decode(key_hex)?.as_slice().try_into()?;
-        let iv_array: [u8; 16] = hex::decode(iv_hex)?.as_slice().try_into()?;
+    for (name, keys) in app_ctx.keys.get_collection("MTK_PKG_CUSTOM_KEYS")? {
+        let key_array: [u8; 16] = keys[0].as_slice().try_into()?;
+        let iv_array: [u8; 16] = keys[1].as_slice().try_into()?;
         let try_decrypt = decrypt_aes128_cbc_nopad(&encrypted_header, &key_array, &iv_array)?;
 
         if &try_decrypt[4..12] == MTK_HEADER_MAGIC {    

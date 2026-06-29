@@ -97,9 +97,11 @@ fn decrypt_block(encrypted32: u32, key_upper: u16, key_lower: u16, prev_block: u
     decrypted ^ prev_block
 }
 
-pub fn decrypt(data: &[u8], key: u32, xor_mask: Option<u32>) -> Vec<u8> {
-    let key_upper = ((key >> 16) & 0xFFFF) as u16;
-    let key_lower = (key & 0xFFFF) as u16;
+pub fn decrypt(data: &[u8], key: &[u8; 4], iv: &[u8; 4]) -> Vec<u8> {
+
+    let key_u32 = u32::from_le_bytes([key[0], key[1], key[2], key[3]]);
+    let key_upper = ((key_u32 >> 16) & 0xFFFF) as u16;
+    let key_lower = (key_u32 & 0xFFFF) as u16;
     
     let mut decrypted = Vec::with_capacity(data.len());
     let mut prev_block = 0u32; //initial iv = 0
@@ -120,18 +122,9 @@ pub fn decrypt(data: &[u8], key: u32, xor_mask: Option<u32>) -> Vec<u8> {
         decrypted.push(byte ^ 0x3D);
     }
     
-    //apply XOR to the first 4 bytes if a mask is provided
-    if let Some(mask) = xor_mask {
-        if decrypted.len() >= 4 {
-            let first_dword = u32::from_le_bytes([
-                decrypted[0],
-                decrypted[1],
-                decrypted[2],
-                decrypted[3],
-            ]);
-            let xored = first_dword ^ mask;
-            decrypted[0..4].copy_from_slice(&xored.to_le_bytes());
-        }
+    //apply IV xor to the first block
+    for i in 0..4 {
+        decrypted[i] ^= iv[i];
     }
     
     decrypted

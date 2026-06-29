@@ -1,13 +1,6 @@
 use crate::utils::common;
 use binrw::BinRead;
 
-pub static HEADER_KEY: [u8; 16] = [
-        0x09, 0x29, 0x10, 0x94, 0x09, 0x29, 0x10, 0x94,
-        0x09, 0x29, 0x10, 0x94, 0x09, 0x29, 0x10, 0x94,
-];
-
-pub static HEADER_IV: [u8; 16] = [0x00; 16];
-
 pub static MTK_HEADER_MAGIC: &[u8; 8] = b"#DH@FiRm";
 pub static MTK_RESERVED_MAGIC: &[u8; 16] = b"reserved mtk inc";
 pub static MTK_META_MAGIC: &[u8; 4] = b"iMtK";

@@ -49,7 +49,8 @@ pub fn extract_rvp(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<dy
     file.read_to_end(&mut obf_data)?;
     println!("DeXORing data..");
 
-    let data = decrypt_xor(&obf_data); 
+    let xor_key= app_ctx.keys.get_key_as_arr::<32>("RVP_XOR_KEY", 0)?;
+    let data = decrypt_xor(&obf_data, &xor_key); 
     let data_size = data.len();
     let mut data_reader = Cursor::new(data);
 

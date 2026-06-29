@@ -12,7 +12,6 @@ use binrw::BinReaderExt;
 use crate::utils::common;
 use crate::utils::global::opt_dump_dec_hdr;
 use crate::utils::aes::{decrypt_aes128_cbc_nopad};
-use crate::keys;
 use lzhs::{decompress_mtk_to_file};
 use include::*;
 
@@ -25,13 +24,14 @@ pub fn is_mtk_pkg_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box
     let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
 
     let mut encrypted_header = common::read_file(&file, 0, HEADER_SIZE)?;
-    let mut header = decrypt_aes128_cbc_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV)?;
+    let header_key= app_ctx.keys.get_key_as_arr::<16>("MTK_PKG_HEADER_KEY_AES", 0)?;
+    let mut header = decrypt_aes128_cbc_nopad(&encrypted_header, &header_key, &[0x00; 16])?;
     if &header[4..12] == MTK_HEADER_MAGIC {
         Ok(Some(Box::new(MtkPkgContext { is_philips_variant: false, decrypted_header: header})))
     } else {
         // try for philips which has additional 128 bytes at beginning
         encrypted_header = common::read_file(&file, PHILIPS_EXTRA_HEADER_SIZE as u64, HEADER_SIZE)?;
-        header = decrypt_aes128_cbc_nopad(&encrypted_header, &HEADER_KEY, &HEADER_IV)?;
+        header = decrypt_aes128_cbc_nopad(&encrypted_header, &header_key, &[0x00; 16])?;
         if &header[4..12] == MTK_HEADER_MAGIC {
             Ok(Some(Box::new(MtkPkgContext { is_philips_variant: true, decrypted_header: header })))
         } else {
@@ -89,17 +89,17 @@ pub fn extract_mtk_pkg(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Bo
             for i in 0..4 {
                 key[i * 4..(i + 1) * 4].copy_from_slice(&hdr.vendor_magic_bytes);
             }
-            let try_decrypt = decrypt_aes128_cbc_nopad(&crypted_header, &key, &HEADER_IV)?;
+            let try_decrypt = decrypt_aes128_cbc_nopad(&crypted_header, &key, &[0x00; 16])?;
             if try_decrypt.starts_with(MTK_RESERVED_MAGIC) {
                 println!("- Decrypting with 4xVendor magic...");
                 matching_key = Some(key);
-                matching_iv = Some(HEADER_IV);
+                matching_iv = Some([0x00; 16]);
 
             } else {
                 //try decrypting with one of custom keys
-                for (key_hex, iv_hex, name) in keys::MTK_PKG_CUST {
-                    let key_array: [u8; 16] = hex::decode(key_hex)?.as_slice().try_into()?;
-                    let iv_array: [u8; 16] = hex::decode(iv_hex)?.as_slice().try_into()?;
+                for (name, keys) in app_ctx.keys.get_collection("MTK_PKG_CUSTOM_KEYS")? {
+                    let key_array: [u8; 16] = keys[0].as_slice().try_into()?;
+                    let iv_array: [u8; 16] = keys[1].as_slice().try_into()?;
                     let try_decrypt = decrypt_aes128_cbc_nopad(&crypted_header, &key_array, &iv_array)?;
 
                     if try_decrypt.starts_with(MTK_RESERVED_MAGIC) {

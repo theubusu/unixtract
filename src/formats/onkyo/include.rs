@@ -2,8 +2,6 @@ use crate::utils::common;
 use binrw::BinRead;
 
 pub static ONKYO_MAGIC: &[u8] = b"ONKYO Encryption";
-pub static HEADER_KEY: [u8; 8] = [0xDA, 0x57, 0x68, 0x0D, 0x44, 0x21, 0x30, 0x7A];
-pub static DATA_KEY:   [u8; 8] = [0xAE, 0xB7, 0x31, 0x74, 0x47, 0xE4, 0xFB, 0x5D];
 
 #[derive(BinRead)]
 pub struct Header {

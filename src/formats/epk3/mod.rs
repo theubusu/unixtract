@@ -9,7 +9,6 @@ use binrw::BinReaderExt;
 
 use crate::utils::common;
 use crate::utils::global::opt_dump_dec_hdr;
-use crate::keys;
 use crate::formats::epk::{decrypt_aes_ecb_auto, find_key};
 use include::*;
 
@@ -29,7 +28,7 @@ pub fn extract_epk3(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
     println!("Finding key...");
 
     // find the key, knowing that the header should start with "EPK3" (old type 128 byte signature)
-    if let Some((key_name, key_bytes)) = find_key(&keys::EPK, &stored_header[128..], b"EPK3")? {
+    if let Some((key_name, key_bytes)) = find_key(app_ctx.keys.get_collection("EPK")?, &stored_header[128..], b"EPK3")? {
         println!("Found valid key: {}", key_name);
         matching_key = Some(key_bytes);
         _header_signature = &stored_header[..128];
@@ -37,7 +36,7 @@ pub fn extract_epk3(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
         opt_dump_dec_hdr(app_ctx, &header, "header")?;
 
     //try for new format epk3 (new type 256 byte signature)
-    } else if let Some((key_name, key_bytes)) = find_key(&keys::EPK, &stored_header[256..], b"EPK3")? {
+    } else if let Some((key_name, key_bytes)) = find_key(app_ctx.keys.get_collection("EPK")?, &stored_header[256..], b"EPK3")? {
         println!("Found valid key: {}", key_name);
         matching_key = Some(key_bytes);
         _header_signature = &stored_header[..256];

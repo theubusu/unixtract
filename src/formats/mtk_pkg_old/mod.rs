@@ -23,7 +23,8 @@ pub fn is_mtk_pkg_old_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>,
     let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
     
     let encrypted_header = common::read_file(&file, 0, HEADER_SIZE)?;
-    let header = decrypt(&encrypted_header, KEY, Some(HEADER_XOR_MASK));
+    let (header_key, header_iv) = app_ctx.keys.get_double_key_as_arr::<4, 4>("MTK_PKG_OLD_HEADER_KEY")?;
+    let header = decrypt(&encrypted_header, &header_key, &header_iv);
     if &header[4..12] == MTK_HEADER_MAGIC {
         Ok(Some(Box::new(MtkPkgOldContext {header_offset: 0})))
     } else if &header[68..76] == MTK_HEADER_MAGIC {
@@ -45,7 +46,8 @@ pub fn extract_mtk_pkg_old(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<()
 
     file.seek(SeekFrom::Start(ctx.header_offset))?;
     let encrypted_header = common::read_exact(&mut file, HEADER_SIZE)?;
-    let header = decrypt(&encrypted_header, KEY, Some(HEADER_XOR_MASK));
+    let (header_key, header_iv) = app_ctx.keys.get_double_key_as_arr::<4, 4>("MTK_PKG_OLD_HEADER_KEY")?;
+    let header = decrypt(&encrypted_header, &header_key, &header_iv);
     opt_dump_dec_hdr(app_ctx, &header, "header")?;
     
     let mut hdr_reader = Cursor::new(header); 
@@ -67,8 +69,8 @@ pub fn extract_mtk_pkg_old(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<()
         if part_entry.is_encrypted() {
             //decrypt with the vendor magic
             println!("- Decrypting...");
-            let vendor_magic_u32 = u32::from_le_bytes(hdr.vendor_magic_bytes.clone().try_into().unwrap());
-            out_data = decrypt(&data, vendor_magic_u32, Some(CONTENT_XOR_MASK));
+            let data_iv = app_ctx.keys.get_key_as_arr::<4>("MTK_PKG_OLD_DATA_IV", 0)?;
+            out_data = decrypt(&data, &hdr.vendor_magic_bytes, &data_iv);
         } else {
             out_data = data;
         }
