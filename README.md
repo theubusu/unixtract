@@ -38,10 +38,12 @@ Options:
 
 ## BEM
 **Used in:** Samsung Signage(LFD)/Hospitality displays  
-**Notes:** **Depends on keys** - see keys.rs (uses MSD11 keys)  
+**Common names:** `swuimage.bem`   
+**Notes:** **Depends on keys** - see keys.ukf (uses MSD11 keys)  
 
 ## CD5  
 **Used in:** Some Samsung TV tuners, and possibly other Irdeto(?)-based tuners  
+**Common names:** `MainAppImage.cd5`   
 **Notes:** Decryption is not supported.
 
 ## EPK v1  
@@ -51,14 +53,14 @@ Options:
 
 ## EPK v2  
 **Used in:** LG TVs since ~2010  
-**Notes:** **Depends on keys** - see keys.rs (most common keys should be included)  
+**Notes:** **Depends on keys** - see keys.ukf (most common keys should be included)  
 **Thanks to:** https://github.com/openlgtv/epk2extract   
 **Options:**   
 ※ Support `dump_dec_hdrs` option
 
 ## EPK v3  
 **Used in:** LG webOS-based TVs  
-**Notes:** **Depends on keys** - see keys.rs  
+**Notes:** **Depends on keys** - see keys.ukf  
 **Thanks to:** https://github.com/openlgtv/epk2extract   
 **Options:**   
 ※ Support `dump_dec_hdrs` option
@@ -80,11 +82,11 @@ Options:
 
 ## Funai UPG   
 **Used in:** Some Funai TVs  
-**Notes:** **Depends on keys** - see keys.rs.    
+**Notes:** **Depends on keys** - see keys.ukf.    
 
 ## Funai UPG PHL   
 **Used in:** Funai & Funai-made Philips TVs (USA market)  
-**Notes:** **Depends on keys** - see keys.rs (most common keys should be included).    
+**Notes:** **Depends on keys** - see keys.ukf (most common keys should be included).    
 
 ## GX DVB
 **Used in:** Cheap NationalChip GX-based DVB tuners    
@@ -97,7 +99,8 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 
 ## MSD 1.0
 **Used in:** Samsung TVs 2013-2015  
-**Notes:** **Depends on keys** - see keys.rs  
+**Common names:** `upgrade.msd`   
+**Notes:** **Depends on keys** - see keys.ukf  
 **Thanks to:** https://github.com/bugficks/msddecrypt  
 **Options:**   
 `msd10:save_cmac` - Save CMAC data for files that is skipped by default.   
@@ -106,14 +109,23 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 
 ## MSD 1.1
 **Used in:** Samsung TVs 2016+  
-**Notes:** **Depends on keys** - see keys.rs  
+**Common names:** `upgrade.msd`   
+**Notes:** **Depends on keys** - see keys.ukf  
 **Thanks to:** https://github.com/bugficks/msddecrypt  
 **Options:**   
 `msd:print_ouith` - Prints the entire parsed OUITH header.  
 ※ Support `dump_dec_hdrs` option
 
+## MSFirm  
+**Used in:** Sony Digital cameras  
+**Notes:** Supports: CXD4105, CXD4108     
+**Thanks to:** https://github.com/ma1co/fwtool.py   
+**Options:**   
+※ Support `dump_dec_hdrs` option
+
 ## MStar upgrade bin
 **Used in:** Many MStar-based TVs (Hisense, Toshiba...)  
+**Common names:** `MStarUpgrade.bin`   
 **Notes:** All files should be supported, includes lzop, lz4, lzma, sparse_write support  
 **Options:**  
 `mstar:keep_unknown` - Save data with unknown destination.  
@@ -131,12 +143,13 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 
 ## MediaTek PKG (New)
 **Used in:** Newer MediaTek-based TVs (TCL, Hisense, Sony, Philips, CVT...)  
-**Notes:** **Depends on keys** - see keys.rs (Keys for Philips and Sony included)  
+**Notes:** **Depends on keys** - see keys.ukf (Keys for Philips and Sony included)  
 **Options:**        
 ※ Support `dump_dec_hdrs` option
 
 ## MediaTek PKG (Old)
 **Used in:** Older MediaTek-based TVs (Philips, Sony, Hisense...)  
+**Common names:** `upgrade_loader.pkg`   
 **Notes:** All files should be supported, decryption + decompression   
 **Options:**       
 ※ Support `dump_dec_hdrs` option
@@ -154,6 +167,7 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 
 ## Novatek BIN
 **Used in:** Some Vestel(?) Novatek-based TVs. Usually accompanied by a .scr file, but it is not needed for extraction.  
+**Common names:** `kylo_usb_update.bin`   
 **Notes:** None, all files should be supported.
 
 ## Novatek TIMG
@@ -167,16 +181,18 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 **Options:**   
 ※ Support `dump_dec_hdrs` option
 
-## Panasonic Blu-Ray (PANA_DVD.FRM, PANA_ESD.FRM, PANAEUSB.FRM)
+## Panasonic Blu-Ray
 **Used in:** Panasonic Blu-Ray Players and Recorders  
-**Notes:** **Depends on keys** - see keys.rs (Included keys should work for 99% of players released in and before 2014, and some released in 2018), Note that there is currently an issue with MAIN in some very ancient files not extracting correctly.   
+**Common names:** `PANA_DVD.FRM`, `PANA_ESD.FRM`, `PANAEDVD.FRM`      
+**Notes:** **Depends on keys** - see keys.ukf (Included keys should work for 99% of players released in and before 2014, and some released in 2018), Note that there is currently an issue with MAIN in some very ancient files not extracting correctly.   
 **Options:**   
 `pana_dvd:split_main` - Automatically split the MAIN module into seperate partitions.   
 ※ Support `dump_dec_hdrs` option
 
-## Philips UPG (Autorun.upg, 2SWU3TXV)
-**Used in:** Philips pre-TPVision TVs 200?-2013 and some Sony TVs 
-**Notes:** **Depends on keys** - see keys.rs  
+## Philips UPG (2SWU3TXV)
+**Used in:** Philips pre-TPVision TVs 200?-2013 and some Sony TVs   
+**Common names:** `autorun.upg`   
+**Notes:** **Depends on keys** - see keys.ukf  
 **Thanks to:** https://github.com/frederic/pflupg-tool   
 **Options:**   
 `pfl_upg:no_extract_inner_upg` - Do not automatically extract inner UPGs. (Warning: this can cause file collisions sometimes!)   
@@ -194,11 +210,12 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 
 ## Roku
 **Used in:** Roku TV's/players  
+**Common names:** `update.roku`   
 **Notes:** The contents of the update file can be extracted, but some firmware images contained inside are additionally encrypted, and they cannot be decrypted as of now. 
 
 ## RUF
 **Used in:** Samsung Broadcom-based Blu-Ray players  
-**Notes:** **Depends on keys** - see keys.rs 
+**Notes:** **Depends on keys** - see keys.ukf 
 
 ## RVP/MVP
 **Used in:** Sharp Blu-Ray players/recorders  
@@ -206,7 +223,7 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 
 ## Samsung (Folder with ***.img.sec)
 **Used in:** Samsung TVs pre 2013  
-**Notes:** **Depends on keys** - see keys.rs  
+**Notes:** **Depends on keys** - see keys.ukf  
 **Thanks to:** https://github.com/george-hopkins/samygo-patcher
 
 ## SDBoot
@@ -215,7 +232,8 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 **Base:** https://github.com/theubusu/sddl_dec
 
 ## SDDL.SEC
-**Used in:** Panasonic TVs  
+**Used in:** Panasonic TVs   
+**Common names:** `SDDL.SEC`   
 **Notes:** None, all files should be supported.  
 **Options:**   
 `sddl_sec:save_extra` - Save SDIT.FDI and .TXT files that are not extracted by default.   
@@ -223,8 +241,9 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 `sddl_sec:no_decomp_peaks` - Do not automatically decompress partitions when splitting PEAKS with above option.  
 **Base:** https://github.com/theubusu/sddl_dec
 
-## SDImage (SDImage.bin)
+## SDImage
 **Used in:** Some 2010 USA Panasonic TVs  
+**Common names:** `SDImage.bin`     
 **Notes:** Decryption is not yet supported.  
 
 ## SLP
@@ -233,11 +252,13 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 
 ## Sony BDP
 **Used in:** Sony MediaTek-based Blu-Ray players  
-**Notes:** **Depends on keys** - see keys.rs (Platforms up to MSB29 are supported)  
+**Common names:** `MSBXX-FW.bin`, `MSBXX-FW_MB.bin`  
+**Notes:** **Depends on keys** - see keys.ukf (Platforms up to MSB29 are supported)  
 **Thanks to:** http://malcolmstagg.com/bdp/s390-firmware.html  
 
 ## TSB Bin
 **Used in:** Older Toshiba TVs  
+**Common names:** `bootimg.prg`, `eutvXXXX.prg`   
 **Notes:** None, all files should be supported.   
 **Options:**   
 ※ Support `dump_dec_hdrs` option

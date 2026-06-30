@@ -37,6 +37,7 @@ pub mod philips_bdp;
 pub mod tsb_bin;
 pub mod novatek_bin;
 pub mod fdat;
+pub mod msfirm;
 
 pub mod pup;
 
@@ -274,5 +275,10 @@ pub fn get_registry() -> Vec<Format> {
             detector_func: crate::formats::fdat::is_fdat_file,
             extractor_func: crate::formats::fdat::extract_fdat,
         }, 
+        Format {
+            name: "msfirm",
+            detector_func: crate::formats::msfirm::is_msfirm_file,
+            extractor_func: crate::formats::msfirm::extract_msfirm,
+        },
     ]
 }
