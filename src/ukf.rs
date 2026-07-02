@@ -54,7 +54,7 @@ impl KeySystem {
 
     //gets a raw specified collection
     pub fn get_collection(&self, name: &str) -> Result<&Vec<(String, Vec<Vec<u8>>)>, Box<dyn std::error::Error>> {
-        self.collections.get(name).ok_or_else(|| format!("key {name} not found").into())
+        self.collections.get(name).ok_or_else(|| format!("collection {name} not found").into())
     }
 }
 

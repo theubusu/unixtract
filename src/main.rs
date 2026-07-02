@@ -115,20 +115,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Loaded {} formats!", formats.len());
 
     for format in formats {
-        if let Some(ctx) = (format.detector_func)(&app_ctx)? {
-            println!("\n{} detected!", format.name);
+        match (format.detector_func)(&app_ctx) {
+            Ok(result) => {
+                if let Some(ctx) = result {
+                    println!("\n{} detected!", format.name);
 
-            //reset seek of the file if present
-            if let Some(mut file) = app_ctx.file() {
-                file.seek(SeekFrom::Start(0))?;
+                    //reset seek of the file if present
+                    if let Some(mut file) = app_ctx.file() {
+                        file.seek(SeekFrom::Start(0))?;
+                    }
+
+                    (format.extractor_func)(&app_ctx, ctx)?;
+
+                    //extractor returned with no error
+                    println!("\nExtraction finished! Saved extracted files to {}", output_path_str);
+                    return Ok(());
+                }
             }
-
-            (format.extractor_func)(&app_ctx, ctx)?;
-
-            //extractor returned with no error
-            println!("\nExtraction finished! Saved extracted files to {}", output_path_str);
-            return Ok(());
-        }
+            Err(e) => {
+                println!("Warning: detector for {} failed: {}", format.name, e);
+            }
+        }  
     }
 
     println!("\nInput format not recognized!");
