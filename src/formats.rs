@@ -38,6 +38,7 @@ pub mod tsb_bin;
 pub mod novatek_bin;
 pub mod fdat;
 pub mod msfirm;
+pub mod nw_wm_upg;
 
 pub mod pup;
 
@@ -279,6 +280,11 @@ pub fn get_registry() -> Vec<Format> {
             name: "msfirm",
             detector_func: crate::formats::msfirm::is_msfirm_file,
             extractor_func: crate::formats::msfirm::extract_msfirm,
+        },
+        Format {
+            name: "nw_wm_upg",
+            detector_func: crate::formats::nw_wm_upg::is_nw_wm_upg_file,
+            extractor_func: crate::formats::nw_wm_upg::extract_nw_wm_upg,
         },
     ]
 }

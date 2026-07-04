@@ -174,6 +174,12 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 **Used in:** Newer Novatek-based TVs (Philips(TPVision), Hisense, TCL...)  
 **Notes:** None, all files should be supported.   
 
+## Sony Walkman NW_WM UPG  
+**Used in:** Sony Walkman digital media players     
+**Common names:** `NW_WM_FW.UPG`   
+**Notes:** **Depends on keys** - see keys.ukf  
+**Thanks to:** https://github.com/roobscoob/SonyWalkmanFirmwarePatcher      
+
 ## Onkyo
 **Used in:** Onkyo AVRs and other AV devices  
 **Notes:** Newer files seem to use a different encryption and are not (yet) supported.   
