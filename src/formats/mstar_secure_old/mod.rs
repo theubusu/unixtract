@@ -24,7 +24,7 @@ pub fn is_mstar_secure_old_file(app_ctx: &AppContext) -> Result<Option<Box<dyn A
     }
     let enc_footer = common::read_file(&file, file_size - 128, 128)?;
     let dec_key = app_ctx.keys.get_key_as_arr::<16>("MSTAR_DEFAULT_UPGRADE_KEY", 0)?;
-    let dec_footer = decrypt_aes128_ecb(&dec_key, &enc_footer)?;
+    let dec_footer = decrypt_aes128_ecb(&enc_footer, &dec_key)?;
 
     if &dec_footer[0..8] == CHUNK_ID && &dec_footer[120..128] == CHUNK_END {
         Ok(Some(Box::new(MstarSecureCtx {dec_footer})))
@@ -44,7 +44,7 @@ pub fn extract_mstar_secure_old(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Resu
     
     println!("- Decrypting...");
     let dec_key = app_ctx.keys.get_key_as_arr::<16>("MSTAR_DEFAULT_UPGRADE_KEY", 0)?;
-    let dec_data = decrypt_aes128_ecb(&dec_key, &enc_data)?;
+    let dec_data = decrypt_aes128_ecb(&enc_data, &dec_key)?;
 
     let output_path = Path::new(&app_ctx.output_dir).join("_decrypted.bin");
     fs::create_dir_all(&app_ctx.output_dir)?;

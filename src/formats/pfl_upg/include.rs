@@ -1,21 +1,5 @@
 use crate::utils::common;
 use binrw::BinRead;
-use aes::Aes256;
-use ecb::{Decryptor, cipher::{BlockDecryptMut, KeyInit, generic_array::GenericArray}};
-
-type Aes256EcbDec = Decryptor<Aes256>;
-
-pub fn decrypt_aes256_ecb(key: [u8; 32], ciphertext: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut decryptor = Aes256EcbDec::new(&key.into());
-    let mut buffer = ciphertext.to_vec();
-
-    for chunk in buffer.chunks_exact_mut(16) {
-        let block: &mut [u8; 16] = chunk.try_into()?;
-        decryptor.decrypt_block_mut(GenericArray::from_mut_slice(block));
-    }
-    
-    Ok(buffer)
-}
 
 #[derive(BinRead)]
 pub struct Header {

@@ -2,6 +2,7 @@ use std::any::Any;
 use std::io::Seek;
 use crate::AppContext;
 
+use crate::utils::aes::{decrypt_aes128_ecb, decrypt_aes256_ecb};
 use crate::utils::common;
 use crate::formats;
 
@@ -91,33 +92,14 @@ pub fn find_key(key_array: &Vec<(String, Vec<Vec<u8>>)>, data: &[u8], expected_m
     Ok(None)
 }
 
-use aes::Aes128;
-use aes::Aes256;
-use ecb::{Decryptor, cipher::{BlockDecryptMut, KeyInit, generic_array::GenericArray}};
-
-type Aes128EcbDec = Decryptor<Aes128>;
-type Aes256EcbDec = Decryptor<Aes256>;
-
-pub fn decrypt_aes_ecb_auto(key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut buffer = ciphertext.to_vec();
-
+pub fn decrypt_aes_ecb_auto(key: &[u8], encrypted_data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     if key.len() == 32 {
         // aes256
-        let key_array: [u8; 32] = key.try_into()?;
-        let mut decryptor = Aes256EcbDec::new(&key_array.into());
-        for chunk in buffer.chunks_exact_mut(16) {
-            let block: &mut [u8; 16] = chunk.try_into()?;
-            decryptor.decrypt_block_mut(GenericArray::from_mut_slice(block));
-        }
-    } else {
+        return decrypt_aes256_ecb(encrypted_data, &key.try_into().unwrap())
+    } else if key.len() == 16 {
         // aes128
-        let key_array: [u8; 16] = key.try_into()?;
-        let mut decryptor = Aes128EcbDec::new(&key_array.into());
-        for chunk in buffer.chunks_exact_mut(16) {
-            let block: &mut [u8; 16] = chunk.try_into()?;
-            decryptor.decrypt_block_mut(GenericArray::from_mut_slice(block));
-        }
+        return decrypt_aes128_ecb(encrypted_data, &key.try_into().unwrap())
+    } else {
+        return Err("invalid key length".into());
     }
-
-    Ok(buffer)
 }

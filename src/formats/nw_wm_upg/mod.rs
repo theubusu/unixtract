@@ -29,7 +29,7 @@ pub fn is_nw_wm_upg_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, B
             let aes_key: [u8; 16] = decrypted_kas[..16].try_into().unwrap();
             let signature = &decrypted_kas[16..];
 
-            let decrypted_hdr = decrypt_aes128_ecb(&aes_key, &enc_hdr)?;
+            let decrypted_hdr = decrypt_aes128_ecb(&enc_hdr, &aes_key)?;
             if &decrypted_hdr[..16] == signature {
                 return Ok(Some(Box::new(NwWmUpgCtx {key_name: name.to_string(), encryption: EncryptionMode::Aes(aes_key)})));
             }
@@ -61,7 +61,7 @@ pub fn extract_nw_wm_upg(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), 
     let entry_count = match ctx.encryption {
         EncryptionMode::Aes(key) => {
             let enc_hdr = common::read_exact(&mut file, 32)?;
-            let dec_hdr = decrypt_aes128_ecb(&key, &enc_hdr)?;
+            let dec_hdr = decrypt_aes128_ecb(&enc_hdr, &key)?;
             u32::from_le_bytes(dec_hdr[16..20].try_into().unwrap())
         },
         EncryptionMode::Des(key) => {
@@ -78,7 +78,7 @@ pub fn extract_nw_wm_upg(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), 
         let entry = match ctx.encryption {
             EncryptionMode::Aes(key) => {
                 let enc_entry = common::read_exact(&mut file, 16)?;
-                decrypt_aes128_ecb(&key, &enc_entry)?
+                decrypt_aes128_ecb(&enc_entry, &key)?
             },
             EncryptionMode::Des(key) => {
                 let enc_entry = common::read_exact(&mut file, 8)?;

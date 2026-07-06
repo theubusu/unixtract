@@ -3,98 +3,65 @@ pub mod msd_ouith_parser_old;
 pub mod msd_ouith_parser_tizen_1_8;
 pub mod msd_ouith_parser_tizen_1_9;
 
-// COMMON MSD FUNCTIONS
-use aes::{Aes128, Aes256};
-use cbc::{Decryptor, cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit}};
-
-type Aes128CbcDec = Decryptor<Aes128>;
-type Aes256CbcDec = Decryptor<Aes256>;
-
 use sha2::{Digest, Sha256};
 
-pub fn decrypt_aes_salted_old(encrypted_data: &[u8], passphrase_bytes: &Vec<u8>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut data = encrypted_data.to_vec();
+use crate::utils::aes::{decrypt_aes128_cbc_pcks7, decrypt_aes256_cbc_pcks7};
 
-    if data[0..8].to_vec() != b"Salted__" {
+pub fn decrypt_aes_salted_old(encrypted_data: &[u8], passphrase_bytes: &Vec<u8>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    if &encrypted_data[0..8] != b"Salted__" {
         return Err("Invalid encrypted data!".into());
     }
-    let salt = &data[8..16];
+    let salt = &encrypted_data[8..16];
 
     //key = md5 of (passphrase + salt)
     let mut key = Vec::new();
     key.extend_from_slice(&passphrase_bytes);
     key.extend_from_slice(&salt);
-    let key_md5 = md5::compute(&key);
+    let key_md5 = md5::compute(&key).0;
 
     //iv = md5 of (md5 of key + passphrase + salt)
     let mut iv = Vec::new();
-    iv.extend_from_slice(&key_md5.0);
+    iv.extend_from_slice(&key_md5);
     iv.extend_from_slice(&passphrase_bytes);
     iv.extend_from_slice(&salt);
-    let iv_md5 = md5::compute(&iv);
+    let iv_md5 = md5::compute(&iv).0;
 
-    let decryptor = Aes128CbcDec::new((&key_md5.0).into(), (&iv_md5.0).into());
-    let decrypted = decryptor.decrypt_padded_mut::<Pkcs7>(&mut data[16..])
-        .map_err(|e| format!("Decryption error!!: {:?}", e))?;
-    
-    Ok(decrypted.to_vec())
+    decrypt_aes128_cbc_pcks7(&encrypted_data[16..], &key_md5, &iv_md5)
 }
 
 pub fn decrypt_aes_salted_tizen(encrypted_data: &[u8], passphrase: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut data = encrypted_data.to_vec();
-
-    if data[0..8].to_vec() != b"Salted__" {
+    if &encrypted_data[0..8] != b"Salted__" {
         return Err("Invalid encrypted data!".into());
     }
-
-    let (header, encrypted) = data.split_at_mut(16);
-    let salt = &header[8..16];
+    let salt = &encrypted_data[8..16];
     
-    let decrypted = 
     if passphrase.len() == 16 { //aes128, md5 deviration
         let iv = md5::compute(salt).0;
-        Aes128CbcDec::new(passphrase.into(), (&iv).into())
-            .decrypt_padded_mut::<Pkcs7>(encrypted)
-            .map_err(|e| format!("Decryption error: {:?}", e))?
+        return decrypt_aes128_cbc_pcks7(&encrypted_data[16..], &passphrase.try_into().unwrap(), &iv);
 
     } else if passphrase.len() == 32 { //aes256, sha256 deviration
         let digest: [u8; 32] = Sha256::digest(salt).into();
         let iv: [u8; 16] = digest[..16].try_into().unwrap();
-
-        Aes256CbcDec::new(passphrase.into(), (&iv).into())
-            .decrypt_padded_mut::<Pkcs7>(encrypted)
-            .map_err(|e| format!("Decryption error: {:?}", e))?
+        return decrypt_aes256_cbc_pcks7(&encrypted_data[16..], &passphrase.try_into().unwrap(), &iv);
             
     } else {
         return Err("Invalid passphrase lenght".into())
     };
-   
-    Ok(decrypted.to_vec())
 }
 
 pub fn decrypt_aes_tizen(encrypted_data: &[u8], passphrase: &[u8], salt: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut encrypted = encrypted_data.to_vec();
-
-    let decrypted = 
     if passphrase.len() == 16 { //aes128, md5 deviration
         let iv = md5::compute(salt).0;
-        Aes128CbcDec::new(passphrase.into(), (&iv).into())
-            .decrypt_padded_mut::<Pkcs7>(&mut encrypted)
-            .map_err(|e| format!("Decryption error: {:?}", e))?
+        return decrypt_aes128_cbc_pcks7(&encrypted_data, &passphrase.try_into().unwrap(), &iv);
 
     } else if passphrase.len() == 32 { //aes256, sha256 deviration
         let digest: [u8; 32] = Sha256::digest(salt).into();
         let iv: [u8; 16] = digest[..16].try_into().unwrap();
-
-        Aes256CbcDec::new(passphrase.into(), (&iv).into())
-            .decrypt_padded_mut::<Pkcs7>(&mut encrypted)
-            .map_err(|e| format!("Decryption error: {:?}", e))?
+        return decrypt_aes256_cbc_pcks7(&encrypted_data, &passphrase.try_into().unwrap(), &iv);
             
     } else {
         return Err("Invalid passphrase lenght".into())
     };
-   
-    Ok(decrypted.to_vec())
 }
 
 pub fn is_valid_ouith(data: &[u8]) -> bool{

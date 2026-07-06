@@ -76,7 +76,7 @@ pub fn extract_fdat(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
         file.seek(SeekFrom::Start(fdat_offset))?;
         let common_aes_key = app_ctx.keys.get_key_as_arr::<16>("FDAT_COMMON_AES_KEY", 0)?;
         let first_block_encrypted = common::read_exact(&mut file, 1024 /* aes block size is 1024 */)?;
-        let mut cmn_decrypted = decrypt_aes128_ecb(&common_aes_key, &first_block_encrypted)?;
+        let mut cmn_decrypted = decrypt_aes128_ecb(&first_block_encrypted, &common_aes_key)?;
         let expected_checksum = u16::from_le_bytes([cmn_decrypted[0], cmn_decrypted[1]]);
    
         if expected_checksum == calc_sum(&cmn_decrypted[2..]) {
@@ -87,7 +87,7 @@ pub fn extract_fdat(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
         } else {
             //3rd gen (2 passes of aes128ecb, but first 512 bytes of 1st block use only the first pass' key)
             let cxd90014_aes_key = app_ctx.keys.get_key_as_arr::<16>("FDAT_CXD90014_AES_KEY", 0)?;
-            let decrypted_2nd_part = decrypt_aes128_ecb(&cxd90014_aes_key, &cmn_decrypted[512..])?;
+            let decrypted_2nd_part = decrypt_aes128_ecb(&cmn_decrypted[512..], &cxd90014_aes_key)?;
             cmn_decrypted[512..].copy_from_slice(&decrypted_2nd_part);
             if expected_checksum == calc_sum(&cmn_decrypted[2..]) {
                 println!("- 3rd gen firmware (CXD90014) detected!");
@@ -135,10 +135,10 @@ pub fn extract_fdat(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<
         let encrypted_block = common::read_exact(&mut file, block_size)?;
         let decrypted_block = match &mut encryption_mode {
             EncryptionMode::Sha(crypter) => crypter.decrypt_block(&encrypted_block),
-            EncryptionMode::AesEcb(key) => decrypt_aes128_ecb(&key, &encrypted_block)?,
+            EncryptionMode::AesEcb(key) => decrypt_aes128_ecb(&encrypted_block, &key)?,
             EncryptionMode::DoubleAesEcb((key1, key2)) => {
-                let decrypted1 = decrypt_aes128_ecb(&key1, &encrypted_block)?;
-                decrypt_aes128_ecb(&key2, &decrypted1)?
+                let decrypted1 = decrypt_aes128_ecb(&encrypted_block,&key1)?;
+                decrypt_aes128_ecb(&decrypted1, &key2)?
             },
             EncryptionMode::AesCbc((key, iv)) => {
                 let decrypted = decrypt_aes256_cbc_nopad(&encrypted_block, &key, &iv)?;

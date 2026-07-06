@@ -9,6 +9,7 @@ use binrw::BinReaderExt;
 use rsa::{RsaPublicKey, BigUint};
 
 use crate::utils::common;
+use crate::utils::aes::decrypt_aes256_ecb;
 use include::*;
 
 pub fn is_pfl_upg_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
@@ -60,7 +61,7 @@ pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), B
             let dec_sig = dec_int.to_bytes_le();
 
             let aes_key = &dec_sig[20..52];
-            let dec_ciphertext = decrypt_aes256_ecb(aes_key.try_into().unwrap(), &ciphertext)?;
+            let dec_ciphertext = decrypt_aes256_ecb(&ciphertext, aes_key.try_into().unwrap())?;
         
             //needs to start with null-termninated filename string
             let end = match dec_ciphertext.iter().position(|&b| b == 0) {
@@ -86,7 +87,7 @@ pub fn extract_pfl_upg(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), B
         let encrypted_data = common::read_exact(&mut file, (header.data_size as usize + 0xf) & !0xf)?;
 
         println!("Decrypting data...");
-        data = decrypt_aes256_ecb(aes_key, &encrypted_data)?;
+        data = decrypt_aes256_ecb(&encrypted_data, &aes_key)?;
         data.truncate(header.data_size as usize);   //discard padding 
         
     } else {
