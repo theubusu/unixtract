@@ -276,5 +276,11 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 **Options:**   
 ※ Support `dump_dec_hdrs` option
 
+## UTV (Qterics)
+**Used in:** Vizio (and possibly other?) TV's  
+**Notes:** **Depends on keys** - see keys.ukf  
+**Options:**   
+※ Support `dump_dec_hdrs` option (dump decoded claims)
+
 # License
 Licensed under GNU GPL v3.  

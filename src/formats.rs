@@ -40,6 +40,7 @@ pub mod novatek_bin;
 pub mod fdat;
 pub mod msfirm;
 pub mod nw_wm_upg;
+pub mod utv_qterics;
 
 pub mod pup;
 
@@ -291,6 +292,11 @@ pub fn get_registry() -> Vec<Format> {
             name: "nw_wm_upg",
             detector_func: crate::formats::nw_wm_upg::is_nw_wm_upg_file,
             extractor_func: crate::formats::nw_wm_upg::extract_nw_wm_upg,
+        },
+        Format {
+            name: "utv_qterics",
+            detector_func: crate::formats::utv_qterics::is_utv_qterics_file,
+            extractor_func: crate::formats::utv_qterics::extract_utv_qterics,
         },
     ]
 }
