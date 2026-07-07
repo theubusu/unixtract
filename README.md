@@ -174,6 +174,13 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 **Used in:** Newer Novatek-based TVs (Philips(TPVision), Hisense, TCL...)  
 **Notes:** None, all files should be supported.   
 
+## Novatek TIMG PKG
+**Used in:** User UPG for newer Novatek-based TVs (Philips(TPVision), Hisense, Vizio...)  
+**Common names:** `autorun.upg`, `update.img`   
+**Notes:** Some firmwares are encrypted using the V2 key. It is not possible to detect whether it is used, so if the output looks incorrect with default key, the use of v2 key needs to be specified using option `nvt_timg_pkg:use_v2_key`    
+**Options:**   
+`nvt_timg_pkg:use_v2_key` - Use the V2 key.   
+
 ## Sony Walkman NW_WM UPG  
 **Used in:** Sony Walkman digital media players     
 **Common names:** `NW_WM_FW.UPG`   

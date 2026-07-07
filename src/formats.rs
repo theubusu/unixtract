@@ -11,6 +11,7 @@ pub mod mstar;
 pub mod mstar_secure_old;
 pub mod samsung_old;
 pub mod nvt_timg;
+pub mod nvt_timg_pkg;
 pub mod pfl_upg;
 pub mod sddl_sec;
 pub mod novatek;
@@ -75,6 +76,11 @@ pub fn get_registry() -> Vec<Format> {
             name: "nvt_timg",
             detector_func: crate::formats::nvt_timg::is_nvt_timg_file,
             extractor_func: crate::formats::nvt_timg::extract_nvt_timg,
+        },
+        Format {
+            name: "nvt_timg_pkg",
+            detector_func: crate::formats::nvt_timg_pkg::is_nvt_timg_pkg_file,
+            extractor_func: crate::formats::nvt_timg_pkg::extract_nvt_timg_pkg,
         },
         Format {
             name: "pfl_upg",

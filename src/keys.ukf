@@ -105,6 +105,11 @@ collection "MTK_PKG_CUSTOM_KEYS": { # (key, iv)
     "Philips Android":		{x"07A30C2E4AAE4849EC3DD2301C381868", x"BC1443A0D17AAB2DB1EA0302EF280717"},  #worked on TPM171E(2017), TPM191E(2019), TPM211E(2021)
 }
 
+# nvt timg pkg keys
+key "NVT_FW40_IMG_ENC_KEY": 	{x"3a7b5b9732bc4465b0dd519e5dced6d9"}
+key "NVT_FW40_IMG_ENC_V2_KEY":  {x"a3f2a16e5fd0a31faf7cf16ca77776969623d04b62a2215fb39291a7a6fd6af7"}
+key "NVT_FW40_IMG_ENC_IV": 		{x"adafa699cff163cc86fb9317a45fd164"}
+
 # sony walkman NW_WM_UPG 
 # https://github.com/roobscoob/SonyWalkmanFirmwarePatcher
 key "NW_WM_UPG_DES_PASSKEY": {x"6564323935303736"}

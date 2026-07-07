@@ -8,7 +8,7 @@ use std::fs::{self, OpenOptions};
 use binrw::BinReaderExt;
 
 use crate::utils::common;
-use crate::utils::compression::{decompress_gzip};
+use crate::utils::compression::{decompress_gzip, decompress_xz};
 use crate::utils::sparse::{unsparse_to_file};
 use include::*;
 
@@ -79,6 +79,10 @@ pub fn extract_nvt_timg(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), B
         if pimg.comp_type() == "gzip" && data.starts_with(b"\x1F\x8B") { //additionally check for gzip header, because sometimes its deceptive
             println!("- Decompressing gzip...");
             out_data = decompress_gzip(&data)?;
+
+        } else if pimg.comp_type() == "xz" {
+            println!("- Decompressing xz...");
+            out_data = decompress_xz(&data)?;
 
         } else if pimg.comp_type() == "none" || pimg.comp_type() == "" {
             out_data = data;
