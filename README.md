@@ -170,6 +170,11 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 **Common names:** `kylo_usb_update.bin`   
 **Notes:** None, all files should be supported.
 
+## Novatek "FWVR"
+**Used in:** Some Novatek-based TVs (Philips).  
+**Common names:** `autorun.upg`   
+**Notes:** None, all files should be supported. An `nvt_timg_pkg` is embedded inside.
+
 ## Novatek TIMG
 **Used in:** Newer Novatek-based TVs (Philips(TPVision), Hisense, TCL...)  
 **Notes:** None, all files should be supported.   

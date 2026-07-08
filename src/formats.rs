@@ -12,6 +12,7 @@ pub mod mstar_secure_old;
 pub mod samsung_old;
 pub mod nvt_timg;
 pub mod nvt_timg_pkg;
+pub mod nvt_fwvr;
 pub mod pfl_upg;
 pub mod sddl_sec;
 pub mod novatek;
@@ -297,6 +298,11 @@ pub fn get_registry() -> Vec<Format> {
             name: "utv_qterics",
             detector_func: crate::formats::utv_qterics::is_utv_qterics_file,
             extractor_func: crate::formats::utv_qterics::extract_utv_qterics,
+        },
+        Format {
+            name: "nvt_fwvr",
+            detector_func: crate::formats::nvt_fwvr::is_nvt_fwvr_file,
+            extractor_func: crate::formats::nvt_fwvr::extract_nvt_fwvr,
         },
     ]
 }
