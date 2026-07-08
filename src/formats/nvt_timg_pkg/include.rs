@@ -1,6 +1,12 @@
 use crate::utils::common;
 use binrw::BinRead;
 
+#[derive(PartialEq, Eq, Debug)]
+pub enum PkgFormatVer {
+    PkgVer30,
+    PkgVer40
+}
+
 #[derive(Debug, BinRead)]
 pub struct TIMGHeader {
     _sign: [u8; 4],             //TIMG
