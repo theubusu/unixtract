@@ -20,7 +20,7 @@ pub fn is_bem_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn
 
     let header_magic = common::read_file(&file, 0, 6)?;
     if header_magic.starts_with(b"BEMU") {
-        if header_magic == b"BEMU20" {
+        if header_magic == b"BEMU20" || header_magic == b"BEMU21" {
             Ok(Some(Box::new(BemCtx {format_version: BemFormatVersion::Bem20})))
         } else if header_magic == b"BEMU10" {
             Ok(Some(Box::new(BemCtx {format_version: BemFormatVersion::Bem10})))
