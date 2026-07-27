@@ -1,5 +1,10 @@
 # unixtract key file
 
+#epsonpj key
+key "EPSONPJ": {
+	x"3437303530300000", x"3732313434370000"
+}
+
 # sony fdat keys
 # https://github.com/ma1co/fwtool.py
 key "FDAT_COMMON_AES_KEY"  : {x"E3B0C44298FC1C149AFBF4C8996FB924"}

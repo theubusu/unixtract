@@ -65,6 +65,10 @@ Options:
 **Options:**   
 ※ Support `dump_dec_hdrs` option
 
+## EpsonPJ
+**Used in:** Epson Projectors  
+**Notes:** None, all files should be supported
+
 ## FDAT  
 **Used in:** Sony Digital cameras and camcorders  
 **Notes:** Supports: CXD4105/MB8AC102, CXD4115, CXD4120, CXD4132, CXD90014, CXD90045  
