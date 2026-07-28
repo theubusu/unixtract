@@ -158,6 +158,11 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 **Options:**       
 ※ Support `dump_dec_hdrs` option
 
+## NCFW
+**Used in:** Canon Printers  
+**Notes:** None  
+**Thanks to:** https://github.com/synacktiv/canon-mf644/   
+
 ## MediaTek PKG
 **Used in:** MediaTek-based TVs (Sony, Philips, Panasonic, Sharp...)  
 **Notes:** All files should be supported, decryption + decompression, however some Philips files use custom keys - most are included some could be missing  

@@ -43,6 +43,7 @@ pub mod msfirm;
 pub mod nw_wm_upg;
 pub mod utv_qterics;
 pub mod epson_pj;
+pub mod ncfw;
 
 pub mod pup;
 
@@ -309,6 +310,11 @@ pub fn get_registry() -> Vec<Format> {
             name: "epson_pj",
             detector_func: crate::formats::epson_pj::is_epson_pj_file,
             extractor_func: crate::formats::epson_pj::extract_epson_pj,
+        },
+        Format {
+            name: "ncfw",
+            detector_func: crate::formats::ncfw::is_ncfw_file,
+            extractor_func: crate::formats::ncfw::extract_ncfw,
         },
     ]
 }
