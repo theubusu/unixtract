@@ -86,6 +86,8 @@ collection "MSD11": {
     "PontusM 2023":	{x"e67b632b431e5ea32c36ea2f0d705db38e0816a3ea54642cc7cc5c9701395173"}, #T-PTMC* - 2023
     "PontusM 2024":	{x"b8e0869e1be4b2dfe4f96f73734cd67ce6df80cc3df5052f3e0bb2112b55ee87"}, #T-PTMD* - 2024
     "PontusM 2025":	{x"3b912671e8af15aaef5a6cb2a3d97cdef2e777707c0067e7a593a968f0de570d"}, #T-PTMF* - 2025
+	"RoseM 2025":	{x"84275d43789d291a532f5d13027483ac8aa65e5c568228c75843ce1a4283703d"}, #T-RSMF* - 2025
+	"PontusM 2026": {x"7e04c3ac1804bcb6722b9d6c0565b6d561c17c5fb21145bbe69c746fa1ea700e"}, #T-PTMH* - 2026
 }
 
 # mstar

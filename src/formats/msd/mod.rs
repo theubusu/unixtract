@@ -66,5 +66,6 @@ pub fn decrypt_aes_tizen(encrypted_data: &[u8], passphrase: &[u8], salt: &[u8]) 
 
 pub fn is_valid_ouith(data: &[u8]) -> bool{
     return &data[256..306] == b"Tizen Software Upgrade Tree Binary Format ver. 1.8" || 
-           &data[262..312] == b"Tizen Software Upgrade Tree Binary Format ver. 1.9" 
+           &data[262..312] == b"Tizen Software Upgrade Tree Binary Format ver. 1.9" ||
+           &data[518..568] == b"Tizen Software Upgrade Tree Binary Format ver. 1.9"       //new signature ver
 }
