@@ -98,7 +98,11 @@ pub fn extract_mstar(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
                     }
                 }
                 if lines[j].starts_with("sparse_write"){
-                    compression = CompressionType::Sparse; //its not really compression but anyway
+                    if compression == CompressionType::Lz4 {
+                        compression = CompressionType::Lz4Sparse;
+                    } else {
+                        compression = CompressionType::Sparse;
+                    }
                     let parts: Vec<&str> = lines[j].split_whitespace().collect();
                     // get part name from sparse_write
                     if partname == "unknown" {
@@ -158,6 +162,25 @@ pub fn extract_mstar(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box
                 println!("-- Saved file!");
                 i += 1;
                 continue
+            } else if compression == CompressionType::Lz4Sparse {
+                println!("- Decompressing LZ4, expected size: {}...", lz4_expect_size);
+
+                let sparse_data =
+                    decompress_lz4(&data, lz4_expect_size.try_into().unwrap())?;
+
+                println!("- Unsparsing LZ4 output...");
+
+                match unsparse_to_file(&sparse_data, output_path) {
+                    Ok(_) => {
+                        println!("-- Saved file!");
+                    },
+                    Err(e) => {
+                        println!("-- Warning: sparse extraction failed - {}", e);
+                    }
+                }
+
+                i += 1;
+                continue;
             } else if compression == CompressionType::Sparse {
                 println!("- Unsparsing...");
                 // some mstar images use a weird/modified sparse format, handle failure here until its properly implemented

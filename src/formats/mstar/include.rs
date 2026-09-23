@@ -5,6 +5,7 @@ pub enum CompressionType {
     Lzma,
     DoubleLzma,
     Lz4,
+    Lz4Sparse,
     Lzo,
     Sparse,
 }

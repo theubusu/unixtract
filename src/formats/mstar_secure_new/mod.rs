@@ -44,7 +44,13 @@ pub fn extract_mstar_secure_new(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Res
     for (name, keys) in app_ctx.keys.get_collection("MSTAR_SECURE")? {
         let ckey: [u8; 32] = keys.first().unwrap().as_slice().try_into().unwrap();
         let dec = decrypt_aes256_cbc_nopad(&start_enc, &ckey, &[0u8;16])?;
-        if dec.is_ascii() { //script
+
+        let looks_like_script = dec.iter()
+            .position(|&c| c == b'\n')
+            .map(|p| dec[p + 1..].is_ascii())
+            .unwrap_or(false);
+
+        if dec.is_ascii() || looks_like_script {
             println!("\nUsing key: {}", name);
             key = Some(ckey);
             break;
