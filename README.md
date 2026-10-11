@@ -291,6 +291,10 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 **Notes:** **Depends on keys** - see keys.ukf (Platforms up to MSB29 are supported)  
 **Thanks to:** http://malcolmstagg.com/bdp/s390-firmware.html  
 
+## SPF1
+**Used in:** Older Sony TVs MemoryStick update   
+**Notes:** None, all files should be supported. 
+
 ## TSB Bin
 **Used in:** Older Toshiba TVs  
 **Common names:** `bootimg.prg`, `eutvXXXX.prg`   

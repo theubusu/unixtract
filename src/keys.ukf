@@ -304,6 +304,11 @@ collection "SONY_BDP_AES": { # new enc AES keys (key, iv)
     "MSB24-29": {x"0D8B87A8CE27702197155B8AC057E13A", x"C280F2F534B1E53421D31AC4BE56CA43"},
 }
 
+#SPF1 key
+key "SPF1": {
+    x"8568cdc008906e08bb0023852aa50fe4a8ed4ba9903b4255ea676117b46e18a6"
+}
+
 # UTV keys
 collection "UTV": { # N of private key from keystore
 	#vizio MG3118

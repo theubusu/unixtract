@@ -46,6 +46,7 @@ pub mod utv_qterics;
 pub mod epson_pj;
 pub mod ncfw;
 pub mod utv;
+pub mod spf1;
 
 pub mod pup;
 pub mod dwcp;
@@ -333,6 +334,11 @@ pub fn get_registry() -> Vec<Format> {
             name: "dwcp",
             detector_func: crate::formats::dwcp::is_dwcp_file,
             extractor_func: crate::formats::dwcp::extract_dwcp,
+        },
+        Format {
+            name: "spf1",
+            detector_func: crate::formats::spf1::is_spf1_file,
+            extractor_func: crate::formats::spf1::extract_spf1,
         },
     ]
 }
