@@ -315,5 +315,11 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 **Options:**   
 ※ Support `dump_dec_hdrs` option (dump decoded claims)
 
+## Zoran ZImage
+**Used in:** Some TVs based on Zoran SoC (Sharp, Toshiba ...)  
+**Notes:** Decryption is not supported,  
+**Options:**   
+`zimage:remove_oob` - Remove OOB/Spare data from produced images   
+
 # License
 Licensed under GNU GPL v3.  
