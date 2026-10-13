@@ -48,6 +48,7 @@ pub mod ncfw;
 pub mod utv;
 pub mod spf1;
 pub mod zimage;
+pub mod redsonic;
 
 pub mod pup;
 pub mod dwcp;
@@ -345,6 +346,11 @@ pub fn get_registry() -> Vec<Format> {
             name: "zimage",
             detector_func: crate::formats::zimage::is_zimage_file,
             extractor_func: crate::formats::zimage::extract_zimage,
+        },
+        Format {
+            name: "redsonic",
+            detector_func: crate::formats::redsonic::is_redsonic_file,
+            extractor_func: crate::formats::redsonic::extract_redsonic,
         },
     ]
 }

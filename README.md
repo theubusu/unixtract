@@ -243,6 +243,9 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 **Notes:** File has to be decrypted.  
 **Thanks to:** https://github.com/Zer0xFF/ps4-pup-unpacker
 
+## REDSONIC
+**Used in:** Found in LG DP1 media player, although could also be used in other devices with software developed by Alpha Networks(?)
+
 ## Roku
 **Used in:** Roku TV's/players  
 **Common names:** `update.roku`   
