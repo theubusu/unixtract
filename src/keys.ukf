@@ -92,9 +92,8 @@ collection "MSD11": {
     "PontusM 2024":	{x"b8e0869e1be4b2dfe4f96f73734cd67ce6df80cc3df5052f3e0bb2112b55ee87"}, #T-PTMD* - 2024
     "PontusM 2025":	{x"3b912671e8af15aaef5a6cb2a3d97cdef2e777707c0067e7a593a968f0de570d"}, #T-PTMF* - 2025
 	"RoseM 2025":	{x"84275d43789d291a532f5d13027483ac8aa65e5c568228c75843ce1a4283703d"}, #T-RSMF* - 2025
+	"NikeL 2025": 	{x"67d4b1e393c22116e5c9da1ecb060cb73f68741e81c9e6cce3b3ea29148ce1e1"}, #T-NKL*****-0090 - 2025 (OSU)
 	"PontusM 2026": {x"7e04c3ac1804bcb6722b9d6c0565b6d561c17c5fb21145bbe69c746fa1ea700e"}, #T-PTMH* - 2026
-    "NikeL 2025": {x"67d4b1e393c22116e5c9da1ecb060cb73f68741e81c9e6cce3b3ea29148ce1e1"}, #T-NKL* - 2025 production (e.g. T-NKLDAKUC-0090)
-    "NikeL 2025 SubModel": {x"2bb7c2e8077bef456a261cb0b243f53ffe5ba376f68be93f7d0b39e89071c2cb"}, #T-NKL* sub-model images
 }
 
 # mstar
