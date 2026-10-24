@@ -1,5 +1,6 @@
 mod include;
 mod crypto;
+mod newer;
 use std::any::Any;
 use crate::AppContext;
 use crate::utils::global::opt_dump_dec_hdr;
@@ -15,10 +16,15 @@ use crypto::*;
 
 struct OnkyoCtx {
     header_size: u32,
+    newer: Option<newer::Context>,
 }
 
 pub fn is_onkyo_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
+
+    if let Some(ctx) = newer::detect(app_ctx)? {
+        return Ok(Some(Box::new(OnkyoCtx {header_size: 0, newer: Some(ctx)})));
+    }
 
     let enc_inihdr = common::read_file(&file, 0, 20)?;
     let hdr_key = app_ctx.keys.get_key_as_arr::<8>("ONKYO_HEADER_KEY", 0)?;
@@ -26,7 +32,7 @@ pub fn is_onkyo_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<d
 
     if dec_inihdr.starts_with(ONKYO_MAGIC) {
         let header_size = u32::from_le_bytes(dec_inihdr[16..20].try_into().unwrap());
-        Ok(Some(Box::new(OnkyoCtx {header_size})))
+        Ok(Some(Box::new(OnkyoCtx {header_size, newer: None})))
     } else {
         Ok(None)
     }
@@ -35,6 +41,8 @@ pub fn is_onkyo_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<d
 pub fn extract_onkyo(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
     let ctx = ctx.downcast::<OnkyoCtx>().expect("Missing context");
+
+    if let Some(newer) = ctx.newer { return newer::extract(app_ctx, newer); }
 
     println!("Header size: {}", ctx.header_size);
 
