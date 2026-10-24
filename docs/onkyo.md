@@ -37,6 +37,34 @@ are checksum-validated and saved unchanged, with an explicit message; this
 includes the outer non-network components in the tested package. Their output
 is not claimed to be decrypted.
 
+## Reproduce the tested key profile
+
+Onkyo's [TX-NR676 support page][support] links the official April 2024 archive
+used for validation. Its SHA-256 is
+`1bebc6381cf147b67fbb05be86201ac8a40513b65e5893e9eeaa590d29fef44e`.
+The archive contains both a legacy `.of4` package and the newer `_N.of*`
+packages. The legacy package contains the V850 host component that constructs
+the updater's key message, so no receiver access is required.
+
+```sh
+curl -LO 'https://assets.onkyo-av.com/product-firmware/ONKAVR0025_E70000EAEAEOEO_N_121.zip?v=1712279175'
+unzip ONKAVR0025_E70000EAEAEOEO_N_121.zip
+cargo run --release -- ONKAVR0025_E70000EAEAEOEO.of4 legacy-of4
+python3 tools/derive_onkyo_new_keys.py legacy-of4/1_EO107.bin \
+  --output onkyo-new-keys.ukf
+cargo run --release -- -k onkyo-new-keys.ukf \
+  ONKAVR0025_E70000EAEAEOEO_N.of2 newer-of2
+```
+
+The script checks the extracted EO107 component against SHA-256
+`a095f1b5aa83803ff42451260c8e8f11a898bc3aa4431c8861f794e3c24b594b`
+before using its verified code offsets. It reconstructs function-parameter
+selector `0x1a` from the V850 stores and writes the first 56 body bytes as the
+32-byte seed, 8-byte network key, and 16-byte identifier expected by
+`ONKYO_NEW_KEYS`. It uses only the Python standard library.
+
+[support]: https://onkyo.com/intl/tx-nr676
+
 ## Format and validation
 
 The AES key is SHA-256 of eight selected seed bytes; the IV selects sixteen seed
