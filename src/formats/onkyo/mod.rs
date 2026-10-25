@@ -67,6 +67,7 @@ pub fn extract_onkyo(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<
 
     let hdr_key = app_ctx.keys.get_key_as_arr::<8>("ONKYO_HEADER_KEY", 0)?;
     let network_key: [u8; 8] = app_ctx.keys.get_key_as_arr::<8>("ONKYO_NEW_NETWORK_KEY", 0)?;
+    let new_data_key: [u8; 8] = app_ctx.keys.get_key_as_arr::<8>("ONKYO_NEW_DATA_KEY", 0)?;
 
     //need to read entire file and optionally aes decrypt it
     let mut file_data: Vec<u8> = Vec::new();
@@ -139,40 +140,46 @@ pub fn extract_onkyo(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<
         let mut is_new = false;
         let mut is_pack = false;
 
-        //try new network key
-        let dec_new = crypt_new(&data[..32], &network_key);
-        if dec_new.starts_with(NEW_MAGIC_ID){ 
-            is_new = true;
+        //try new network and component data keys
+        for new_key in [network_key, new_data_key] {
+            let dec_new = crypt_new(&data[..32], &new_key);
+            if dec_new.starts_with(NEW_MAGIC_ID){
+                is_new = true;
 
-            //naive pack detection for new
-            let header_size = u32::from_le_bytes(dec_new[16..20].try_into().unwrap());
-            if header_size < data.len() as u32 && header_size < 4096 && header_size > 32 {
-                let dec_hdr = crypt_new(&data[..header_size as usize], &network_key);
-                let calc = checksum(&dec_hdr[24..]);
-                let exp = u32::from_le_bytes(dec_hdr[20..24].try_into().unwrap());
-                println!("calc={}, exp={}", calc, exp);
+                //naive pack detection for new
+                let header_size = u32::from_le_bytes(dec_new[16..20].try_into().unwrap());
+                if header_size < data.len() as u32 && header_size < 4096 && header_size > 32 {
+                    let dec_hdr = crypt_new(&data[..header_size as usize], &new_key);
+                    let calc = checksum(&dec_hdr[24..]);
+                    let exp = u32::from_le_bytes(dec_hdr[20..24].try_into().unwrap());
+                    println!("calc={}, exp={}", calc, exp);
 
-                is_pack = (calc==exp) as bool ;
-            } else {
-                dec_key = Some(network_key);
+                    is_pack = (calc==exp) as bool ;
+                }
+                if !is_pack {
+                    dec_key = Some(new_key);
+                }
+                break;
             }
         }
 
-        //try using standard data key
-        let data_key = app_ctx.keys.get_key_as_arr::<8>("ONKYO_DATA_KEY", 0)?;
-        if ub_encrypte_block(&data[..16], &data_key).starts_with(ONKYO_MAGIC) {
-            dec_key = Some(data_key);
+        if dec_key.is_none() && !is_pack {
+            //try using standard data key
+            let data_key = app_ctx.keys.get_key_as_arr::<8>("ONKYO_DATA_KEY", 0)?;
+            if ub_encrypte_block(&data[..16], &data_key).starts_with(ONKYO_MAGIC) {
+                dec_key = Some(data_key);
 
-        //try header key, if success it means this is a package inside a package, and it should not be decrypted
-        } else if ub_encrypte_block(&data[..16], &hdr_key).starts_with(ONKYO_MAGIC) { 
-            is_pack = true;
+            //try header key, if success it means this is a package inside a package, and it should not be decrypted
+            } else if ub_encrypte_block(&data[..16], &hdr_key).starts_with(ONKYO_MAGIC) {
+                is_pack = true;
 
-        //if not matched with data key, try to calc key
-        } else {
-            let calced_key = calc_key(&data[..8]); 
+            //if not matched with data key, try to calc key
+            } else {
+                let calced_key = calc_key(&data[..8]);
 
-            if ub_encrypte_block(&data[..16], &calced_key).starts_with(ONKYO_MAGIC) {  
-                dec_key = Some(calced_key);
+                if ub_encrypte_block(&data[..16], &calced_key).starts_with(ONKYO_MAGIC) {
+                    dec_key = Some(calced_key);
+                }
             }
         }
 
