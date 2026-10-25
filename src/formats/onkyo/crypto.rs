@@ -51,3 +51,46 @@ pub fn calc_key(ciphertext: &[u8]) -> [u8; 8] {
 
     key
 }
+
+//newer scheme
+pub fn crypt_new(data: &[u8], key: &[u8; 8]) -> Vec<u8> {
+    let [a, b, c, d, e, f, g, h] = key.map(u32::from);
+    let table = [
+        ((g << 1) & 255) + (a >> 3),
+        (e << 2) + g,
+        (c << 3) + (d >> 1),
+        ((b << 4) & 255) + (c >> 2),
+        a + (h >> 3),
+        ((d << 1) & 255) + (f >> 4),
+        (f << 2) + e,
+        (h << 3) + (b >> 1),
+        (c << 4) + (e >> 2),
+        e + (d >> 3),
+        (a << 1) + (h >> 4),
+        a + (d << 2),
+        ((f << 3) & 255) + (c >> 1),
+        ((b << 4) & 255) + (b >> 2),
+        h + (g >> 3),
+        ((g << 1) & 255) + f,
+    ]
+    .map(|v| v as u8);
+    let mut state = ((a << 4)
+        + (b << 3)
+        + (c << 2)
+        + ((d << 1) & 255)
+        + (e << 4)
+        + ((f << 3) & 255)
+        + (g << 2)
+        + h) as u8;
+    data.iter()
+        .enumerate()
+        .map(|(i, &byte)| {
+            let decoded = byte ^ state;
+            state = table[i % 16]
+                .wrapping_add(table[((i % 208 + 1) * 13) % 16])
+                .wrapping_add(((i + 1) >> 6) as u8)
+                .wrapping_add(state.rotate_right(1));
+            decoded
+        })
+        .collect()
+}

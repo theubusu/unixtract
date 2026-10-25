@@ -1,13 +1,13 @@
 mod include;
 mod crypto;
-mod newer;
 use std::any::Any;
-use crate::AppContext;
+use crate::{AppContext, InputTarget};
+use crate::utils::aes::decrypt_aes256_cbc_nopad;
 use crate::utils::global::opt_dump_dec_hdr;
 
 use std::path::Path;
-use std::fs::{self, OpenOptions};
-use std::io::{Cursor, Seek, SeekFrom, Write};
+use std::fs::{self, File, OpenOptions};
+use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use binrw::BinReaderExt;
 
 use crate::utils::common;
@@ -16,39 +16,75 @@ use crypto::*;
 
 struct OnkyoCtx {
     header_size: u32,
-    newer: Option<newer::Context>,
+    encryption: EncryptionMode,
 }
 
 pub fn is_onkyo_file(app_ctx: &AppContext) -> Result<Option<Box<dyn Any>>, Box<dyn std::error::Error>> {
     let file = match app_ctx.file() {Some(f) => f, None => return Ok(None)};
 
-    if let Some(ctx) = newer::detect(app_ctx)? {
-        return Ok(Some(Box::new(OnkyoCtx {header_size: 0, newer: Some(ctx)})));
-    }
-
-    let enc_inihdr = common::read_file(&file, 0, 20)?;
+    let enc_inihdr = common::read_file(&file, 0, 32)?;
     let hdr_key = app_ctx.keys.get_key_as_arr::<8>("ONKYO_HEADER_KEY", 0)?;
-    let dec_inihdr= ub_encrypte_block(&enc_inihdr, &hdr_key);
+    let mut dec_inihdr= ub_encrypte_block(&enc_inihdr, &hdr_key);
 
     if dec_inihdr.starts_with(ONKYO_MAGIC) {
         let header_size = u32::from_le_bytes(dec_inihdr[16..20].try_into().unwrap());
-        Ok(Some(Box::new(OnkyoCtx {header_size, newer: None})))
-    } else {
-        Ok(None)
+        return Ok(Some(Box::new(OnkyoCtx {header_size, encryption: EncryptionMode::Old})));
     }
+
+    //new enc
+    let network: [u8; 8] = app_ctx.keys.get_key_as_arr::<8>("ONKYO_NEW_NETWORK_KEY", 0)?;
+    dec_inihdr = crypt_new(&enc_inihdr, &network);
+    if dec_inihdr.starts_with(&NEW_MAGIC_ID) {
+        let header_size = u32::from_le_bytes(dec_inihdr[16..20].try_into().unwrap());
+        return Ok(Some(Box::new(OnkyoCtx {header_size, encryption: EncryptionMode::New})));
+    }
+
+    //new enc + AES wrap
+    for (_name, keys) in app_ctx.keys.get_collection("ONKYO_NEW_KEYS")? {
+        let seed: [u8; 32] = keys.first().unwrap().as_slice().try_into().unwrap();       
+        let (key, iv) = derive_aes_key(&seed);
+
+        //decrypt AES with keys from seed
+        dec_inihdr = decrypt_aes256_cbc_nopad(&enc_inihdr, &key, &iv)?;
+        
+        //decrypt custom with Network key
+        dec_inihdr = crypt_new(&dec_inihdr, &network);
+
+        if dec_inihdr.starts_with(&NEW_MAGIC_ID) {
+            let header_size = u32::from_le_bytes(dec_inihdr[16..20].try_into().unwrap());
+            return Ok(Some(Box::new(OnkyoCtx {header_size, encryption: EncryptionMode::NewAES((key, iv))})));
+        }
+    }
+
+    Ok(None)
 }
 
 pub fn extract_onkyo(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = app_ctx.file().ok_or("Extractor expected file")?;
     let ctx = ctx.downcast::<OnkyoCtx>().expect("Missing context");
 
-    if let Some(newer) = ctx.newer { return newer::extract(app_ctx, newer); }
-
     println!("Header size: {}", ctx.header_size);
 
-    let enc_hdr = common::read_exact(&mut file, ctx.header_size as usize)?;
     let hdr_key = app_ctx.keys.get_key_as_arr::<8>("ONKYO_HEADER_KEY", 0)?;
-    let dec_hdr = ub_encrypte_block(&enc_hdr, &hdr_key);
+    let network_key: [u8; 8] = app_ctx.keys.get_key_as_arr::<8>("ONKYO_NEW_NETWORK_KEY", 0)?;
+
+    //need to read entire file and optionally aes decrypt it
+    let mut file_data: Vec<u8> = Vec::new();
+    file.read_to_end(&mut file_data)?;
+
+    if let EncryptionMode::NewAES((key, iv)) = &ctx.encryption {
+        println!("- Decrypting file...");
+        file_data = decrypt_aes256_cbc_nopad(&file_data, key, iv)?;
+    }
+    let mut data_rdr = Cursor::new(file_data);
+
+    let enc_hdr = common::read_exact(&mut data_rdr, ctx.header_size as usize)?;
+    let dec_hdr = match ctx.encryption {
+        EncryptionMode::Old => ub_encrypte_block(&enc_hdr, &hdr_key),
+        EncryptionMode::New => crypt_new(&enc_hdr, &network_key),
+        EncryptionMode::NewAES((_, _)) => crypt_new(&enc_hdr, &network_key),
+    };
+
     opt_dump_dec_hdr(app_ctx, &dec_hdr, "header")?;
     let mut hdr_rdr = Cursor::new(dec_hdr);
 
@@ -93,12 +129,34 @@ pub fn extract_onkyo(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<
         println!("\n({}/{}) - {}, Size: {}, Offset: {}, Pack location: {}",
                 act_ei, info.entries_in_file, entry.id(), data_entry.size, data_entry.offset, entry.pack_location);
 
-        let data = common::read_file(&mut file, data_entry.offset as u64, data_entry.size as usize)?;
+        data_rdr.seek(SeekFrom::Start(data_entry.offset as u64))?;
+        let data = common::read_exact(&mut data_rdr, data_entry.size as usize)?;
+
         let mut out_data;
 
         // -- try to decrypt --
         let mut dec_key: Option<[u8; 8]> = None;
+        let mut is_new = false;
         let mut is_pack = false;
+
+        //try new network key
+        let dec_new = crypt_new(&data[..32], &network_key);
+        if dec_new.starts_with(NEW_MAGIC_ID){ 
+            is_new = true;
+
+            //naive pack detection for new
+            let header_size = u32::from_le_bytes(dec_new[16..20].try_into().unwrap());
+            if header_size < data.len() as u32 && header_size < 4096 && header_size > 32 {
+                let dec_hdr = crypt_new(&data[..header_size as usize], &network_key);
+                let calc = checksum(&dec_hdr[24..]);
+                let exp = u32::from_le_bytes(dec_hdr[20..24].try_into().unwrap());
+                println!("calc={}, exp={}", calc, exp);
+
+                is_pack = (calc==exp) as bool ;
+            } else {
+                dec_key = Some(network_key);
+            }
+        }
 
         //try using standard data key
         let data_key = app_ctx.keys.get_key_as_arr::<8>("ONKYO_DATA_KEY", 0)?;
@@ -120,11 +178,14 @@ pub fn extract_onkyo(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<
 
         if let Some(key) = dec_key {
             println!("- Detected encrypted data, decrypting...");
-            out_data = ub_encrypte_block(&data, &key);
+            out_data = if is_new {
+                crypt_new(&data, &key)
+            } else {
+                ub_encrypte_block(&data, &key)
+            };
             out_data.drain(0..16);      //remove ONKYO Encryption heading
 
         } else if is_pack {
-            println!("- Inner pack detected!");     //maybe handle this...
             out_data = data;
 
         } else {
@@ -134,10 +195,27 @@ pub fn extract_onkyo(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<
 
         let output_path = Path::new(&app_ctx.output_dir).join(format!("{}_{}.bin", act_ei, entry.id()));
         fs::create_dir_all(&app_ctx.output_dir)?;
-        let mut out_file = OpenOptions::new().write(true).create(true).open(output_path)?;        
+        let mut out_file = OpenOptions::new().write(true).create(true).open(&output_path)?;        
         out_file.write_all(&out_data)?;
 
         println!("-- Saved file!");
+
+        //extract an inner pack
+        if is_pack {
+            let r_out_file = File::open(&output_path)?;
+            let in_ctx: AppContext = AppContext { 
+                input: InputTarget::File(r_out_file), 
+                output_dir: app_ctx.output_dir.join(format!("_{}_{}.bin", act_ei, entry.id())), 
+                options: app_ctx.options,
+                keys: app_ctx.keys,
+            };
+
+            //do check and extarct
+            if let Some(result) = is_onkyo_file(&in_ctx)? {
+                println!("- Extracting inner pack...");
+                extract_onkyo(&in_ctx, result)?;
+            };
+        }
 
     }
 
