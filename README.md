@@ -211,7 +211,7 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 
 ## Onkyo
 **Used in:** Onkyo AVRs and other AV devices  
-**Notes:** Newer files seem to use a different encryption and are not (yet) supported.   
+**Notes:** Older packages are supported with the built-in keys. Newer `_N` version packages depend on keys - see keys.ukf.
 **Thanks to:** http://divideoverflow.com/2014/04/decrypting-onkyo-firmware-files/   
 **Options:**   
 ※ Support `dump_dec_hdrs` option
