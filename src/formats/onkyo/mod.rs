@@ -152,7 +152,7 @@ pub fn extract_onkyo(app_ctx: &AppContext, ctx: Box<dyn Any>) -> Result<(), Box<
                     let dec_hdr = crypt_new(&data[..header_size as usize], &new_key);
                     let calc = checksum(&dec_hdr[24..]);
                     let exp = u32::from_le_bytes(dec_hdr[20..24].try_into().unwrap());
-                    println!("calc={}, exp={}", calc, exp);
+                    //println!("calc={}, exp={}", calc, exp);
 
                     is_pack = (calc==exp) as bool ;
                 }

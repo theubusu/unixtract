@@ -45,7 +45,7 @@ pub fn extract_utv(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<d
     for (name, keys) in app_ctx.keys.get_collection("UTV")? {
         let dec = decrypt_key_header(&ini_keyhdr, keys.first().unwrap());
         if dec.ends_with(CLEAR_HEADER_SIGNATURE) {
-            println!("\nUsing key: {}\n", name);
+            println!("\nUsing key: {}", name);
             dec_keyheader = Some(dec);
             break
         }
@@ -78,12 +78,11 @@ pub fn extract_utv(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(), Box<d
     }
     comp_dir_rdr.seek(SeekFrom::Start(56 + comp_dir_hdr.string_table_size as u64))?;
 
-    // NOTE: THIS STRUCTURE IS NOT COMFIRMED DUE TO LACK OF A MATCHING FILE WITH MULTIPLE COMPONENTS
     for i in 0..comp_dir_hdr.component_count {
         let component: ComponentDescriptor = comp_dir_rdr.read_le()?;
         let component_name = common::string_from_bytes(&comp_dir[component.name_offset as usize..]);
 
-        println!("({}/{}) - {}, Version: {:x}, Size: {}, Module count: {}",
+        println!("\n({}/{}) - {}, Version: {:x}, Size: {}, Module count: {}",
                 i+1, comp_dir_hdr.component_count, component_name, component.module_version, component.size, component.module_count);
 
         let output_path = Path::new(&app_ctx.output_dir).join(component_name);

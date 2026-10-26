@@ -9,7 +9,7 @@ pub fn decrypt_key_header(ciphertext: &[u8], n_bytes: &[u8]) -> Vec<u8> {
 
     let m = c.modpow(&d, &n);
 
-    let key_size = n_bytes.len(); // RSA_size(rsa) — modulus byte length
+    let key_size = n_bytes.len();
     let mut out = m.to_bytes_be();
     if out.len() < key_size {
         let mut padded = vec![0u8; key_size - out.len()];
