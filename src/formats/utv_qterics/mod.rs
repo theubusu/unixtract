@@ -59,7 +59,7 @@ pub fn extract_utv_qterics(app_ctx: &AppContext, _ctx: Box<dyn Any>) -> Result<(
     //find private key that decrypts the encrypted key
     let mut dec_key: Option<Vec<u8>> = None;
     for (name, keys) in app_ctx.keys.get_collection("UTV_QTERICS")? {
-        let key_str= common::string_from_bytes(&general_purpose::STANDARD.decode(keys.first().unwrap())?);
+        let key_str= common::string_from_bytes(&keys.first().unwrap()).replace("\\n", "\n");
         let private_key = RsaPrivateKey::from_pkcs8_pem(&key_str)?;
         if let Ok(dec) = private_key.decrypt(Oaep::new::<Sha1>(), &enc_key) {
             if dec.len() == 44 {
