@@ -87,6 +87,7 @@ collection "MSD11": {
     "NikeM":		{x"dd18df36fdbbd957bcdf1a69aa5c06d6"}, #T-NKM*  - 2020
     "NikeL":		{x"5bab1098dab48792619ebd63650d929f"}, #T-NKL*  - 2020
     "KantSU2":		{x"ae2117f9ec83931998781a8bc068116d"}, #T-KTSU2* - 2020
+    "KantSU2 SubModel":	{x"55048dda09365939092dee3dbd6e777a"}, #T-KTSU2* - 2020 (sub-model)
     "NikeM2":		{x"1c7b83f91c03b7cb942e18a7ad90b0bfa7cafef83637129188c12931af145f46"}, #T-NKM2* - 2021
     "PontusM 2022":	{x"9fb9856acb02348553fce0250379568f1f41c5fd995c284f5836717f3ca04fac"}, #T-PTM*  - 2022
     "KantSU2E 2023":{x"13f9ed51b5b5f285ee79a80b5a252ec80b4ca9ff3431bec06e2ec866867d25b8"}, #T-KSU2EC* - 2023
