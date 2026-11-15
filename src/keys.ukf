@@ -214,6 +214,7 @@ collection "ONKYO_NEW_KEYS": {
 
 #pana dvd keys (no AES)
 collection "PANA_DVD_KEYONLY": {
+    "Old":          {x"DF7215C7427FD010"},
     "<=2011":		{x"08E03D859AF9F3EE"},
 
     # Thanks to 

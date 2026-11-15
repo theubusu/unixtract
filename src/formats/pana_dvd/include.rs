@@ -5,20 +5,20 @@ use crate::utils::aes::{decrypt_aes128_cbc_nopad};
 
 //find key
 
-pub fn find_key(key_array: &Vec<(String, Vec<Vec<u8>>)>, data: &[u8], expected_magic: &[u8], magic_offset: usize) -> Result<Option<[u8; 8]>, Box<dyn std::error::Error>> {
+pub fn find_key(key_array: &Vec<(String, Vec<Vec<u8>>)>, data: &[u8], expected_magic: &[&[u8]], magic_offset: usize) -> Result<Option<[u8; 8]>, Box<dyn std::error::Error>> {
     for (_, keys) in key_array {
         let key_bytes = keys.first().unwrap();
         let key_array: [u8; 8] = key_bytes.as_slice().try_into()?;
         let decrypted = decrypt_data(data, &key_array);
      
-        if decrypted[magic_offset..].starts_with(expected_magic) {
+        if expected_magic.iter().any(|prefix| decrypted[magic_offset..].starts_with(prefix)) {
             return Ok(Some(key_array));
         }
     }
     Ok(None)
 }
 
-pub fn find_aes_key_pair(key_array: &Vec<(String, Vec<Vec<u8>>)>, data: &[u8], expected_magic: &[u8], magic_offset: usize) -> Result<Option<([u8; 16], [u8; 16], [u8; 8])>, Box<dyn std::error::Error>> {
+pub fn find_aes_key_pair(key_array: &Vec<(String, Vec<Vec<u8>>)>, data: &[u8], expected_magic: &[&[u8]], magic_offset: usize) -> Result<Option<([u8; 16], [u8; 16], [u8; 8])>, Box<dyn std::error::Error>> {
     for (_, keys) in key_array {
         let aes_key: [u8; 16] = keys[0].as_slice().try_into()?;
         let aes_iv: [u8; 16] = keys[1].as_slice().try_into()?;
@@ -28,7 +28,7 @@ pub fn find_aes_key_pair(key_array: &Vec<(String, Vec<Vec<u8>>)>, data: &[u8], e
         let key_array: [u8; 8] = key_bytes.as_slice().try_into()?;
         let decrypted = decrypt_data(&aes_decrypted, &key_array);
      
-        if decrypted[magic_offset..].starts_with(expected_magic) {
+        if expected_magic.iter().any(|prefix| decrypted[magic_offset..].starts_with(prefix)) {
             return Ok(Some((aes_key, aes_iv, key_array)));
         }
     }
@@ -111,35 +111,35 @@ pub const COMPRESSED_FILE_MAGIC: &[u8; 8] = b"EXTRHEAD";
 #[derive(BinRead)]
 pub struct CompressedFileHeader {
     _magic_bytes: [u8; 8],      // EXTRHEAD
-    _unk_string: [u8; 4],       // "DRV " ?
+    _label: [u8; 4],            // in older could be "MAIN", "MINI", in newer seems to be always "DRV "
     pub _compressed_flag: u16,  // checks for 1 here, else -> "Error! Not compress"
-    pub compression_type: u16,  // see CompressionType. GzipAndLzss is not used in this context.
+    pub compression_type: u16,  // see CompressionType.
     pub dest_size: u32,         // decompressed size
     pub _dest_address: u32,
     pub src_size: u32,          // compressed size
     pub _src_address: u32,
-    pub _footer_offset: u32,    // offset to footer, with magic bytes "EXTRFOOT". it aligns data to 8 bytes for encryption.
-    _unk: u32,
+    pub footer_offset: u32,     // offset to footer, with magic bytes "EXTRFOOT". it aligns data to 8 bytes for encryption.
+    _addr: u32,
     pub _checksum: u32,         // adler32 calculated every checksum_skip bytes of decompressed data
     pub _checksum_skip: u32,
-    _unused: [u8; 16],
+    _version: [u8; 16],         // in some old files, this had a version label
 }
 
 #[derive(Debug, PartialEq)]
 pub enum CompressionType {
-    None,
+    Zlib,
     Gzip,
     Lzss,
-    GzipAndLzss,
+    Lzma,
     Unknown,
 }
 impl From<u16> for CompressionType {
     fn from(value: u16) -> Self {
         match value {
-            0 => CompressionType::None,
+            0 => CompressionType::Zlib,
             1 => CompressionType::Gzip,
             2 => CompressionType::Lzss,
-            3 => CompressionType::GzipAndLzss,
+            3 => CompressionType::Lzma,
             _ => CompressionType::Unknown
         }
     }

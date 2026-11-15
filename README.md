@@ -219,7 +219,7 @@ Tip: if you have split ROM (.ROM-00 and .ROM-01), extract both into the same fol
 ## Panasonic Blu-Ray
 **Used in:** Panasonic Blu-Ray Players and Recorders  
 **Common names:** `PANA_DVD.FRM`, `PANA_ESD.FRM`, `PANAEUSB.FRM`      
-**Notes:** **Depends on keys** - see keys.ukf (Included keys should work for 99% of players released in and before 2014, and some released in 2018), Note that there is currently an issue with MAIN in some very ancient files not extracting correctly.   
+**Notes:** **Depends on keys** - see keys.ukf. Some ancient files may have issues with extracting.   
 **Options:**   
 `pana_dvd:split_main` - Automatically split the MAIN module into seperate partitions.   
 ※ Support `dump_dec_hdrs` option
